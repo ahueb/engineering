@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the claude-setup configuration into a Claude Code config directory.
+# Install the engineering configuration into a Claude Code config directory.
 #
 #   ./install.sh                 install into ~/.claude (or $CLAUDE_CONFIG_DIR)
 #   ./install.sh --no-official   skip installing plugins from claude-plugins-official
@@ -54,9 +54,9 @@ print("merged settings.json")
 PY
 
 # 3. Marketplace + plugin
-claude plugin marketplace add "$SOURCE" >/dev/null 2>&1 || claude plugin marketplace update claude-setup >/dev/null
-claude plugin install engineering@claude-setup --scope user
-echo "installed engineering@claude-setup"
+claude plugin marketplace add "$SOURCE" >/dev/null 2>&1 || claude plugin marketplace update engineering >/dev/null
+claude plugin install engineering@engineering --scope user
+echo "installed engineering@engineering"
 
 # 4. Official plugins the policy expects
 if [ "$OFFICIAL" = 1 ]; then

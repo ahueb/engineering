@@ -1,18 +1,18 @@
-# claude-setup
+# engineering
 
 Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), eight cost-tiered agents, five process skills, four user-invoked escalation skills, and recommended settings. Everything except `CLAUDE.md` and settings ships as the `engineering` plugin so it can be updated in place.
 
 ## Install
 
 ```bash
-git clone <this repo> claude-setup && cd claude-setup
+git clone git@github.com:ahueb/engineering.git && cd engineering
 ./install.sh            # into ~/.claude, or $CLAUDE_CONFIG_DIR if set
 ./install.sh --no-official   # skip the claude-plugins-official plugins
 ```
 
-The script backs up any existing `CLAUDE.md` and `settings.json`, copies the policy, merges the recommended settings key by key, registers this checkout as a marketplace, and installs `engineering@claude-setup`. Defaults set: Fable 5.1 with 1M context (`claude-fable-5-1[1m]`) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents.
+The script backs up any existing `CLAUDE.md` and `settings.json`, copies the policy, merges the recommended settings key by key, registers this checkout as a marketplace, and installs `engineering@engineering`. Defaults set: Fable 5.1 with 1M context (`claude-fable-5-1[1m]`) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents.
 
-Marketplace-only install (no script) also works: `claude plugin marketplace add <owner>/claude-setup && claude plugin install engineering@claude-setup`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
+Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
 
 ## What you get
 

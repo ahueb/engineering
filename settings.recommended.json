@@ -15,7 +15,7 @@
     "claude-plugins-official": { "source": { "source": "github", "repo": "anthropics/claude-plugins-official" } }
   },
   "enabledPlugins": {
-    "engineering@claude-setup": true,
+    "engineering@engineering": true,
     "superpowers@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
