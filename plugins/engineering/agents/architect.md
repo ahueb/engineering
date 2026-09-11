@@ -2,7 +2,7 @@
 name: architect
 description: Resolves cross-cutting or difficult-to-reverse architecture and invariants before implementation.
 tools: Read, Grep, Glob
-model: claude-opus-5
+model: opus
 effort: medium
 ---
 

@@ -2,7 +2,7 @@
 name: mechanical-worker
 description: Executes repetitive, explicitly specified transformations with deterministic verification.
 tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-5
+model: sonnet
 effort: low
 ---
 

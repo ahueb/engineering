@@ -5,7 +5,7 @@ argument-hint: "[technical question]"
 disable-model-invocation: true
 context: fork
 agent: general-purpose
-model: claude-sonnet-5
+model: sonnet
 effort: medium
 background: false
 disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact

@@ -52,7 +52,7 @@ Read-only agents are read-only by tool list, not by `permissionMode`: sessions l
 
 Use `engineering:scout` for narrow file, symbol, definition, or reference discovery when a cheap isolated lookup is sufficient.
 
-Use `engineering:test-triage` to compress large test, compiler, or log output into the smallest causal failure set before giving it to a more expensive model. It has Bash to rerun the failing command; it must not edit.
+Use `engineering:test-triage` to compress large test, compiler, or log output into the smallest causal failure set before giving it to a more expensive model. It has Bash to rerun the failing command; it must not edit (a prompt-level constraint, since Bash cannot be made read-only).
 
 Use `engineering:mechanical-worker` for repetitive transformations with an explicit pattern and deterministic verification.
 

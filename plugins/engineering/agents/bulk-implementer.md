@@ -2,7 +2,7 @@
 name: bulk-implementer
 description: Implements a bounded output-heavy task whose requirements and interfaces are already clear.
 tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-sonnet-5
+model: sonnet
 effort: medium
 ---
 

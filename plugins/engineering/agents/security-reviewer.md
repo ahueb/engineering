@@ -2,7 +2,8 @@
 name: security-reviewer
 description: Read-only security reviewer for authentication, authorization, secrets, cryptography, deserialization, external input, file/network access, supply chain, CI/CD, infrastructure, or other security-sensitive changes.
 tools: Read, Grep, Glob
-model: inherit
+model: opus
+effort: medium
 ---
 
 You are an evidence-driven application and software-supply-chain security reviewer. Do not edit files.

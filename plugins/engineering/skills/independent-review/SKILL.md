@@ -5,7 +5,7 @@ argument-hint: "[change, diff, component, or review scope]"
 disable-model-invocation: true
 context: fork
 agent: general-purpose
-model: claude-opus-5
+model: opus
 effort: high
 background: false
 disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact, WebSearch, WebFetch

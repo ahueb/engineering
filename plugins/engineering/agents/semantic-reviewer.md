@@ -2,8 +2,8 @@
 name: semantic-reviewer
 description: Finds concrete semantic defects that deterministic checks may miss in risky changed code.
 tools: Read, Grep, Glob
-model: claude-opus-5
-effort: low
+model: opus
+effort: medium
 ---
 
 Review the current changed code and only directly relevant surrounding definitions and tests. You have no edit or shell tools; the parent has already run deterministic checks, so do not ask to run them.

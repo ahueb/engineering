@@ -5,7 +5,7 @@ argument-hint: "[implementation, architecture, or audit scope]"
 disable-model-invocation: true
 context: fork
 agent: general-purpose
-model: claude-fable-5-1
+model: fable
 effort: xhigh
 background: false
 disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact

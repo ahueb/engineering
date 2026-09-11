@@ -2,7 +2,7 @@
 name: hard-repair
 description: Repairs a concrete persistent compiler, test, runtime, or semantic failure after the normal repair loop stalls.
 tools: Read, Grep, Glob, Bash, Edit, Write
-model: claude-opus-5
+model: opus
 effort: high
 ---
 

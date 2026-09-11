@@ -5,7 +5,7 @@ argument-hint: "[research question or decision]"
 disable-model-invocation: true
 context: fork
 agent: general-purpose
-model: claude-opus-5
+model: opus
 effort: medium
 background: false
 disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact

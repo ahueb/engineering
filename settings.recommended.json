@@ -1,9 +1,13 @@
 {
-  "model": "claude-fable-5-1[1m]",
+  "model": "fable[1m]",
   "effortLevel": "low",
   "modelSettings": {
-    "claude-fable-5-1": { "effortLevel": "low" },
-    "claude-sonnet-5": { "effortLevel": "medium" }
+    "claude-fable-5-1": {
+      "effortLevel": "low"
+    },
+    "claude-sonnet-5": {
+      "effortLevel": "medium"
+    }
   },
   "env": {
     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "16",
@@ -12,7 +16,12 @@
   "outputStyle": "Concise",
   "autoMemoryEnabled": true,
   "extraKnownMarketplaces": {
-    "claude-plugins-official": { "source": { "source": "github", "repo": "anthropics/claude-plugins-official" } }
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
   },
   "enabledPlugins": {
     "engineering@engineering": true,
