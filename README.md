@@ -27,3 +27,7 @@ Read-only agents are read-only by tool list (no Edit, Write, or Bash), so the gu
 ## Not included
 
 Credentials, permission allow-lists (machine-specific), history, and project memory.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

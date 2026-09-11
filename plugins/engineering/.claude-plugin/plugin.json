@@ -3,5 +3,9 @@
   "name": "engineering",
   "description": "Evidence-first engineering: operating policy, cost-tiered agents, process skills, and user-invoked escalations.",
   "version": "2.0.0",
-  "author": { "name": "Alan", "email": "alan@hueb.org" }
+  "author": {
+    "name": "Alan",
+    "email": "alan@hueb.org"
+  },
+  "license": "MIT"
 }
