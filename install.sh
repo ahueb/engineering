@@ -69,7 +69,11 @@ echo "installed engineering@engineering"
 # 4. Official plugins the policy expects
 if [ "$OFFICIAL" = 1 ]; then
   claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1 || true
+  # `claude plugin install` flips enabledPlugins to true, so skip anything the user set to false.
   for p in superpowers context7 code-review playwright frontend-design claude-code-setup claude-md-management typescript-lsp pyright-lsp rust-analyzer-lsp gopls-lsp; do
+    if python3 -c "import json,sys; sys.exit(0 if json.load(open('$CFG/settings.json')).get('enabledPlugins',{}).get('$p@claude-plugins-official') is False else 1)"; then
+      echo "skipped $p (disabled in your settings)"; continue
+    fi
     claude plugin install "$p@claude-plugins-official" --scope user >/dev/null && echo "installed $p" || echo "WARN: could not install $p" >&2
   done
 fi
