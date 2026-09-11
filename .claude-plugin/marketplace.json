@@ -1,0 +1,13 @@
+{
+  "name": "claude-setup",
+  "owner": { "name": "Alan", "email": "alan@hueb.org" },
+  "metadata": { "description": "Evidence-first engineering policy, agents, and skills for Claude Code." },
+  "plugins": [
+    {
+      "name": "engineering",
+      "source": "./plugins/engineering",
+      "description": "Agent operating policy, seven cost-tiered agents, a security reviewer, process skills, and user-invoked escalations.",
+      "category": "development"
+    }
+  ]
+}

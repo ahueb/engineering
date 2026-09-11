@@ -1,0 +1,17 @@
+---
+name: implementation-loop
+description: Implement a software change from request through verified completion. Use for feature work, bug fixes, refactors, migrations, or multi-file coding tasks where Claude should inspect the repository, minimize assumptions, implement the change, verify behavior, review the diff, and report evidence.
+---
+
+# Implementation loop
+
+1. Restate the requested outcome and hard constraints in working terms.
+2. Inspect the repository before editing. Discover the relevant architecture, existing patterns, test commands, CI checks, and configuration from source files rather than guessing. Dispatch independent discovery questions (call sites, tests, migrations, config) to `engineering:scout` agents in one batch and keep only their conclusions.
+3. Identify uncertainty that can be resolved from the repository or authoritative documentation. Resolve it before implementation when it could change the design.
+4. Plan only enough to make the next actions coherent. Prefer the smallest design that satisfies the requested behavior and preserves existing interfaces unless change is required.
+5. Implement in focused increments. Avoid unrelated cleanup, dependency churn, configuration weakening, or speculative abstraction.
+6. Add or update tests where they materially improve regression detection. Use test-first development when it clarifies behavior or reproduces a bug; do not force TDD when it adds no value.
+7. Run the narrowest meaningful verification first, then broaden to repository-standard checks when practical. Run independent checks concurrently in the background and collect all results before judging.
+8. Inspect the final diff for accidental changes, debug code, generated artifacts, weakened assertions, missing error paths, or silent behavior changes.
+9. Use a fresh review perspective (`engineering:semantic-reviewer`) only when change breadth, uncertainty, or failure cost warrants the extra call and deterministic checks do not already cover the property. Delegate to `engineering:security-reviewer` for changed trust boundaries or sensitive data paths. When both reviews apply, dispatch them together in one batch. Use more than one `engineering:bulk-implementer` only for packages that touch disjoint files and each have a named deterministic check; keep implementation that shares types, migrations, or contracts in one context.
+10. Do not claim completion without evidence. Report what passed, what was not run, and any residual risk.
