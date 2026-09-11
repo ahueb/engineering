@@ -25,11 +25,11 @@ mkdir -p "$CFG"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 # 1. CLAUDE.md (back up any existing one; never merge policy text)
-if [ -f "$CFG/CLAUDE.md" ] && ! cmp -s "$CFG/CLAUDE.md" "$HERE/plugins/engineering/CLAUDE.md"; then
+if [ -f "$CFG/CLAUDE.md" ] && ! cmp -s "$CFG/CLAUDE.md" "$HERE/plugins/engineering/context/CLAUDE.md"; then
   cp "$CFG/CLAUDE.md" "$CFG/CLAUDE.md.bak-$STAMP"
   echo "backed up existing CLAUDE.md -> CLAUDE.md.bak-$STAMP"
 fi
-cp "$HERE/plugins/engineering/CLAUDE.md" "$CFG/CLAUDE.md"
+cp "$HERE/plugins/engineering/context/CLAUDE.md" "$CFG/CLAUDE.md"
 echo "installed CLAUDE.md"
 
 # 2. settings.json: key-level merge; recommended values win for the keys they define,

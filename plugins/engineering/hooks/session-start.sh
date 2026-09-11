@@ -5,4 +5,4 @@ CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 if [ -f "$CFG/CLAUDE.md" ] && grep -q '^# Agent operating policy' "$CFG/CLAUDE.md"; then
   exit 0
 fi
-cat "$(dirname "$0")/../CLAUDE.md"
+cat "$(dirname "$0")/../context/CLAUDE.md"
