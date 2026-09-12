@@ -1,6 +1,6 @@
 ---
 name: plan-auditor
-description: Adversarial read-only auditor that checks a merged implementation against its plan for completeness and correctness, reporting every gap, partial implementation, silent scope reduction, and unverified claim.
+description: Audits a merged implementation against its plan, read-only and adversarially, reporting every gap, partial implementation, silent scope reduction, and unverified claim.
 tools: Read, Grep, Glob
 model: opus
 effort: high

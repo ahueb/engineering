@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Cheap narrow lookup for files, symbols, definitions, references, and obvious code locations.
+description: Finds files, symbols, definitions, references, and obvious code locations with a cheap narrow lookup.
 tools: Read, Grep, Glob
 model: haiku
 ---

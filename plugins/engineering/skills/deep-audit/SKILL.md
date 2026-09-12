@@ -1,6 +1,6 @@
 ---
 name: deep-audit
-description: Perform an explicitly requested high-assurance adversarial audit of software or system architecture, using Fable only for difficult or consequential verification.
+description: Perform an explicitly requested high-assurance adversarial audit of software or system architecture on Fable. Use only when the user invokes it for difficult or consequential verification.
 argument-hint: "[implementation, architecture, or audit scope]"
 disable-model-invocation: true
 context: fork

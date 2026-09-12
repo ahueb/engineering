@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Read-only security reviewer for authentication, authorization, secrets, cryptography, deserialization, external input, file/network access, supply chain, CI/CD, infrastructure, or other security-sensitive changes.
+description: Reviews security-sensitive changes read-only: authentication, authorization, secrets, cryptography, deserialization, external input, file/network access, supply chain, CI/CD, and infrastructure.
 tools: Read, Grep, Glob
 model: opus
 effort: medium

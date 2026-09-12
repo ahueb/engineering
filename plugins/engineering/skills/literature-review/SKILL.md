@@ -1,6 +1,6 @@
 ---
 name: literature-review
-description: Evidence-driven scientific or technical literature review for a consequential design, architecture, algorithm, or research decision. Use when the user asks for research, prior art, a survey, or what the evidence says, or when a choice between approaches needs published results, standards, or benchmarks rather than a single documentation lookup. Not for a one-fact version check or ordinary coding.
+description: Review the scientific or technical literature, evidence first, for a consequential design, architecture, algorithm, or research decision. Use when the user asks for research, prior art, a survey, or what the evidence says, or when a choice between approaches needs published results, standards, or benchmarks rather than a single documentation lookup. Not for a one-fact version check or ordinary coding.
 argument-hint: "[research question or decision]"
 context: fork
 agent: general-purpose

@@ -1,6 +1,6 @@
 ---
 name: docs-check
-description: Narrow authoritative documentation check for one current or version-dependent technical fact. Use when a design or implementation decision depends on a library, API, protocol, platform, or CLI behavior that could have changed, when a version, default, deprecation, or compatibility claim must be confirmed against official docs, or when the user asks to verify or look up such a fact. Not for broad research or general programming knowledge.
+description: Confirm one current or version-dependent technical fact against authoritative documentation. Use when a design or implementation decision depends on a library, API, protocol, platform, or CLI behavior that could have changed, when a version, default, deprecation, or compatibility claim must be confirmed against official docs, or when the user asks to verify or look up such a fact. Not for broad research or general programming knowledge.
 argument-hint: "[technical question]"
 context: fork
 agent: general-purpose

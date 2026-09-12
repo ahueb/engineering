@@ -1,6 +1,6 @@
 ---
 name: production-readiness-review
-description: Evidence-first production readiness audit with non-compensable hard gates, graded dimensions, and adversarial falsification, returning READY, CONDITIONALLY READY, or NOT READY. Use when asked whether a repo, branch, PR, service, build, or release is ready to ship, launch, deploy, go live, or reach GA; for an operational or launch readiness review, release gate, canary or GA assessment, on-call handover, or go/no-go; or when asked to challenge or disprove a claim that something is production ready. Not for ordinary code review, debugging, test writing, or deployment execution.
+description: Audit production readiness evidence-first with non-compensable hard gates, graded dimensions, and adversarial falsification, returning READY, CONDITIONALLY READY, or NOT READY. Use when asked whether a repo, branch, PR, service, build, or release is ready to ship, launch, deploy, go live, or reach GA; for an operational or launch readiness review, release gate, canary or GA assessment, on-call handover, or go/no-go; or when asked to challenge or disprove a claim that something is production ready. Not for ordinary code review, debugging, test writing, or deployment execution.
 ---
 
 # Production Readiness Review
