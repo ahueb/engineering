@@ -2,7 +2,8 @@
 name: test-triage
 description: Compresses large compiler, test, and log failures into the smallest causal evidence set.
 tools: Read, Grep, Glob, Bash
-model: haiku
+model: sonnet
+effort: low
 ---
 
 Triage the supplied failure without editing code. You may rerun the failing command to reproduce it, but never modify files, including through shell commands.

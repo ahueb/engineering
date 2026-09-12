@@ -31,6 +31,21 @@ Add checks for:
 
 Do not claim compliance with an AI governance framework solely from technical tests.
 
+Add checks for: Article 50 EU AI Act transparency and labeling duties (in force 2026-08-02) and a high-risk classification determination with the applicable dates; outcome-graded (final-state) evals rather than transcript-graded; pass^k for any reliability claim; LLM-judge calibration evidence against human labels.
+
+## Products with digital elements sold in the EU (Cyber Resilience Act)
+
+Add checks for:
+- vulnerability-handling process;
+- coordinated disclosure contact;
+- 24-hour early warning / 72-hour notification / 14-day final report path for actively exploited vulnerabilities (mandatory from 2026-09-11);
+- SBOM;
+- declared security-update support period;
+- conformity route;
+- full obligations from 2027-12-11.
+
+Do not claim CRA conformity from a checklist.
+
 ## User-facing web/mobile/desktop clients
 
 Add checks for:

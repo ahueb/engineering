@@ -30,7 +30,7 @@ Are flaky/disabled/quarantined tests suppressing a real signal? Are retries hidi
 ## Deployment and data
 
 ### Rollback fiction
-Does rollback cover only code while migrations, queues, caches, external side effects, irreversible writes, or incompatible clients remain changed?
+Does rollback cover only code while migrations, queues, caches, external side effects, irreversible writes, or incompatible clients remain changed? Is the version-skew and re-enable path untested? Is the rollback trigger metric undefined?
 
 ### Migration trap
 Can old and new application versions coexist safely during rollout/rollback? Are long locks, backfills, partial failures, and retries bounded?

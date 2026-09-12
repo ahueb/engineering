@@ -16,14 +16,17 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 DEFAULT_MAX_FILES = 50000
 MAX_TEXT_BYTES = 1_000_000
 MAX_PATHS_PER_SIGNAL = 80
 MAX_CONTENT_PATHS_PER_SIGNAL = 30
+DEFAULT_MAX_SECONDS = 20.0
+DEFAULT_MAX_TEXT_BUDGET_BYTES = 200_000_000
 
 EXCLUDED_DIRS = {
     ".git", ".hg", ".svn", ".venv", "venv", "env", "node_modules",
@@ -63,6 +66,14 @@ CONTENT_PATTERNS = {
     "accessibility": re.compile(r"\b(?:WCAG|accessibility|axe-core|pa11y)\b", re.I),
     "ai_ml_eval": re.compile(r"\b(?:model card|eval(?:uation)? set|drift|prompt injection|MLflow|model registry)\b", re.I),
     "data_quality": re.compile(r"\b(?:data lineage|data contract|reconciliation|backfill|schema migration|freshness)\b", re.I),
+    "signed_release": re.compile(r"\b(?:cosign|sigstore|attest\w*|gpg --sign)\b", re.I),
+}
+
+CI_PERMISSIONS_RE = re.compile(r"^\s*permissions:", re.M)
+
+DEPENDENCY_AUTOMATION_NAMES = {
+    "dependabot.yml", "dependabot.yaml", "renovate.json", "renovate.json5",
+    ".renovaterc", ".renovaterc.json",
 }
 
 MANIFEST_NAMES = {
@@ -93,25 +104,32 @@ def safe_run(args: list[str], cwd: Path, timeout: float = 5.0) -> tuple[int, str
             stderr=subprocess.PIPE,
             timeout=timeout,
             check=False,
-            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0"},
         )
         return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, "", str(exc)
 
 
+# Config-driven execution points are neutralised so a hostile .git/config in a cloned repo
+# cannot run commands through the probe (core.fsmonitor, hooks).
+GIT_HARDENING = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
+
+
 def git_info(start: Path) -> tuple[Path, dict]:
+    """Return (toplevel, metadata). The toplevel is reported, not scanned: the scan root is
+    always the path the caller supplied."""
     if not shutil.which("git"):
         return start, {"available": False, "is_repo": False}
 
-    code, out, _ = safe_run(["git", "-C", str(start), "rev-parse", "--show-toplevel"], start)
+    code, out, _ = safe_run(["git", *GIT_HARDENING, "-C", str(start), "rev-parse", "--show-toplevel"], start)
     if code != 0 or not out:
         return start, {"available": True, "is_repo": False}
 
     root = Path(out).resolve()
-    _, head, _ = safe_run(["git", "rev-parse", "HEAD"], root)
-    _, branch, _ = safe_run(["git", "branch", "--show-current"], root)
-    status_code, status, _ = safe_run(["git", "status", "--porcelain=v1", "--untracked-files=normal"], root)
+    _, head, _ = safe_run(["git", *GIT_HARDENING, "rev-parse", "HEAD"], root)
+    _, branch, _ = safe_run(["git", *GIT_HARDENING, "branch", "--show-current"], root)
+    status_code, status, _ = safe_run(["git", *GIT_HARDENING, "status", "--porcelain=v1", "--untracked-files=normal"], root)
 
     counts: collections.Counter[str] = collections.Counter()
     dirty = False
@@ -125,6 +143,7 @@ def git_info(start: Path) -> tuple[Path, dict]:
     return root, {
         "available": True,
         "is_repo": True,
+        "toplevel": str(root),
         "head": head or None,
         "branch": branch or None,
         "dirty": dirty,
@@ -140,10 +159,18 @@ def relpath(path: Path, root: Path) -> str:
         return path.as_posix()
 
 
-def is_sensitive(path: Path) -> bool:
+def is_sensitive(path: Path, root: Path | None = None) -> bool:
+    """Sensitivity is judged on the path relative to the scan root, so a repository that
+    happens to live under a directory named e.g. `credentials` is not blanked out."""
     if SENSITIVE_BASENAME_RE.match(path.name):
         return True
-    lowered = {part.lower() for part in path.parts}
+    parts = path.parts
+    if root is not None:
+        try:
+            parts = path.relative_to(root).parts
+        except ValueError:
+            pass
+    lowered = {part.lower() for part in parts}
     return bool(lowered & {".aws", ".ssh", "secrets", "secret", "credentials"})
 
 
@@ -205,8 +232,8 @@ def classify_path(rel: str) -> set[str]:
     return categories
 
 
-def should_scan_text(path: Path) -> bool:
-    if is_sensitive(path) or path.is_symlink():
+def should_scan_text(path: Path, root: Path | None = None) -> bool:
+    if is_sensitive(path, root) or path.is_symlink():
         return False
     if path.suffix.lower() not in TEXT_SUFFIXES and path.name not in {"Dockerfile", "Containerfile", "Makefile", "Jenkinsfile"}:
         return False
@@ -216,28 +243,38 @@ def should_scan_text(path: Path) -> bool:
         return False
 
 
-def iter_files(root: Path, max_files: int) -> tuple[list[Path], bool, list[str]]:
+def iter_files(root: Path, max_files: int, deadline: float) -> tuple[list[Path], bool, bool, list[str]]:
     files: list[Path] = []
     warnings: list[str] = []
     capped = False
+    time_exhausted = False
 
     def onerror(exc: OSError) -> None:
         warnings.append(f"scan error: {exc.filename or '<unknown>'}: {exc.strerror or exc}")
 
     for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False, onerror=onerror):
+        if time.monotonic() >= deadline:
+            time_exhausted = True
+            return files, capped, time_exhausted, warnings
         dirnames[:] = sorted(
             d for d in dirnames
-            if d not in EXCLUDED_DIRS and not (Path(dirpath) / d).is_symlink()
+            if d not in EXCLUDED_DIRS and d != ".git" and not (Path(dirpath) / d).is_symlink()
         )
         for filename in sorted(filenames):
+            if filename == ".git":
+                # Skip submodule gitlink files so submodules are not counted.
+                continue
             path = Path(dirpath) / filename
             if path.is_symlink():
                 continue
             files.append(path)
             if len(files) >= max_files:
                 capped = True
-                return files, capped, warnings
-    return files, capped, warnings
+                return files, capped, time_exhausted, warnings
+            if time.monotonic() >= deadline:
+                time_exhausted = True
+                return files, capped, time_exhausted, warnings
+    return files, capped, time_exhausted, warnings
 
 
 def add_limited(bucket: dict[str, list[str]], key: str, value: str, limit: int) -> None:
@@ -246,31 +283,63 @@ def add_limited(bucket: dict[str, list[str]], key: str, value: str, limit: int) 
         values.append(value)
 
 
-def build_report(start: Path, max_files: int) -> dict:
-    root, git = git_info(start)
-    files, capped, scan_warnings = iter_files(root, max_files)
+def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes: int) -> dict:
+    toplevel, git = git_info(start)
+    root = start  # scan only what the caller asked for, never the enclosing repository
+    start_time = time.monotonic()  # the budget covers the scan, not the git metadata calls
+    deadline = start_time + max_seconds
+    files, capped, time_budget_exhausted, scan_warnings = iter_files(root, max_files, deadline)
 
     suffix_counts: collections.Counter[str] = collections.Counter()
     signals: dict[str, list[str]] = {}
     content_signals: dict[str, list[str]] = {}
     text_scanned = 0
     unreadable_text = 0
+    text_bytes_total = 0
+    text_budget_exhausted = False
+    text_files_skipped_oversize = 0
+    files_classified = 0
 
     for path in files:
+        if not time_budget_exhausted and time.monotonic() >= deadline:
+            time_budget_exhausted = True
+        if time_budget_exhausted:
+            break
+        files_classified += 1
+
         rel = relpath(path, root)
         suffix = path.suffix.lower() or "<none>"
         suffix_counts[suffix] += 1
+        lower = rel.lower()
+        nlower = path.name.lower()
 
-        if not is_sensitive(path):
+        if not is_sensitive(path, root):
             for category in classify_path(rel):
                 add_limited(signals, category, rel, MAX_PATHS_PER_SIGNAL)
+            if nlower == "security.md" or lower.endswith(".well-known/security.txt"):
+                add_limited(content_signals, "vuln_reporting", rel, MAX_CONTENT_PATHS_PER_SIGNAL)
+            if nlower in DEPENDENCY_AUTOMATION_NAMES:
+                add_limited(content_signals, "dependency_automation", rel, MAX_CONTENT_PATHS_PER_SIGNAL)
 
-        if not should_scan_text(path):
+        if text_budget_exhausted or not should_scan_text(path, root):
             continue
+
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 0
+        if size > max_text_bytes:
+            text_files_skipped_oversize += 1  # one oversized file does not end scanning for the rest
+            continue
+        if text_bytes_total + size > max_text_bytes:
+            text_budget_exhausted = True  # budget genuinely consumed; content scanning stops, classification continues
+            continue
+
         try:
             data = path.read_bytes()
             text = data.decode("utf-8", errors="ignore")
             text_scanned += 1
+            text_bytes_total += size
         except OSError:
             unreadable_text += 1
             continue
@@ -278,11 +347,15 @@ def build_report(start: Path, max_files: int) -> dict:
         for category, pattern in CONTENT_PATTERNS.items():
             if pattern.search(text):
                 add_limited(content_signals, category, rel, MAX_CONTENT_PATHS_PER_SIGNAL)
+        if lower.startswith(".github/workflows/") and CI_PERMISSIONS_RE.search(text):
+            add_limited(content_signals, "ci_permissions", rel, MAX_CONTENT_PATHS_PER_SIGNAL)
 
     for values in signals.values():
         values.sort()
     for values in content_signals.values():
         values.sort()
+
+    elapsed_seconds = round(time.monotonic() - start_time, 3)
 
     limitations = [
         "Discovery signals are heuristics and are not readiness evidence until files are inspected and claims are corroborated.",
@@ -296,6 +369,16 @@ def build_report(start: Path, max_files: int) -> dict:
         limitations.append(f"{unreadable_text} candidate text files could not be read.")
     if scan_warnings:
         limitations.append("Some directories/files could not be scanned; see warnings.")
+    if time_budget_exhausted:
+        limitations.append(
+            f"Scan stopped after max_seconds={max_seconds}; only {files_classified} of {len(files)} enumerated files were classified."
+        )
+    if git.get("is_repo") and toplevel != root:
+        limitations.append(f"Scan root {root} is inside repository {toplevel}; files outside the scan root were not inspected.")
+    if text_files_skipped_oversize:
+        limitations.append(f"{text_files_skipped_oversize} text files larger than max_text_bytes={max_text_bytes} were not content-scanned.")
+    if text_budget_exhausted:
+        limitations.append(f"Text content scanning stopped at max_text_bytes={max_text_bytes}; content signals are incomplete.")
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -304,10 +387,17 @@ def build_report(start: Path, max_files: int) -> dict:
         "git": git,
         "scan": {
             "file_count": len(files),
+            "files_classified": files_classified,
             "capped": capped,
             "max_files": max_files,
             "text_files_scanned_for_signal_presence": text_scanned,
             "suffix_counts": dict(suffix_counts.most_common(40)),
+            "max_seconds": max_seconds,
+            "elapsed_seconds": elapsed_seconds,
+            "time_budget_exhausted": time_budget_exhausted,
+            "max_text_bytes": max_text_bytes,
+            "text_budget_exhausted": text_budget_exhausted,
+            "text_files_skipped_oversize": text_files_skipped_oversize,
         },
         "signals": dict(sorted(signals.items())),
         "content_signal_files": dict(sorted(content_signals.items())),
@@ -322,6 +412,8 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     )
     parser.add_argument("root", nargs="?", default=".", help="Repository path or a path inside it (default: current directory).")
     parser.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES, help=f"Maximum files to enumerate (default: {DEFAULT_MAX_FILES}).")
+    parser.add_argument("--max-seconds", type=float, default=DEFAULT_MAX_SECONDS, help=f"Maximum wall-clock seconds to spend scanning (default: {DEFAULT_MAX_SECONDS}).")
+    parser.add_argument("--max-text-bytes", type=int, default=DEFAULT_MAX_TEXT_BUDGET_BYTES, help=f"Maximum total bytes of text content to scan for signals (default: {DEFAULT_MAX_TEXT_BUDGET_BYTES}).")
     return parser.parse_args(list(argv))
 
 
@@ -329,6 +421,9 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     if args.max_files < 1:
         print("error: --max-files must be >= 1", file=sys.stderr)
+        return 2
+    if args.max_seconds < 0 or args.max_text_bytes < 0:
+        print("error: --max-seconds and --max-text-bytes must be >= 0", file=sys.stderr)
         return 2
 
     start = Path(args.root).expanduser()
@@ -342,7 +437,13 @@ def main(argv: Iterable[str] | None = None) -> int:
         return 2
 
     try:
-        report = build_report(start, args.max_files)
+        os.listdir(start)
+    except OSError as exc:
+        print(f"error: cannot list root: {exc}", file=sys.stderr)
+        return 3
+
+    try:
+        report = build_report(start, args.max_files, args.max_seconds, args.max_text_bytes)
         json.dump(report, sys.stdout, indent=2, sort_keys=False)
         sys.stdout.write("\n")
         return 0

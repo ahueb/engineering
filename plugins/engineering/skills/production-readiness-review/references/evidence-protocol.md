@@ -87,10 +87,10 @@ Conversely, presence is not proof of execution.
 
 Use confidence to describe the **quality and completeness of the evidence**, not subjective certainty about the software.
 
-A useful qualitative convention:
-
-- **High evidence confidence**: critical gate claims are predominantly E3/E4, evidence is internally consistent, and no material external dependency remains unverified.
-- **Moderate evidence confidence**: critical claims have meaningful direct evidence but some important external/contextual limitations remain.
-- **Low evidence confidence**: one or more material gates depend on E0-E2 evidence, significant context is missing, or the candidate cannot be tied to runtime/operational evidence.
+Evidence confidence is the minimum evidence strength across applicable hard gates: E3/E4 everywhere → High; any E2 on a critical gate → Moderate; any E0/E1 on a critical gate → Low.
 
 Never use confidence to turn a FAIL into a PASS.
+
+## Argument validity
+
+Rate separately whether the evidence entails the claim (the weak-oracle check), and record an argument gap as a defeater even when the evidence is E3.

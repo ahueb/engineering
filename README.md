@@ -1,6 +1,6 @@
 # engineering
 
-Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, seven process skills, four user-invoked escalation skills, and recommended settings. Everything except `CLAUDE.md` and settings ships as the `engineering` plugin so it can be updated in place.
+Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, seven process skills, four user-invoked escalation skills, and recommended settings. Everything except settings ships as the `engineering` plugin; the policy also ships inside it and `install.sh` copies it to `CLAUDE.md`.
 
 ## Install
 
@@ -11,20 +11,20 @@ git clone git@github.com:ahueb/engineering.git && cd engineering
 ./install.sh --source ahueb/engineering   # register the GitHub repo as the marketplace instead of this checkout
 ```
 
-The script backs up any existing `CLAUDE.md` and `settings.json`, copies the policy, merges the recommended settings key by key, registers the marketplace, and installs `engineering@engineering`. A plugin you have explicitly disabled stays disabled. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models.
+The script validates your `settings.json`, registers the marketplace, copies the policy to `CLAUDE.md`, merges the recommended settings key by key, and installs `engineering@engineering`, in that order; a marketplace failure stops it before anything is written. A file is backed up as `<name>.bak-<timestamp>` only when the install would change it, so an identical rerun leaves no new backups. A plugin you have explicitly disabled stays disabled, except `engineering@engineering` itself, which the installer always enables. `--no-official` also removes previously enabled `claude-plugins-official` entries from `settings.json`, because Claude Code auto-installs any enabled official plugin at the next session start. If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models.
 
 Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
 
 ### How the policy loads
 
-The plugin's `hooks/session-start.sh` runs on `startup`, `clear`, `compact`, and `fork`. If `CLAUDE.md` in the config directory begins with `# Agent operating policy`, the hook exits silently and the file is the source. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used.
+The plugin's `hooks/session-start.sh` runs on `startup`, `resume`, `clear`, `compact`, and `fork`. The hook is silent only when the first line of `$CFG/CLAUDE.md` is exactly `# Agent operating policy`; the file is then the source. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used.
 
 ### What `install.sh` writes
 
 | Target | Action |
 |---|---|
-| `CLAUDE.md` | Replaced with `plugins/engineering/context/CLAUDE.md`; the previous file is kept as `CLAUDE.md.bak-<timestamp>` |
-| `settings.json` | Merged from `settings.recommended.json`; the previous file is kept as `settings.json.bak-<timestamp>`. Scalars are overwritten, objects are merged, and an `enabledPlugins` entry you set to `false` is left alone |
+| `CLAUDE.md` | Replaced with `plugins/engineering/context/CLAUDE.md`; a differing previous file is kept as `CLAUDE.md.bak-<timestamp>` |
+| `settings.json` | Merged from `settings.recommended.json`; a previous file that the merge changes is kept as `settings.json.bak-<timestamp>`. Scalars are overwritten, objects are merged, and an `enabledPlugins` entry you set to `false` is left alone |
 | marketplaces | `engineering` registered from this checkout, or from `--source`; `claude-plugins-official` registered unless `--no-official` |
 | plugins | `engineering@engineering` installed at user scope; each official plugin installed unless `--no-official` or disabled in your settings |
 
@@ -34,26 +34,34 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 
 Claude Code copies the plugin into a version-keyed cache and skips `plugin update` when the version is unchanged, so editing this repo changes nothing until the version is bumped.
 
-- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, commits, and refreshes the local install. Add `--no-commit` to bump and refresh without committing. Push afterwards.
+- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, commits, and refreshes the local install. Add `--no-commit` (in any position) to bump and refresh without committing. Push afterwards. `release.sh` refuses to run on a working tree with unrelated changes, restores the version if validation fails, and commits only `plugin.json` and `CHANGELOG.md`.
 - Everyone else: `claude plugin update engineering@engineering`, then restart Claude Code.
 - Policy changes also need a fresh `~/.claude/CLAUDE.md`: rerun `./install.sh`, or copy `plugins/engineering/context/CLAUDE.md` over it.
 
 ## Requirements
 
-- **Claude Code v2.1.257 or later** for the `fable` alias and `[1m]` handling used in `settings.recommended.json`.
-- **Model access.** Agents and skills use the `haiku`, `sonnet`, `opus`, and `fable` aliases, so they resolve to your provider's current models. On Amazon Bedrock, Google Vertex, or Microsoft Foundry, pin them with `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and `ANTHROPIC_DEFAULT_FABLE_MODEL`. If your account has no Fable access, set `model` to `opus[1m]` or `opus` after install; `/engineering:deep-audit` then also needs its `model` changed.
-- **1M context** is included on Max, Team, and Enterprise, billed to usage credits on Pro, and always on for the API. Drop the `[1m]` suffix or set `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` if you would rather stay at 200K.
+- **Claude Code v2.1.267 or later.** Fable 5.1 resolves from the `fable` alias from v2.1.257; the `effort` frontmatter on Fable and Opus 4.7+ models takes effect from v2.1.267.
+- **Model access.** Agents and skills use the `haiku`, `sonnet`, `opus`, and `fable` aliases, so they resolve to your provider's current models. On Amazon Bedrock, Google Vertex, or Microsoft Foundry, pin them with `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and `ANTHROPIC_DEFAULT_FABLE_MODEL`.
+- **1M context** is on by default for Fable and Sonnet 5 on the API. On subscription plans Fable usage may bill to usage credits depending on plan and seat tier; check the model picker's `Requires usage credits` label. Drop the `[1m]` suffix or set `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` to stay at 200K.
+- If your account has no Fable access, set `model` to `opus[1m]`, set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=opus` or change `deep-audit`'s `model`.
 - **bash** for the SessionStart hook. Windows users need Git Bash on `PATH`, or should run `install.sh` so the policy is a file and the hook is not needed.
+
+### Tuning
+
+- `maxEffortLevel` caps the highest `effort` value agents and skills may request.
+- `skillOverrides` / `skillListingMaxDescChars` control per-skill description length in the listing budget.
+- `--plugin-dir ./plugins` runs against this checkout's plugin code without a version bump, for trying edits.
+- `claude plugin eval --threshold` gates the trigger evals in CI.
 
 ## What you get
 
 | Kind | Names |
 |---|---|
-| Agents | `engineering:scout` (haiku), `engineering:test-triage` (haiku, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high) |
+| Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high) |
 | Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
 | User-only escalations | `/engineering:deep-audit` (fable, xhigh), `independent-review` (opus, high), `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` have no Edit, Write, or Bash tool, so they cannot modify anything even under `--dangerously-skip-permissions`. `test-triage` keeps Bash to rerun a failing command and is told not to write; that is a prompt-level constraint, not a hard one.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `deep-audit`, and `independent-review` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
 
 ## Executing plans
 
@@ -76,7 +84,7 @@ Trigger-quality evals live in `plugins/engineering/evals/`; see its README.
 
 ## Working with superpowers
 
-The policy maps superpowers' subagent roles onto engineering agents (implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`), and `implementation-loop`, `verification-loop`, and `checkpoint` invoke the matching superpowers skills when they are present. Superpowers is not a dependency; without it every reference is simply skipped.
+The policy maps superpowers' subagent roles onto engineering agents (implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`), and `implementation-loop` and `verification-loop` invoke the matching superpowers skills when present; `checkpoint` records the superpowers plan file and completed task numbers. `dispatching-parallel-agents` work that edits code maps to `bulk-implementer` or `hard-repair`, not `scout`. Superpowers is not a dependency; without it every reference is simply skipped.
 
 ## Repository layout
 
@@ -89,6 +97,7 @@ plugins/engineering/
   evals/                          claude plugin eval cases for skill trigger quality
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy
+docs/plans/                       plan documents for planned work
 settings.recommended.json         settings merged by install.sh
 install.sh                        installer
 release.sh                        version bump and local refresh
@@ -102,7 +111,7 @@ claude plugin uninstall engineering@engineering
 claude plugin marketplace remove engineering
 ```
 
-Then restore `CLAUDE.md` and `settings.json` from the `.bak-<timestamp>` files the installer left in your config directory, or edit them by hand.
+Then restore `CLAUDE.md` and `settings.json` from the `.bak-<timestamp>` files the installer left in your config directory (written only when an install changed the file), or edit them by hand.
 
 ## Not included
 

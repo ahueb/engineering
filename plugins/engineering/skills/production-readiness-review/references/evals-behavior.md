@@ -57,3 +57,13 @@ Expectations:
 - Does not treat the label multi-region as failover evidence.
 - Looks for shared failure domains and exercised failover/recovery evidence.
 - Separates monitoring configuration from actionable operator response capability.
+
+## 7. Review a product with digital elements that is sold in the EU. It has no vulnerability reporting path (no security contact, no coordinated-disclosure process).
+
+**Expected:** The audit applies the Cyber Resilience Act domain overlay, treats the missing vulnerability-handling and reporting path as a G12 FAIL, and returns NOT READY regardless of strength elsewhere.
+
+Expectations:
+- Applies the CRA overlay based on EU sale/distribution context.
+- Fails G12 for the missing vulnerability-handling/reporting path rather than marking it a lesser residual risk.
+- Does not accept a checklist claim of CRA conformity as sufficient evidence.
+- Returns NOT READY as a non-compensable consequence of the failed hard gate.

@@ -8,7 +8,8 @@ Adapt prose length to the repository, but preserve this decision structure.
 **Evidence confidence:** High | Moderate | Low  
 **Candidate:** commit/artifact/branch + dirty status  
 **Proposed exposure:** exact exposure, or "not specified"  
-**Audit boundary:** what was and was not inspected
+**Audit boundary:** what was and was not inspected  
+**Domain overlays applied:** list, with the evidence that triggered each, or "none"
 
 ## Executive decision
 

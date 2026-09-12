@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -12,17 +13,23 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 PROBE = SKILL_ROOT / "scripts" / "repo_probe.py"
 
 
-def run_probe(root: Path) -> dict:
-    proc = subprocess.run(
-        [sys.executable, str(PROBE), str(root)],
+def run_probe_raw(args: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(PROBE), *args],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
         timeout=20,
     )
+
+
+def run_probe(root: Path, *extra_args: str) -> dict:
+    proc = run_probe_raw([str(root), *extra_args])
     if proc.returncode != 0:
         raise AssertionError(f"probe failed: rc={proc.returncode}\nstdout={proc.stdout}\nstderr={proc.stderr}")
+    if proc.stderr != "":
+        raise AssertionError(f"expected empty stderr on success, got: {proc.stderr!r}")
     return json.loads(proc.stdout)
 
 
@@ -100,10 +107,191 @@ class RepoProbeTests(unittest.TestCase):
                 timeout=20,
             )
             self.assertEqual(0, proc.returncode, proc.stderr)
+            self.assertEqual("", proc.stderr)
             report = json.loads(proc.stdout)
             self.assertTrue(report["scan"]["capped"])
             self.assertEqual(2, report["scan"]["file_count"])
             self.assertTrue(any("incomplete" in x.lower() for x in report["limitations"]))
+
+    def test_nonexistent_path_exits_2_with_empty_stdout(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            missing = Path(td) / "does-not-exist"
+            proc = run_probe_raw([str(missing)])
+            self.assertEqual(2, proc.returncode)
+            self.assertEqual("", proc.stdout)
+
+    def test_file_argument_exits_2(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            file_path = Path(td) / "not-a-dir.txt"
+            file_path.write_text("x", encoding="utf-8")
+            proc = run_probe_raw([str(file_path)])
+            self.assertEqual(2, proc.returncode)
+            self.assertEqual("", proc.stdout)
+
+    def test_max_files_zero_exits_2(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            proc = run_probe_raw([str(td), "--max-files", "0"])
+            self.assertEqual(2, proc.returncode)
+            self.assertEqual("", proc.stdout)
+
+    def test_symlink_loop_and_broken_symlink_are_handled(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "loop").mkdir()
+            try:
+                (root / "loop" / "self").symlink_to(root / "loop", target_is_directory=True)
+                (root / "broken").symlink_to(root / "does-not-exist-target")
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"symlinks unsupported: {exc}")
+            (root / "real.txt").write_text("hello\n", encoding="utf-8")
+
+            report = run_probe(root)
+            self.assertEqual(1, report["scan"]["file_count"])  # only real.txt; symlinks are never followed
+            self.assertNotIn("loop/", json.dumps(report))
+            self.assertNotIn("broken", json.dumps(report))
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "running as root bypasses permission checks")
+    def test_permission_denied_subdirectory_produces_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            blocked = root / "blocked"
+            blocked.mkdir()
+            (blocked / "secretish.txt").write_text("x", encoding="utf-8")
+            (root / "visible.txt").write_text("x", encoding="utf-8")
+            try:
+                blocked.chmod(0o000)
+                report = run_probe(root)
+            finally:
+                blocked.chmod(0o755)
+
+            self.assertIsInstance(report, dict)
+            self.assertTrue(report["warnings"], "expected a warning for the unreadable subdirectory")
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "running as root bypasses permission checks")
+    def test_unreadable_root_exits_3(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "locked"
+            root.mkdir()
+            try:
+                root.chmod(0o000)
+                proc = run_probe_raw([str(root)])
+            finally:
+                root.chmod(0o755)
+
+            self.assertEqual(3, proc.returncode)
+            self.assertEqual("", proc.stdout)
+            self.assertNotEqual("", proc.stderr)
+
+    def test_non_utf8_filename_is_handled(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bad_name = b"bad-\xff\xfe-name.txt"
+            try:
+                fd = os.open(
+                    os.path.join(os.fsencode(str(root)), bad_name),
+                    os.O_CREAT | os.O_WRONLY,
+                    0o644,
+                )
+                os.close(fd)
+            except OSError as exc:
+                self.skipTest(f"filesystem rejects non-UTF-8 names: {exc}")
+
+            report = run_probe(root)
+            self.assertIsInstance(report, dict)
+
+    def test_submodule_gitlink_file_not_counted(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "lib").mkdir()
+            (root / "lib" / ".git").write_text("gitdir: ../.git/modules/lib\n", encoding="utf-8")
+            (root / "lib" / "code.py").write_text("print('hi')\n", encoding="utf-8")
+
+            report = run_probe(root)
+            self.assertEqual(1, report["scan"]["file_count"])
+
+    def test_secret_fixture_names_and_contents_excluded(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            env_secret = "ENV_SENTINEL_7a1c9"
+            key_secret = "RSA_SENTINEL_3e8b2"
+            pem_secret = "PEM_SENTINEL_5d4f1"
+            (root / ".env").write_text(f"TOKEN={env_secret}\n", encoding="utf-8")
+            (root / "id_rsa").write_text(f"-----BEGIN {key_secret}-----\n", encoding="utf-8")
+            (root / "server.pem").write_text(f"-----BEGIN {pem_secret}-----\n", encoding="utf-8")
+
+            proc = run_probe_raw([str(root)])
+            self.assertEqual(0, proc.returncode)
+            self.assertEqual("", proc.stderr)
+            report = json.loads(proc.stdout)
+            self.assertIsInstance(report, dict)
+
+            self.assertNotIn(env_secret, proc.stdout)
+            self.assertNotIn(key_secret, proc.stdout)
+            self.assertNotIn(pem_secret, proc.stdout)
+            self.assertNotIn(".env", proc.stdout)
+            self.assertNotIn("id_rsa", proc.stdout)
+
+    def test_max_seconds_zero_exhausts_time_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.txt").write_text("x", encoding="utf-8")
+            report = run_probe(root, "--max-seconds", "0")
+            self.assertTrue(report["scan"]["time_budget_exhausted"])
+
+    def test_signed_release_matches_attestations_and_negative_budgets_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wf = root / ".github" / "workflows"
+            wf.mkdir(parents=True)
+            (wf / "release.yml").write_text("permissions:\n  attestations: write\n", encoding="utf-8")
+            report = run_probe(root)
+            self.assertIn("signed_release", report["content_signal_files"])
+            self.assertIn("ci_permissions", report["content_signal_files"])
+            for flag in ("--max-seconds", "--max-text-bytes"):
+                proc = run_probe_raw([str(root), flag, "-1"])
+                self.assertEqual(2, proc.returncode)
+                self.assertEqual("", proc.stdout)
+
+    def test_text_budget_stops_content_scanning_but_not_classification(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "big.md").write_text("rollback " * 2000, encoding="utf-8")
+            for i in range(5):
+                (root / f"small{i}.md").write_text("rollback\n", encoding="utf-8")
+            # Budget of 30 bytes: big.md (oversized) is skipped without ending the scan; the
+            # 9-byte small files are scanned until the budget is consumed (3 fit), then scanning stops.
+            report = run_probe(root, "--max-text-bytes", "30")
+            self.assertEqual(1, report["scan"]["text_files_skipped_oversize"])
+            self.assertTrue(report["scan"]["text_budget_exhausted"])
+            self.assertEqual(3, report["scan"]["text_files_scanned_for_signal_presence"])
+            self.assertEqual(6, report["scan"]["files_classified"])
+
+    def test_scan_root_stays_inside_requested_subdirectory(self) -> None:
+        if not shutil.which("git"):
+            self.skipTest("git not available")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "outside.md").write_text("runbook\n", encoding="utf-8")
+            sub = root / "svc"
+            sub.mkdir()
+            (sub / "inside.md").write_text("runbook\n", encoding="utf-8")
+            report = run_probe(sub)
+            self.assertEqual(str(sub.resolve()), report["root"])
+            self.assertEqual(1, report["scan"]["file_count"])
+            self.assertNotIn("outside.md", json.dumps(report))
+            self.assertTrue(any("inside repository" in x for x in report["limitations"]))
+
+    def test_sensitivity_is_relative_to_scan_root(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            repo = Path(td) / "credentials" / "repo"
+            repo.mkdir(parents=True)
+            (repo / "package.json").write_text("{}\n", encoding="utf-8")
+            (repo / "secrets" / "x").mkdir(parents=True)
+            (repo / "secrets" / "x" / "package.json").write_text("{}\n", encoding="utf-8")
+            report = run_probe(repo)
+            self.assertIn("manifests", report["signals"])
+            self.assertEqual(["package.json"], report["signals"]["manifests"])
 
 
 if __name__ == "__main__":

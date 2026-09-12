@@ -20,7 +20,9 @@ Look for:
 - deterministic or controlled build inputs and lockfiles;
 - configuration/schema/IaC version linkage;
 - artifact integrity/provenance/SBOM where risk warrants it;
-- promotion rules that prevent testing one candidate and deploying another.
+- promotion rules that prevent testing one candidate and deploying another;
+- source integrity (protected history, required review) as distinct from build provenance;
+- where an SBOM is claimed, its contents: component name, version, supplier, hash, license, dependency relationship, generation timestamp and tool, known unknowns.
 
 Fail/unknown patterns:
 - tests executed against a different commit/artifact;
@@ -57,7 +59,8 @@ Look for:
 - build provenance/integrity where relevant;
 - privacy/data classification, minimization, retention, encryption, and access controls;
 - abuse/rate-limit protections where relevant;
-- current vulnerability disposition, not scanner output alone.
+- current vulnerability disposition, not scanner output alone;
+- CI token permissions minimized, branch protection and required checks, signed releases or attestations, vulnerability reporting path.
 
 Fail/unknown patterns:
 - exploitable critical/high-impact vulnerability without accepted mitigation;
@@ -76,7 +79,9 @@ Look for:
 - backup scope, retention, integrity, encryption, and restore evidence;
 - measured RPO/RTO where applicable;
 - reconciliation/idempotency and replay semantics;
-- data corruption/loss detection.
+- data corruption/loss detection;
+- restore test recency relative to the last schema or storage change;
+- sampled-restore evidence with a date.
 
 Fail/unknown patterns:
 - backups exist but restore has not been demonstrated where recovery is material;
@@ -94,7 +99,10 @@ Look for:
 - staged rollout, canary, feature flags, or other blast-radius controls as warranted;
 - rollback or forward-recovery strategy including schema/data/external effects;
 - pre/post-deploy checks and stop criteria;
-- tested rollback/recovery mechanics.
+- tested rollback/recovery mechanics;
+- upgrade→downgrade→upgrade tested where version skew is possible;
+- a named metric that triggers rollback;
+- an emergency change path that is tested and audited.
 
 Fail/unknown patterns:
 - one-shot manual production procedure;
@@ -112,7 +120,8 @@ Look for:
 - actionable alerts tied to symptoms/SLOs, with ownership;
 - synthetic/critical-journey checks where appropriate;
 - diagnostic correlation and safe data handling;
-- evidence alerts and dashboards actually function.
+- evidence alerts and dashboards actually function;
+- SLO target with owner, approval date, and an error-budget consequence.
 
 Fail/unknown patterns:
 - only host/process health while incorrect business output can remain green;
@@ -167,7 +176,9 @@ Look for:
 - failure isolation and blast-radius design;
 - degraded-mode behavior;
 - failover/fault tests or direct evidence;
-- shared-fate analysis for redundant components.
+- shared-fate analysis for redundant components;
+- a failure-mode analysis artifact for critical journeys;
+- distinguish fault injection exercised in a representative environment (E3) from staging-only (E2).
 
 Fail/unknown patterns:
 - unbounded retry amplification;
@@ -188,6 +199,12 @@ Look for:
 - communication and decision authority during disaster.
 
 Use N/A only when the impact/risk genuinely makes dedicated continuity controls unnecessary and the rationale is explicit.
+
+Fail/unknown patterns:
+- failover only on diagrams;
+- unmeasured RTO/RPO;
+- shared control plane or account between primary and recovery;
+- recovery never rehearsed end to end.
 
 ### G11 Known-risk closure
 
@@ -216,7 +233,9 @@ Look for:
 - required approvals/certifications/reviews;
 - license/notice obligations;
 - accessibility requirements for user-facing systems;
-- domain assurance for medical, financial, safety, scientific, real-time, AI, data, or other specialized systems.
+- domain assurance for medical, financial, safety, scientific, real-time, AI, data, or other specialized systems;
+- change authorization and audit record where SOC 2 CC8.1 or ISO 27001 A.8.32 is in scope;
+- EU CRA vulnerability-handling and reporting obligations where the product is sold in the EU.
 
 Fail/unknown patterns:
 - mandatory requirement not met;
@@ -261,7 +280,7 @@ Modularity, testability, reviewability, upgrade path, reproducibility, technical
 Bus factor, accountable owners, staffing depth, training, handover, risk authority, lifecycle/retirement ownership.
 
 ### D12 Economic and resource sustainability
-Cloud/runtime cost, observability/storage cardinality, licenses, quotas, vendor limits, operational labor, predictable scaling economics.
+Cloud/runtime cost, observability/storage cardinality, licenses, quotas, vendor limits, operational labor, predictable scaling economics, cost anomaly alerting, and a unit-economics forecast at target scale.
 
 ### D13 Safety, compliance, and domain-specific assurance
 Hazards, regulatory constraints, scientific/numerical validity, accessibility, auditability, specialized independent verification.
@@ -297,4 +316,4 @@ For each condition record:
 - accountable owner;
 - expiry or reassessment event.
 
-If the condition merely postpones a failed hard gate without bounding the consequence, the verdict is NOT READY.
+A condition never converts a failed applicable hard gate. If any applicable hard gate is FAIL, the verdict is NOT READY regardless of bounding.

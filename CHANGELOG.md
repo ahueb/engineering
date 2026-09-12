@@ -1,11 +1,21 @@
 # Changelog
 
-## 2.4.1 — 2026-09-12
+## 2.5.0 — 2026-09-11
+
+- `install.sh`: parses and validates `settings.json` before touching `CLAUDE.md`; registers the marketplace before any file write and surfaces the real error; writes a `settings.json.bak-` only when the merged content actually changes; quote-safe opt-out check for config paths containing `'`; documents that `engineering@engineering` is always enabled.
+- `release.sh`: parses `--no-commit` in any position; validates the current version is `x.y.z` before bumping; gates the version bump on `claude plugin validate --strict`, restoring the prior version on failure; refuses to run on a working tree with unrelated changes; commits only `plugin.json` and `CHANGELOG.md`.
+- SessionStart hook: also fires on `resume`; the policy is considered present only when the first line of `CLAUDE.md` is exactly `# Agent operating policy`, so a copy under a different heading is not mistaken for it.
+- Policy (`context/CLAUDE.md`): corrects the superpowers mapping (`plan-execution` replaces both `executing-plans` and `subagent-driven-development` and overrides any build/test step in a superpowers prompt file; `dispatching-parallel-agents` work that edits code goes to `bulk-implementer` or `hard-repair`, not `scout`), restates the read-only/no-edit-tools wording precisely, and makes the plan-execution no-test rule explicitly override prompt-file text. `test-triage` moves to `sonnet` at `low` effort.
+- `security-reviewer` and `semantic-reviewer` accept a whole-candidate scope (not just a diff) and, having no shell, name the command a claim would need rather than asking to run one.
+- `production-readiness-review`: literature refresh — SLSA v1.2 (source track), EU Cyber Resilience Act reporting-obligation overlay, EU AI Act Article 50 transparency duties, CISA 2026 SBOM minimum elements, restore-test recency, named rollback-trigger metrics, SLO ownership and error-budget consequence, CI hardening (token permissions, branch protection, signed releases), and a change-authorization/audit-record requirement where SOC 2 CC8.1 or ISO 27001 A.8.32 applies. E4 now requires independent reproduction under bounded real-production or realistic adverse conditions, cumulative on E3.
+- `repo_probe.py`: bounded by `--max-seconds` and `--max-text-bytes`; excludes `.git` gitlinks so submodules are not miscounted; new content-signal keys for CI permissions, signed releases, vulnerability-reporting paths, and dependency automation. Probe tests extended accordingly.
+
+## 2.4.1 — 2026-09-11
 
 - Shorter `production-readiness-review` description.
 - `settings.recommended.json` sets `skillListingBudgetFraction` to 0.02: at the 1% default, 200K-context models drop the descriptions of the last skills in the listing, which disables automatic invocation for them.
 
-## 2.4.0 — 2026-09-12
+## 2.4.0 — 2026-09-11
 
 - `production-readiness-review` skill: read-only, gate-first production readiness audit with hard gates, graded dimensions, domain overlays, adversarial falsification, and a bundled repository probe with tests. Evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer`.
 - `evals/`: twenty `claude plugin eval` trigger cases for the readiness skill.

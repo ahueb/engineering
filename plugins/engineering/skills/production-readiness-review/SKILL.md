@@ -54,8 +54,8 @@ Then inspect, as applicable:
 For large repositories, dispatch read-only evidence collection in one batch and keep gate synthesis and the final verdict with the primary auditor:
 
 - `engineering:scout`: locate test, CI, deployment, migration, operations, observability, and security files the probe did not surface, returning paths only.
-- `engineering:security-reviewer`: collect evidence for gate G3 (authentication, authorization, secrets, dependency and supply-chain controls, trust boundaries) and report findings as evidence with `path:line`, not as a verdict.
-- `engineering:semantic-reviewer`: examine the critical-journey tests for gate G2 and report weak oracles, mocked contracts, and untested failure modes.
+- `engineering:security-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Collect evidence for gate G3 (authentication, authorization, secrets, dependency and supply-chain controls, trust boundaries).
+- `engineering:semantic-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Examine the critical-journey tests for gate G2 and report weak oracles, mocked contracts, and untested failure modes.
 
 All three are read-only by tool list. Their output is evidence to be weighed under the rubric; none of them decides a gate.
 
@@ -91,7 +91,7 @@ Use separate evidence strength:
 - **E1** - assertion, plan, policy, or documentation only.
 - **E2** - direct evidence, but partial, stale, nonrepresentative, or not candidate-specific.
 - **E3** - recent, traceable, repeatable, representative, candidate-specific evidence.
-- **E4** - independently reproduced and/or demonstrated under bounded real-production or realistic adverse conditions.
+- **E4** - meets every E3 property and is additionally independently reproduced or demonstrated under bounded real-production or realistic adverse conditions.
 
 Use readiness state for each graded dimension:
 
@@ -100,6 +100,8 @@ Use readiness state for each graded dimension:
 - **2 Defined but incompletely demonstrated**
 - **3 Validated for the candidate under representative conditions**
 - **4 Robustly demonstrated at realistic scale and adverse conditions**
+
+Evidence strength says how well a claim is known; readiness state says what has been achieved. Rate both; never derive one from the other.
 
 Do not average these into a universal score.
 
