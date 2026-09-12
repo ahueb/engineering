@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "engineering",
-  "description": "Evidence-first engineering: operating policy, cost-tiered agents including a Playwright browser tester, process skills including browser testing, research skills, and a user-invoked deep audit.",
-  "version": "2.6.0",
+  "description": "Evidence-first engineering: cost-tiered agents, verified implementation and review loops, parallel plan execution, browser testing with Playwright, and a hard-gated production readiness review.",
+  "version": "2.7.0",
   "author": {
     "name": "Alan",
     "email": "alan@hueb.org"

@@ -1,6 +1,20 @@
 # engineering
 
-Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), ten cost-tiered agents, eight process skills, two research skills, one user-invoked escalation skill, and recommended settings. Everything except settings ships as the `engineering` plugin; the policy also ships inside it and `install.sh` copies it to `CLAUDE.md`.
+Evidence-first engineering for Claude Code. One operating policy plus ten cost-tiered agents and nine process skills that route each job to the cheapest model that can do it, verify with real checks before claiming success, and report what was actually proven. Includes parallel plan execution, adversarial code and plan audits, a production readiness review with hard gates, Playwright browser testing, and narrow research skills for documentation and literature. Works standalone or alongside superpowers.
+
+Everything except settings ships as the `engineering` plugin; the policy (`CLAUDE.md`) also ships inside it and `install.sh` copies it to your config directory.
+
+## Example use cases
+
+- **Ship a feature from a plan fast.** `/engineering:plan-execution docs/plans/checkout.md` splits the plan into disjoint-file packages, implements all of them in parallel on Sonnet, runs one integrated build-and-test pass, then has Opus auditors prove every plan item is complete.
+- **Fix a bug with evidence.** `/engineering:implementation-loop` inspects the repo, reproduces the failure, makes the smallest fix, and closes with `verification-loop`, which reports exactly which checks ran, passed, or could not run.
+- **Confirm a UI change in a real browser.** `/engineering:browser-testing "add item to cart and see the badge update"` starts the app, dispatches a headless Playwright agent with an explicit pass condition, and returns screenshots, console errors, and failed requests.
+- **Decide go or no-go before a release.** `/engineering:production-readiness-review assess this branch for a 5% canary` audits twelve non-compensable gates, tries to falsify every apparent pass, and returns READY, CONDITIONALLY READY, or NOT READY with evidence strength per gate.
+- **Review a pull request without noise.** `/engineering:change-review` reports concrete defects with location, failure mechanism, and fix direction, adding a security reviewer when the diff touches auth, secrets, or external input.
+- **Check one fact that may have changed.** `/engineering:docs-check "does Next.js 16 still support the pages router?"` answers from version-matched official docs with citations, on Sonnet, without editing anything.
+- **Make comments orient a stranger.** `/engineering:comment-cleanup` scans every comment in the repo, strips dates, phase and plan references, and history, and rewrites what remains into one concise sentence about the code it annotates.
+- **Hand work to the next session.** `/engineering:checkpoint` writes what is done, what failed and why, what was verified, and the next safe step.
+- **Escalate only when it matters.** `/engineering:deep-audit` runs a read-only adversarial audit on Fable at extra-high effort, reserved for consequential or hard-to-reverse changes.
 
 ## Install
 
@@ -79,6 +93,7 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 | Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, has Bash and Playwright MCP) |
 | Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
 | Research skills (forked, read-only) | `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
+| Forked edit skill | `comment-cleanup` (sonnet, medium, edits comments only) |
 | User-only escalation | `/engineering:deep-audit` (fable, xhigh) |
 
 `scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `browser-tester`, and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
@@ -119,7 +134,7 @@ The policy maps superpowers' subagent roles onto engineering agents (implementer
 plugins/engineering/
   .claude-plugin/plugin.json      plugin manifest and version
   agents/                         ten agent definitions
-  skills/                         eleven SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests
+  skills/                         twelve SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests
   evals/                          claude plugin eval cases for skill trigger quality
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy

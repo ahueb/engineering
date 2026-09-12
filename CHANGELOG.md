@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0 — 2026-09-12
+
+- New process skill `comment-cleanup`: repository-wide comment audit that removes dates, phase, plan, spec, ticket, and history references and rewrites the rest so each comment orients an unfamiliar reader in one concise sentence. Runs forked on Sonnet at medium effort with edit tools but no subagents; comment-only edits; formatter and lint run afterwards.
+
 ## 2.6.0 — 2026-09-12
 
 - New agent `browser-tester` (sonnet, medium): executes one named user journey in a headless browser through a self-declared Playwright MCP server (`mcpServers` frontmatter, so no dependency on the official `playwright` plugin) and returns a fixed evidence block. Bash is read-only by instruction; no edit tools.

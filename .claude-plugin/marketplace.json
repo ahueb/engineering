@@ -6,7 +6,7 @@
     {
       "name": "engineering",
       "source": "./plugins/engineering",
-      "description": "Agent operating policy, ten cost-tiered agents including a security reviewer, a plan auditor, and a Playwright browser tester, eight process skills including browser testing and a production readiness review, and two research skills, and a user-invoked deep audit.",
+      "description": "Evidence-first engineering: cost-tiered agents, verified implementation and review loops, parallel plan execution, browser testing with Playwright, and a hard-gated production readiness review.",
       "category": "development"
     }
   ]
