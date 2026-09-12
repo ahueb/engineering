@@ -1627,7 +1627,7 @@ s35() {
   [ "$gh_order" = "create checks merge " ] && ok "S35 pr: gh called create, checks, merge in order" || bad "S35 pr: gh call order was '$gh_order'"
   grep -q "^pr create --base main --head release/v$new " "$ghlog" && ok "S35 pr: pr create targets main from release/v$new" || bad "S35 pr: pr create arguments wrong: $(grep '^pr create' "$ghlog")"
   grep -q "^pr checks release/v$new --watch --fail-fast$" "$ghlog" && ok "S35 pr: pr checks watches the branch" || bad "S35 pr: pr checks arguments wrong"
-  grep -q "^pr merge release/v$new --rebase --delete-branch$" "$ghlog" && ok "S35 pr: pr merge rebases and deletes the branch" || bad "S35 pr: pr merge arguments wrong"
+  grep -q "^pr merge release/v$new --squash --subject Release engineering $new --delete-branch$" "$ghlog" && ok "S35 pr: pr merge squashes with the release subject and deletes the branch" || bad "S35 pr: pr merge arguments wrong: $(grep '^pr merge' "$ghlog")"
 
   # --- tag: refuses when origin/main's head is not the release commit
   if OUT="$(cd "$repo" && PATH="$bindir:$PATH" GH_FAKE_LOG="$ghlog" ./release.sh tag "$new" 2>&1)"; then RC=0; else RC=$?; fi
@@ -1683,7 +1683,7 @@ s35() {
     *) bad "S35 auth-fail: manual gh pr checks command missing: $OUT" ;;
   esac
   case "$OUT" in
-    *"gh pr merge release/v$new2 --rebase --delete-branch"*) ok "S35 auth-fail: prints the manual gh pr merge command" ;;
+    *"gh pr merge release/v$new2 --squash --subject \"Release engineering $new2\" --delete-branch"*) ok "S35 auth-fail: prints the manual gh pr merge command" ;;
     *) bad "S35 auth-fail: manual gh pr merge command missing: $OUT" ;;
   esac
   git -C "$work2/origin.git" show-ref --verify -q "refs/heads/release/v$new2" \

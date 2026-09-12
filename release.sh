@@ -13,7 +13,7 @@
 #       (same as `pr` below).
 #   ./release.sh pr X.Y.Z
 #       for an already-pushed release/vX.Y.Z branch: gh pr create (base
-#       main), gh pr checks --watch --fail-fast, gh pr merge --rebase
+#       main), gh pr checks --watch --fail-fast, gh pr merge --squash
 #       --delete-branch. Requires an authenticated `gh`.
 #   ./release.sh tag [X.Y.Z]
 #       fetch origin/main, require its head commit subject to be exactly
@@ -286,7 +286,7 @@ do_pr() {
     echo "gh is not installed or not authenticated; finish the release manually:" >&2
     echo "  gh pr create --base main --head $BRANCH --title \"Release engineering $V\" --body-file <body.md>" >&2
     echo "  gh pr checks $BRANCH --watch --fail-fast" >&2
-    echo "  gh pr merge $BRANCH --rebase --delete-branch" >&2
+    echo "  gh pr merge $BRANCH --squash --subject \"Release engineering $V\" --delete-branch" >&2
     exit 1
   fi
 
@@ -323,17 +323,20 @@ do_pr() {
   if ! gh pr checks "$BRANCH" --watch --fail-fast; then
     echo "gh pr checks failed; after fixing, continue with:" >&2
     echo "  gh pr checks $BRANCH --watch --fail-fast" >&2
-    echo "  gh pr merge $BRANCH --rebase --delete-branch" >&2
+    echo "  gh pr merge $BRANCH --squash --subject \"Release engineering $V\" --delete-branch" >&2
     exit 1
   fi
   echo "checks passed"
 
-  if ! gh pr merge "$BRANCH" --rebase --delete-branch; then
+  # Squash, not rebase: main requires signed commits, and GitHub signs the squash commit it
+  # creates but cannot sign the commits a rebase merge rewrites. The subject is what
+  # `release.sh tag` later checks at origin/main.
+  if ! gh pr merge "$BRANCH" --squash --subject "Release engineering $V" --delete-branch; then
     echo "gh pr merge failed; retry with:" >&2
-    echo "  gh pr merge $BRANCH --rebase --delete-branch" >&2
+    echo "  gh pr merge $BRANCH --squash --subject \"Release engineering $V\" --delete-branch" >&2
     exit 1
   fi
-  echo "merged $BRANCH into main (rebase) and deleted the branch"
+  echo "merged $BRANCH into main (squash) and deleted the branch"
 }
 
 # $1 = X.Y.Z or empty (defaults to origin/main's plugin.json version).
