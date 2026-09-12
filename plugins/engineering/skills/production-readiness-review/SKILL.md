@@ -42,6 +42,7 @@ For large repositories, dispatch read-only evidence collection in one batch and 
 - `engineering:scout`: locate test, CI, deployment, migration, operations, observability, and security files the probe did not surface, returning paths only.
 - `engineering:security-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Collect evidence for gate G3 (authentication, authorization, secrets, dependency and supply-chain controls, trust boundaries).
 - `engineering:semantic-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Examine the critical-journey tests for gate G2 and report weak oracles, mocked contracts, and untested failure modes.
+- `engineering:browser-tester`: only when the candidate is a web application that can be run locally without new dependencies. One dispatch per critical journey via `/engineering:browser-testing` step 3; the result is direct G2 evidence for that journey and nothing else.
 
 All three are read-only by tool list. Their output is evidence to be weighed under the rubric; none of them decides a gate.
 

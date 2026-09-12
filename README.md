@@ -1,6 +1,6 @@
 # engineering
 
-Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, seven process skills, two research skills, one user-invoked escalation skill, and recommended settings. Everything except settings ships as the `engineering` plugin; the policy also ships inside it and `install.sh` copies it to `CLAUDE.md`.
+Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), ten cost-tiered agents, eight process skills, two research skills, one user-invoked escalation skill, and recommended settings. Everything except settings ships as the `engineering` plugin; the policy also ships inside it and `install.sh` copies it to `CLAUDE.md`.
 
 ## Install
 
@@ -76,16 +76,22 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 
 | Kind | Names |
 |---|---|
-| Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high) |
-| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
+| Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, has Bash and Playwright MCP) |
+| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
 | Research skills (forked, read-only) | `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 | User-only escalation | `/engineering:deep-audit` (fable, xhigh) |
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `browser-tester`, and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
 
 ## Executing plans
 
 `/engineering:plan-execution` is the fast path for a written plan. It partitions the plan into packages that own disjoint files and share explicit interfaces, dispatches every package to a parallel `bulk-implementer` in one batch with building and testing forbidden, merges the results, runs one integrated build-and-test pass, and then has `plan-auditor` and `semantic-reviewer` adversarially check the merged result against the plan for completeness and correctness. The policy routes superpowers' `executing-plans` and `subagent-driven-development` through this flow.
+
+## Browser testing
+
+`/engineering:browser-testing` is the only path through which the plugin drives a browser. It finds the app's own launch path (`playwright.config` `webServer`, package scripts, compose files), starts the app once, and requires an explicit oracle for every journey before anything is clicked. Exploratory runs dispatch `engineering:browser-tester`, which carries its own Playwright MCP server (`npx -y @playwright/mcp@latest --headless`, declared in the agent's `mcpServers` frontmatter, so it works whether or not the official `playwright` plugin is enabled) and returns a fixed evidence block: result, steps executed, oracle evidence, console errors, same-origin network failures, artifact paths, blockers. It never edits files. Journeys that will be rerun are codified as `@playwright/test` specs under the conventions in `skills/browser-testing/references/playwright-conventions.md` (user-facing locators, web-first assertions, no fixed sleeps, no assertion loosening to hide a defect, three-run flake rule) and run with `npx playwright test`. `verification-loop` and `implementation-loop` route user-facing web changes here; the readiness review may use one `browser-tester` dispatch per critical journey as G2 evidence.
+
+Requirements: Node with `npx`; Playwright browsers installed (`npx playwright install --with-deps chromium`; the conventions reference has the agent ask before installing). The first `browser-tester` dispatch downloads `@playwright/mcp` on demand.
 
 ## Production readiness review
 
@@ -112,8 +118,8 @@ The policy maps superpowers' subagent roles onto engineering agents (implementer
 .claude-plugin/marketplace.json   marketplace manifest; lists the engineering plugin
 plugins/engineering/
   .claude-plugin/plugin.json      plugin manifest and version
-  agents/                         nine agent definitions
-  skills/                         ten SKILL.md skills; production-readiness-review bundles references, a probe, and tests
+  agents/                         ten agent definitions
+  skills/                         eleven SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests
   evals/                          claude plugin eval cases for skill trigger quality
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy

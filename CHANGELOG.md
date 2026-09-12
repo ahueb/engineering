@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- New agent `browser-tester` (sonnet, medium): executes one named user journey in a headless browser through a self-declared Playwright MCP server (`mcpServers` frontmatter, so no dependency on the official `playwright` plugin) and returns a fixed evidence block. Bash is read-only by instruction; no edit tools.
+- New process skill `browser-testing`: launch-once, oracle-first browser verification with exploratory (`browser-tester`), codified (`@playwright/test` spec), and repair modes; bundles `references/playwright-conventions.md` (locators, web-first assertions, waiting, structure, config, commands, MCP tool map, evidence rules).
+- `verification-loop`, `implementation-loop`, and `production-readiness-review` route user-facing web changes and critical-journey G2 evidence to `browser-testing`. Policy table and README updated.
+
 ## 2.5.4 — 2026-09-12
 
 - `docs-check` and `literature-review` are model-invocable: `disable-model-invocation` removed and descriptions rewritten as trigger text. `deep-audit` remains user-only.

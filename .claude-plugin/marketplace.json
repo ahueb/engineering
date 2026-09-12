@@ -6,7 +6,7 @@
     {
       "name": "engineering",
       "source": "./plugins/engineering",
-      "description": "Agent operating policy, nine cost-tiered agents including a security reviewer and a plan auditor, seven process skills including a production readiness review, and two research skills, and a user-invoked deep audit.",
+      "description": "Agent operating policy, ten cost-tiered agents including a security reviewer, a plan auditor, and a Playwright browser tester, eight process skills including browser testing and a production readiness review, and two research skills, and a user-invoked deep audit.",
       "category": "development"
     }
   ]

@@ -46,7 +46,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 
 ## Delegation policy
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `browser-tester`, and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
 
 | Agent | Use when | Tools |
 |---|---|---|
@@ -58,12 +58,13 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 | `semantic-reviewer` | correctness properties not adequately covered by deterministic checks, or material semantic/concurrency/migration/compatibility/data-integrity risk | read-only |
 | `security-reviewer` | change touches a trust boundary: auth, secrets, external input, file/network access, supply chain, or CI | read-only |
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
+| `browser-tester` | one named user journey must be exercised in a real browser against a running app; returns pass/fail with snapshot, console, and network evidence, never edits | Bash (read-only), Playwright MCP, no edit |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
 | `deep-audit` (user-invoked slash command) | Fable at xhigh effort, adversarial audit with no edit tools | Bash (non-mutating), no edit |
 | `docs-check` (skill) | Sonnet, one version-dependent fact confirmed against official docs | Bash (non-mutating), no edit |
 | `literature-review` (skill) | Opus, evidence-driven research synthesis for a consequential decision | Bash (non-mutating), no edit |
 
-The `engineering` plugin also provides the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:change-review`, `/engineering:checkpoint`, `/engineering:change-eval`, and `/engineering:production-readiness-review`. The last is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command; it is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer` in one batch; the verdict stays with the main session.
+The `engineering` plugin also provides the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:browser-testing`, `/engineering:change-review`, `/engineering:checkpoint`, `/engineering:change-eval`, and `/engineering:production-readiness-review`. `browser-testing` owns every Playwright run: it launches the app once, dispatches `browser-tester` per journey with an explicit oracle, and codifies only journeys that will be rerun. The last is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command; it is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer` in one batch; the verdict stays with the main session.
 
 Size each delegated work package so the agent finishes within roughly 200k tokens of context; split larger packages or have the agent checkpoint and hand off, because every turn re-reads the whole history.
 
