@@ -33,8 +33,16 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 ## Verify, pin, and roll back
 
 - Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.5.1`.
-- Pin instead of tracking `main`: `claude plugin install engineering@engineering@2.5.1`.
-- Roll back a bad release: `claude plugin uninstall engineering@engineering && claude plugin install engineering@engineering@<previous version>`, then restart Claude Code. Stop criterion for a release: any session-start error or a `claude plugin validate --strict` failure on the installed cache; the fix is always a new patch version, never a rewritten one.
+- Pin instead of tracking `main`. A GitHub-sourced marketplace always serves the version on `main` (`engineering@engineering@<version>` is accepted but resolves to `main`, verified 2026-09-12), so pin by checking out the signed tag and registering the clone as a directory marketplace:
+
+  ```bash
+  git clone https://github.com/ahueb/engineering.git && cd engineering && git checkout v2.5.1
+  git tag -v v2.5.1   # after: git config gpg.ssh.allowedSignersFile .allowed_signers
+  claude plugin marketplace remove engineering; claude plugin marketplace add "$PWD"
+  claude plugin install engineering@engineering
+  ```
+
+- Roll back a bad release the same way with the previous tag, then restart Claude Code. Stop criterion for a release: any session-start error or a `claude plugin validate --strict` failure on the installed cache; the fix is always a new patch version, never a rewritten one.
 - Security reports and support expectations: [SECURITY.md](SECURITY.md). Known residual risks: [docs/risk-register.md](docs/risk-register.md).
 
 ## Update

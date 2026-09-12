@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.2 — 2026-09-12
+
+- Docs: `engineering@engineering@<version>` does not pin for a GitHub-sourced marketplace; pinning and rollback now documented via signed-tag checkout plus a directory marketplace, verified in a scratch config. All commits on `main` are signed and GitHub enforces signatures.
+
 ## 2.5.1 — 2026-09-11
 
 - Local CI gate `ci.sh` (lint, both manifests under `--strict`, probe tests, frontmatter and cross-reference checks, hook contract, scratch install) wired into `.githooks/pre-push` and `release.sh`. No GitHub Actions or server-side hooks.

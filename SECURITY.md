@@ -19,7 +19,7 @@ Expected response: acknowledgement within 7 days; a fix or mitigation for a conf
 
 - `main` is branch-protected on GitHub: linear history, no force pushes, no deletions, enforced for admins.
 - Every push is gated locally by `./ci.sh` through a pre-push hook; there is no server-side CI, so the tag signature is the integrity evidence.
-- Pin a version instead of tracking `main`: `claude plugin install engineering@engineering@2.5.1`.
+- Pin a version instead of tracking `main` by checking out the signed tag and registering the clone as a directory marketplace (steps in README, "Verify, pin, and roll back"). The `engineering@engineering@<version>` install form resolves to `main` for a GitHub-sourced marketplace and does not pin.
 
 ## What the code does and does not do
 
