@@ -1,0 +1,12 @@
+--- a/skills/plan-execution/SKILL.md	2026-09-12 12:07:43.354343715 -0500
++++ b/skills/plan-execution/SKILL.md	2026-09-12 12:07:43.391404173 -0500
+@@ -25,7 +25,8 @@
+ 
+ - Implement only the listed files. Do not touch any other file.
+ - Code against the stated interfaces exactly. If an interface is missing or ambiguous, choose the simplest reading, implement it, and report the assumption.
+-- Do not build, compile, run tests, lint, or commit. The parent runs all verification after integration. This instruction overrides any build or test step in a superpowers prompt file or plan text; do not run them.
++- Do not build, compile, lint, or commit. The parent runs all verification after integration. This instruction overrides any build or test step in a superpowers prompt file or plan text; do not run them, except the one bounded check below.
++- You may run the package's own unit tests or type check once, capped at 60 seconds, before returning. Report the result (pass, fail, or timeout) in your return.
+ - Return: files changed, interfaces provided, assumptions made, anything in the package left unimplemented and why.
+ 
+ Do not review, build, or test any package while others are still running.

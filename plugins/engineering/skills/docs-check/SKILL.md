@@ -7,10 +7,10 @@ agent: general-purpose
 model: sonnet
 effort: medium
 background: false
-disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact
+disallowed-tools: Bash, PowerShell, Edit, Write, NotebookEdit, Agent, Skill, Artifact
 ---
 
-Do not modify files or repository state; Bash is for read-only inspection.
+No shell: use Read, WebFetch, and WebSearch.
 
 Resolve $ARGUMENTS using the minimum external research necessary.
 

@@ -3,7 +3,7 @@
 Python >= 3.8, stdlib only. See docs/plans/2026-09-12-installer-merge-hardening.md
 (decisions 4-5) and the shared interface contract for the exact behaviour.
 
-Subcommands: write, backup, restore, list, check, mode.
+Subcommands: write, backup, mark-written, restore, list, check, mode.
 """
 
 from __future__ import annotations
@@ -19,7 +19,9 @@ import stat
 import sys
 import tempfile
 
-STAMP_RE = re.compile(r"^\d{8}T\d{6}Z-\d+$")
+# Install stamps are YYYYMMDDTHHMMSS.ffffffZ-<pid>; the second-resolution form
+# YYYYMMDDTHHMMSSZ-<pid> written by installers before 2.9.0 is still accepted.
+STAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\.\d{6})?Z-\d+$")
 SCHEMA = 1
 
 
@@ -177,12 +179,24 @@ def _ensure_dir_mode(path, mode):
 
 
 def _stamp_key(name):
-    """Sort key for a stamp dir: (timestamp, numeric pid), not lexicographic."""
+    """Sort key for a stamp dir: (datetime, numeric pid), not lexicographic.
+
+    Both stamp forms parse; a legacy second-resolution stamp is padded to
+    `.000000`, so it sorts below a microsecond stamp of the same second.
+    """
     ts, _, pid = name.rpartition("-")
     try:
-        return (ts, int(pid))
+        pid_num = int(pid)
     except ValueError:
-        return (ts, 0)
+        pid_num = 0
+    core = ts[:-1] if ts.endswith("Z") else ts
+    if "." not in core:
+        core += ".000000"
+    try:
+        when = datetime.datetime.strptime(core, "%Y%m%dT%H%M%S.%f")
+    except ValueError:
+        when = datetime.datetime.min
+    return (when, pid_num)
 
 
 def _list_stamps(engineering_dir):
@@ -197,11 +211,19 @@ def _list_stamps(engineering_dir):
     return names
 
 
-def _prune(engineering_dir, keep=5):
+def _prune(engineering_dir, keep=5, protect=None):
+    """Keep the `keep` newest stamp dirs, but never remove the one named `protect`.
+
+    `protect` is the stamp the caller just wrote to; without this, five
+    pre-existing stamps (however they sort relative to it) could prune the
+    run's own stamp on its first write. `protect` still counts toward `keep`
+    when present, so the total stays bounded the same way it always has.
+    """
     names = _list_stamps(engineering_dir)
     if len(names) <= keep:
         return
-    for old in names[: len(names) - keep]:
+    removable = [n for n in names if n != protect]
+    for old in removable[: len(names) - keep]:
         shutil.rmtree(os.path.join(engineering_dir, old), ignore_errors=True)
 
 
@@ -221,17 +243,40 @@ def _existing_files(manifest_path):
 
 
 def _merge_files(old_files, new_files):
-    """Merge manifest entries, keyed by `rel`; later entries win, order kept."""
+    """Merge manifest entries, keyed by `rel`; order kept.
+
+    Merging is per field: an entry for a `rel` that already exists keeps every
+    field the newer entry does not carry (so a `backup()` never drops the
+    `written_sha256`/`created`/`removed` fields a `mark-written` recorded, and
+    a `mark-written` never drops `stored`/`sha256`/`mode`/`link_target`).
+    """
     merged = []
     index = {}
     for entry in list(old_files) + list(new_files):
         rel = entry.get("rel")
         if rel in index:
-            merged[index[rel]] = entry
+            combined = dict(merged[index[rel]])
+            combined.update(entry)
+            merged[index[rel]] = combined
         else:
             index[rel] = len(merged)
-            merged.append(entry)
+            merged.append(dict(entry))
     return merged
+
+
+def _write_manifest(stamp_dir, stamp, version, files):
+    manifest_path = os.path.join(stamp_dir, "manifest.json")
+    manifest = {
+        "schema": SCHEMA,
+        "installer_version": version,
+        "stamp": stamp,
+        "files": files,
+    }
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+        f.write("\n")
+    os.chmod(manifest_path, 0o600)
+    return manifest_path
 
 
 def backup(cfg, stamp, version, paths):
@@ -295,20 +340,67 @@ def backup(cfg, stamp, version, paths):
         return None
 
     manifest_path = os.path.join(stamp_dir, "manifest.json")
-    manifest = {
-        "schema": SCHEMA,
-        "installer_version": version,
-        "stamp": stamp,
-        "files": _merge_files(_existing_files(manifest_path), files_meta),
-    }
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2)
-        f.write("\n")
-    os.chmod(manifest_path, 0o600)
+    _write_manifest(
+        stamp_dir, stamp, version, _merge_files(_existing_files(manifest_path), files_meta)
+    )
 
-    _prune(engineering_dir)
+    _prune(engineering_dir, protect=stamp)
 
     return stamp_dir
+
+
+def mark_written(cfg, stamp, version, rel, written_sha, created=False, removed=False):
+    """Record that this run wrote (or removed) `rel`, merging into its entry.
+
+    Creates the stamp directory and a manifest when the run has backed up
+    nothing yet, so a rollback can find files that were created rather than
+    overwritten. Returns the stamp directory.
+    """
+    backups_root = os.path.join(cfg, "backups")
+    engineering_dir = os.path.join(backups_root, "engineering")
+    stamp_dir = os.path.join(engineering_dir, stamp)
+
+    _ensure_dir(cfg, 0o700)
+    _ensure_dir_mode(backups_root, 0o700)
+    _ensure_dir_mode(engineering_dir, 0o700)
+    _ensure_dir_mode(stamp_dir, 0o700)
+
+    rel_posix = rel.replace(os.sep, "/")
+    entry = {
+        "rel": rel_posix,
+        "written_sha256": written_sha,
+        "created": bool(created),
+        "removed": bool(removed),
+    }
+    if created:
+        # The live path decides how a created file is undone: a symlink this run
+        # created through is unlinked itself, never its target.
+        live = os.path.join(cfg, rel)
+        was_symlink = os.path.islink(live)
+        entry["was_symlink"] = was_symlink
+        entry["link_target"] = os.readlink(live) if was_symlink else None
+
+    manifest_path = os.path.join(stamp_dir, "manifest.json")
+    _write_manifest(
+        stamp_dir, stamp, version, _merge_files(_existing_files(manifest_path), [entry])
+    )
+
+    _prune(engineering_dir, protect=stamp)
+
+    return stamp_dir
+
+
+def _marked_written(cfg, stamp):
+    """True when any entry of `stamp` (or the newest stamp) carries written_sha256."""
+    engineering_dir = os.path.join(cfg, "backups", "engineering")
+    stamp_dir = _resolve_stamp_dir(engineering_dir, stamp)
+    if stamp_dir is None:
+        return False
+    for entry in _existing_files(os.path.join(stamp_dir, "manifest.json")):
+        value = entry.get("written_sha256")
+        if isinstance(value, str) and value:
+            return True
+    return False
 
 
 def list_backups(cfg):
@@ -373,18 +465,58 @@ def _sha_of_file(path):
 
 
 def _pre_restore_stamp():
-    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     return "{}-{}".format(now, os.getpid())
 
 
-def restore(cfg, stamp=None, break_hardlinks=False):
+def _recorded_link_real(entry, target):
+    """Real path of the symlink target recorded for `entry`, or None."""
+    link_target = entry.get("link_target")
+    if not bool(entry.get("was_symlink")):
+        return None
+    if not isinstance(link_target, str) or not link_target:
+        return None
+    if os.path.isabs(link_target):
+        return os.path.realpath(link_target)
+    return os.path.realpath(os.path.join(os.path.dirname(target), link_target))
+
+
+def _effective_real(entry, target):
+    """Where a restore of `entry` would actually land.
+
+    The live path decides while it exists (an intact symlink wins over the
+    manifest); otherwise the recorded link target is what would be recreated.
+    """
+    if os.path.lexists(target):
+        return os.path.realpath(target)
+    recorded = _recorded_link_real(entry, target)
+    return recorded if recorded is not None else os.path.realpath(target)
+
+
+def _inside(real_cfg, path):
+    return path == real_cfg or path.startswith(real_cfg + os.sep)
+
+
+def restore(
+    cfg,
+    stamp=None,
+    break_hardlinks=False,
+    only_run_files=False,
+    no_outside_cfg=False,
+):
     """Restore files from a stamp directory.
 
     Returns 0 (all restored), 8 (any refusal), or raises SafeWriteError(9, ...)
-    when there is no usable backup/manifest. Prints "restored <rel>" or
-    "refused <rel>: <reason>" for each manifest entry as a side effect, after a
-    "pre-restore backup: <stamp dir>" line when the current state of any target
-    was saved first.
+    when there is no usable backup/manifest, or SafeWriteError(12, ...) when
+    `only_run_files` is set and the stamp marks nothing as written. Prints
+    "restored <rel>", "deleted <rel>", "refused <rel>: <reason>" or
+    "not rolled back: <rel> changed after this run wrote it" for each manifest
+    entry as a side effect, after the "outside config dir: <rel> -> <real>"
+    disclosure lines and a "pre-restore backup: <stamp dir>" line when the
+    current state of any target was saved first.
+
+    `only_run_files` restricts the work to entries this run marked with
+    `mark-written` and leaves anything changed since that write alone.
     """
     engineering_dir = os.path.join(cfg, "backups", "engineering")
     stamp_dir = _resolve_stamp_dir(engineering_dir, stamp)
@@ -406,18 +538,51 @@ def restore(cfg, stamp=None, break_hardlinks=False):
     real_cfg = os.path.realpath(cfg)
     any_refused = False
 
+    entries = [raw if isinstance(raw, dict) else {} for raw in files]
+    if only_run_files and not any(
+        isinstance(e.get("written_sha256"), str) and e.get("written_sha256")
+        for e in entries
+    ):
+        raise SafeWriteError(
+            12, "no file in this stamp was marked as written by an installer run"
+        )
+
     # Phase 1: validate every entry and read its backup copy into memory. This
     # happens before anything touches the filesystem because the pre-restore
     # backup below may prune this very stamp dir.
     plans = []
-    for raw in files:
-        entry = raw if isinstance(raw, dict) else {}
+    for entry in entries:
         rel = entry.get("rel", "")
         if not isinstance(rel, str):
             rel = ""
+        written_sha = entry.get("written_sha256")
+        if not isinstance(written_sha, str):
+            written_sha = ""
+        created = bool(entry.get("created"))
+
+        if only_run_files:
+            if not written_sha:
+                continue
+        elif created:
+            # A file this run created has no backup copy: a plain restore puts
+            # the recorded files back and leaves everything else alone.
+            continue
+
         reason = _validate_rel(rel)
         if reason:
             plans.append({"rel": rel, "refused": reason})
+            continue
+
+        if only_run_files and created:
+            plans.append(
+                {
+                    "rel": rel,
+                    "entry": entry,
+                    "action": "delete",
+                    "written_sha": written_sha,
+                    "target": os.path.join(cfg, rel),
+                }
+            )
             continue
 
         stored = entry.get("stored", "")
@@ -455,15 +620,31 @@ def restore(cfg, stamp=None, break_hardlinks=False):
             {
                 "rel": rel,
                 "entry": entry,
+                "action": "restore",
+                "written_sha": written_sha,
                 "content": content,
                 "mode": mode,
                 "target": os.path.join(cfg, rel),
             }
         )
 
+    # Disclosure: every entry whose real target lies outside the config dir is
+    # named before anything is written; --no-outside-cfg refuses those entries.
+    for plan in plans:
+        if "target" not in plan or "refused" in plan:
+            continue
+        real = _effective_real(plan["entry"], plan["target"])
+        if _inside(real_cfg, real):
+            continue
+        print("outside config dir: {} -> {}".format(plan["rel"], real))
+        if no_outside_cfg:
+            plan["refused"] = "outside config dir"
+
     # Phase 2: save the current state of every target we are about to write, so
     # a restore never silently discards post-backup edits.
-    targets = [plan["target"] for plan in plans if "target" in plan]
+    targets = [
+        plan["target"] for plan in plans if "target" in plan and "refused" not in plan
+    ]
     if targets:
         version = manifest.get("installer_version", "")
         if not isinstance(version, str):
@@ -486,19 +667,49 @@ def restore(cfg, stamp=None, break_hardlinks=False):
 
         entry = plan["entry"]
         target = plan["target"]
+        recorded_real = _recorded_link_real(entry, target)
+
+        if plan["action"] == "delete":
+            # A file this run created: undo it only when it still holds exactly
+            # the bytes this run wrote, and only inside $CFG (or at the exact
+            # link target recorded when it was written).
+            if _sha_of_file(os.path.realpath(target)) != plan["written_sha"]:
+                print(
+                    "not rolled back: {} changed after this run wrote it".format(rel)
+                )
+                continue
+            real_target = os.path.realpath(target)
+            if not _inside(real_cfg, real_target) and real_target != recorded_real:
+                print("refused {}: delete target escapes $CFG".format(rel))
+                any_refused = True
+                continue
+            try:
+                os.unlink(target)  # the path itself; a symlink's target is kept
+            except OSError as e:
+                print("refused {}: {}".format(rel, e))
+                any_refused = True
+                continue
+            print("deleted {}".format(rel))
+            continue
+
+        if only_run_files:
+            if bool(entry.get("removed")):
+                if os.path.lexists(target):
+                    print(
+                        "not rolled back: {} changed after this run wrote it".format(
+                            rel
+                        )
+                    )
+                    continue
+            elif _sha_of_file(os.path.realpath(target)) != plan["written_sha"]:
+                print("not rolled back: {} changed after this run wrote it".format(rel))
+                continue
+
         content = plan["content"]
         mode = plan["mode"]
-
         link_target = entry.get("link_target")
-        recorded_real = None
 
-        if bool(entry.get("was_symlink")) and isinstance(link_target, str) and link_target:
-            if os.path.isabs(link_target):
-                recorded_real = os.path.realpath(link_target)
-            else:
-                recorded_real = os.path.realpath(
-                    os.path.join(os.path.dirname(target), link_target)
-                )
+        if recorded_real is not None:
             if not os.path.lexists(target):
                 # The link is gone. Recreate it only when the recorded target
                 # still holds exactly the backed-up bytes; then the content is
@@ -526,13 +737,28 @@ def restore(cfg, stamp=None, break_hardlinks=False):
                 continue
 
         real_target = os.path.realpath(target)
-        inside_cfg = real_target == real_cfg or real_target.startswith(
-            real_cfg + os.sep
-        )
+        inside_cfg = _inside(real_cfg, real_target)
+        create_through_dangling = True
         if not inside_cfg:
-            # An intact symlink may still point outside $CFG, but only at the
-            # exact location recorded at backup time.
-            if recorded_real is None or real_target != recorded_real:
+            if recorded_real is not None and real_target == recorded_real:
+                # The entry's own symlink is intact and still points at the exact
+                # location recorded at backup time. If that target is now missing
+                # (a dangling symlink), refuse rather than create a file (and any
+                # missing parent directories) outside $CFG.
+                if not os.path.exists(real_target):
+                    print(
+                        "refused {}: symlink target {} outside $CFG is missing; "
+                        "not created".format(rel, real_target)
+                    )
+                    any_refused = True
+                    continue
+                create_through_dangling = False
+            elif recorded_real is None and os.path.lexists(target):
+                # Not a symlink entry itself, but it resolves outside $CFG because a
+                # parent directory is a symlink (already disclosed above). Restore
+                # only over a path that already exists there; never create one.
+                create_through_dangling = False
+            else:
                 print("refused {}: restore target escapes $CFG".format(rel))
                 any_refused = True
                 continue
@@ -543,7 +769,7 @@ def restore(cfg, stamp=None, break_hardlinks=False):
                 content,
                 mode,
                 break_hardlinks=break_hardlinks,
-                create_through_dangling=True,
+                create_through_dangling=create_through_dangling,
             )
             os.chmod(os.path.realpath(target), mode)
         except SafeWriteError as e:
@@ -591,11 +817,33 @@ def _backup_cmd(args):
     return 0
 
 
+def _mark_written_cmd(args):
+    mark_written(
+        args.cfg,
+        args.stamp,
+        args.version,
+        args.rel,
+        args.written_sha,
+        created=args.created,
+        removed=args.removed,
+    )
+    return 0
+
+
 def _restore_cmd(args):
-    return restore(args.cfg, args.stamp, args.break_hardlinks)
+    return restore(
+        args.cfg,
+        args.stamp,
+        args.break_hardlinks,
+        only_run_files=args.only_run_files,
+        no_outside_cfg=args.no_outside_cfg,
+    )
 
 
 def _list_cmd(args):
+    if args.written:
+        # Predicate only: no output, exit 0 when this run wrote something.
+        return 0 if _marked_written(args.cfg, args.stamp) else 1
     for line in list_backups(args.cfg):
         print(line)
     return 0
@@ -639,14 +887,29 @@ def build_parser():
     b.add_argument("paths", nargs="*")
     b.set_defaults(func=_backup_cmd)
 
+    mw = sub.add_parser("mark-written")
+    mw.add_argument("--cfg", required=True)
+    mw.add_argument("--stamp", required=True)
+    mw.add_argument("--version", required=True)
+    mw.add_argument("--rel", required=True)
+    mw.add_argument("--written-sha", dest="written_sha", required=True)
+    kind = mw.add_mutually_exclusive_group()
+    kind.add_argument("--created", action="store_true")
+    kind.add_argument("--removed", action="store_true")
+    mw.set_defaults(func=_mark_written_cmd)
+
     r = sub.add_parser("restore")
     r.add_argument("--cfg", required=True)
     r.add_argument("--stamp")
     r.add_argument("--break-hardlinks", action="store_true")
+    r.add_argument("--only-run-files", dest="only_run_files", action="store_true")
+    r.add_argument("--no-outside-cfg", dest="no_outside_cfg", action="store_true")
     r.set_defaults(func=_restore_cmd)
 
     l = sub.add_parser("list")
     l.add_argument("--cfg", required=True)
+    l.add_argument("--stamp")
+    l.add_argument("--written", action="store_true")
     l.set_defaults(func=_list_cmd)
 
     c = sub.add_parser("check")

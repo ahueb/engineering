@@ -37,7 +37,18 @@
 #                               intended target (usually a dotfiles checkout) is missing.
 #   --restore [STAMP]           Restore the most recent backup, or STAMP if given, then exit.
 #                               Delegates to scripts/safe_write.py restore. Accepts
-#                               --break-hardlinks.
+#                               --break-hardlinks and --no-outside-cfg.
+#   --no-outside-cfg            --restore only: refuse every entry whose real target lies
+#                               outside the config directory (an intact symlink into a
+#                               dotfiles checkout, or a path under a symlinked directory
+#                               such as rules/, for example). Those entries exit 8; the
+#                               rest are restored, each disclosed as "outside config dir:
+#                               <rel> -> <path>". Without this flag such entries still
+#                               restore only over a path that already exists; a restore
+#                               never creates a new file or directory outside $CFG.
+#   --no-rollback               Do not roll this run's writes back when it fails; print the
+#                               manual restore command instead. Without it a failing run
+#                               restores every file it wrote and left unchanged.
 #   --list-backups               List backup stamps and their files, then exit.
 #   -h, --help                  Show this help and exit.
 #
@@ -66,8 +77,21 @@
 #   5  a write target is hard-linked and --break-hardlinks was not given
 #   6  a write failed and its temp file was removed (from scripts/safe_write.py)
 #   7  Windows: the target file is open elsewhere; close Claude Code and rerun
-#   8  --restore: one or more files were refused (see scripts/safe_write.py restore)
+#   8  --restore: one or more files were refused (see scripts/safe_write.py restore), including
+#      every entry outside the config directory when --no-outside-cfg was given
 #   9  --restore: no backups found or the manifest is invalid
+#  11  partial: the run finished but one or more official-marketplace plugins failed to
+#      install; engineering@engineering, settings.json and the policy are in place and
+#      nothing is rolled back
+#  12  never produced by this script: scripts/safe_write.py restore --only-run-files uses it
+#      when the stamp marks no file as written by an installer run (this script checks that
+#      with `safe_write.py list --stamp ... --written` first and rolls nothing back instead)
+#
+# Rollback: after the first file this run writes, an unexpected command failure or an exit
+# with code 3-7 restores every file this run wrote and nobody changed since, removes the
+# files it created, and exits with the original code. A refusal (exit 1), exit 11 and
+# --dry-run never roll back. The config directory created for this run and its backups/
+# tree are kept by design.
 #
 # Settings modes: "enforce" makes every recommended value win; "defaults" only fills in
 # absent paths and reports drift. The mode is auto-selected once in preflight from
@@ -94,6 +118,8 @@ CREATE_THROUGH_DANGLING=0
 RESTORE_MODE=0
 RESTORE_STAMP=""
 LIST_BACKUPS=0
+NO_OUTSIDE_CFG=0
+NO_ROLLBACK=0
 
 print_help() {
   sed -n '/^# Usage:/,/^set -Eeuo pipefail$/p' "$HERE/install.sh" | sed '$d' | sed 's/^# \{0,1\}//'
@@ -133,6 +159,8 @@ while [ $# -gt 0 ]; do
         esac
       fi
       ;;
+    --no-outside-cfg) NO_OUTSIDE_CFG=1 ;;
+    --no-rollback) NO_ROLLBACK=1 ;;
     --list-backups) LIST_BACKUPS=1 ;;
     -h|--help) print_help; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
@@ -150,7 +178,13 @@ SOURCE="${SOURCE_FLAG:-$HERE}"
 # for mode purposes and is tightened to 0600 after the merge is written.
 if [ -e "$CFG/settings.json" ] || [ -L "$CFG/settings.json" ]; then SETTINGS_PREEXISTED=1; else SETTINGS_PREEXISTED=0; fi
 if [ -d "$CFG" ]; then CFG_PREEXISTED=1; else CFG_PREEXISTED=0; fi
-
+# The marker is the one file written without a preceding backup; it is rolled back only when
+# this run created it.
+if [ -e "$CFG/engineering-installer.json" ] || [ -L "$CFG/engineering-installer.json" ]; then
+  MARKER_PREEXISTED=1
+else
+  MARKER_PREEXISTED=0
+fi
 # --restore / --list-backups delegate to safe_write.py and exit immediately.
 if [ "$LIST_BACKUPS" -eq 1 ]; then
   python3 "$HERE/scripts/safe_write.py" list --cfg "$CFG"
@@ -160,6 +194,7 @@ if [ "$RESTORE_MODE" -eq 1 ]; then
   set -- restore --cfg "$CFG"
   [ -n "$RESTORE_STAMP" ] && set -- "$@" --stamp "$RESTORE_STAMP"
   [ "$BREAK_HARDLINKS" -eq 1 ] && set -- "$@" --break-hardlinks
+  [ "$NO_OUTSIDE_CFG" -eq 1 ] && set -- "$@" --no-outside-cfg
   python3 "$HERE/scripts/safe_write.py" "$@"
   exit $?
 fi
@@ -250,6 +285,29 @@ sw_write() {
   python3 "$HERE/scripts/safe_write.py" "$@"
 }
 
+# Result of the last sw_write_result call ("written" or "unchanged").
+SW_RESULT=""
+sw_write_result() {
+  # sw_write_result TARGET FROM DEFAULT_MODE ; prints the result as sw_write does
+  SW_RESULT="$(sw_write "$1" "$2" "$3")"
+  printf '%s\n' "$SW_RESULT"
+}
+
+sha256_of() {
+  python3 -c 'import hashlib, sys
+with open(sys.argv[1], "rb") as f:
+    print(hashlib.sha256(f.read()).hexdigest())' "$1"
+}
+
+mark_written() {
+  # mark_written REL SHA [--created|--removed] ; records what this run wrote, so a failure
+  # can roll back exactly those files.
+  local rel="$1" sha="$2"
+  shift 2
+  python3 "$HERE/scripts/safe_write.py" mark-written --cfg "$CFG" --stamp "$STAMP" \
+    --version "$INSTALLER_VERSION" --rel "$rel" --written-sha "$sha" "$@"
+}
+
 # Files skipped this run (unchanged or refused), reported in the Summary block.
 SKIPPED=""
 note_skip() {
@@ -261,7 +319,13 @@ $1"
   fi
 }
 
-STAMP="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+# Microsecond resolution (bash 3.2's `date` has none), so two runs in the same second still
+# order correctly.
+STAMP="$(python3 -c '
+import datetime, sys
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%f")
+print("{}Z-{}".format(now, sys.argv[1]))
+' "$$")"
 BACKED_UP=0
 BACKUP_DIR=""
 INSTALLER_VERSION=""
@@ -277,13 +341,45 @@ take_backup() {
   fi
 }
 
+# do_rollback CODE: undo this run's writes, then exit CODE. Re-entrancy is impossible: the
+# ERR trap is cleared on the first line and every path exits.
+do_rollback() {
+  trap - ERR
+  local code="${1:-1}"
+  # Nothing marked as written by this run -> nothing to undo (also the case for a failure
+  # before the first write, for --dry-run, and for a no-op rerun).
+  if ! python3 "$HERE/scripts/safe_write.py" list --cfg "$CFG" --stamp "$STAMP" --written; then
+    exit "$code"
+  fi
+  if [ "$NO_ROLLBACK" -eq 1 ]; then
+    echo "rollback skipped; restore with: ./install.sh --restore $STAMP" >&2
+    exit "$code"
+  fi
+  if ! python3 "$HERE/scripts/safe_write.py" restore --cfg "$CFG" --stamp "$STAMP" --only-run-files >&2; then
+    echo "rollback failed; restore manually with: ./install.sh --restore $STAMP" >&2
+    exit "$code"
+  fi
+  # The marker, when created this run, is marked --created above and so is already covered
+  # by the --only-run-files restore's delete plan (which removes it only if it still holds
+  # exactly the bytes this run wrote); no separate rm -f here.
+  echo "rolled back to $STAMP" >&2
+  echo "left in place by design: the config directory created for this run, an empty rules/" \
+    "directory created for this run (parent directories are not recorded), and its" \
+    "backups/ tree" >&2
+  exit "$code"
+}
+
 on_err() {
   local ec=$?
   # With errtrace the trap also runs inside command substitutions; only the top-level
-  # invocation prints the hint, so a failing $(...) does not duplicate it.
-  if [ "${BASH_SUBSHELL:-0}" -eq 0 ] && [ "$BACKED_UP" -eq 1 ]; then
-    echo "backup: $BACKUP_DIR" >&2
-    echo "restore with: ./install.sh --restore $STAMP" >&2
+  # invocation prints the hint and rolls back, so a failing $(...) never rolls back from
+  # the subshell.
+  if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then
+    if [ "$BACKED_UP" -eq 1 ]; then
+      echo "backup: $BACKUP_DIR" >&2
+      echo "restore with: ./install.sh --restore $STAMP" >&2
+    fi
+    do_rollback "$ec"
   fi
   exit "$ec"
 }
@@ -713,7 +809,16 @@ case "$MERGE_CHECK_RC" in
     take_backup "$CFG/settings.json"
     TMP_SETTINGS="$(mktemp)"
     python3 "$HERE/scripts/merge_settings.py" --current "$CFG/settings.json" --recommended "$RECOMMENDED" --mode "$SETTINGS_MODE" $OFFICIAL_FLAGS > "$TMP_SETTINGS"
-    sw_write "$CFG/settings.json" "$TMP_SETTINGS" 0600
+    if [ -e "$CFG/settings.json" ] || [ -L "$CFG/settings.json" ]; then SETTINGS_EXISTED_NOW=1; else SETTINGS_EXISTED_NOW=0; fi
+    sw_write_result "$CFG/settings.json" "$TMP_SETTINGS" 0600
+    if [ "$SW_RESULT" = "written" ]; then
+      SETTINGS_SHA="$(sha256_of "$TMP_SETTINGS")"
+      if [ "$SETTINGS_EXISTED_NOW" -eq 0 ]; then
+        mark_written "settings.json" "$SETTINGS_SHA" --created
+      else
+        mark_written "settings.json" "$SETTINGS_SHA"
+      fi
+    fi
     rm -f "$TMP_SETTINGS"
     if [ "$SETTINGS_PREEXISTED" -eq 0 ]; then
       python3 -c 'import os, sys; os.chmod(os.path.realpath(sys.argv[1]), 0o600)' "$CFG/settings.json"
@@ -722,7 +827,7 @@ case "$MERGE_CHECK_RC" in
     ;;
   *)
     echo "settings.json could not be merged (exit $MERGE_CHECK_RC); aborting without further changes" >&2
-    exit "$MERGE_CHECK_RC"
+    do_rollback "$MERGE_CHECK_RC"
     ;;
 esac
 
@@ -743,7 +848,16 @@ write_policy_claude_md() {
     fi
     take_backup "$target"
   fi
-  sw_write "$target" "$POLICY_SRC" 0644
+  local existed=0
+  if [ -e "$target" ] || [ -L "$target" ]; then existed=1; fi
+  sw_write_result "$target" "$POLICY_SRC" 0644
+  if [ "$SW_RESULT" = "written" ]; then
+    if [ "$existed" -eq 0 ]; then
+      mark_written "CLAUDE.md" "$(sha256_of "$POLICY_SRC")" --created
+    else
+      mark_written "CLAUDE.md" "$(sha256_of "$POLICY_SRC")"
+    fi
+  fi
   echo "wrote CLAUDE.md"
 }
 
@@ -761,7 +875,16 @@ write_policy_rules() {
     fi
     take_backup "$target"
   fi
-  sw_write "$target" "$POLICY_SRC" 0644
+  local existed=0
+  if [ -e "$target" ] || [ -L "$target" ]; then existed=1; fi
+  sw_write_result "$target" "$POLICY_SRC" 0644
+  if [ "$SW_RESULT" = "written" ]; then
+    if [ "$existed" -eq 0 ]; then
+      mark_written "rules/engineering-policy.md" "$(sha256_of "$POLICY_SRC")" --created
+    else
+      mark_written "rules/engineering-policy.md" "$(sha256_of "$POLICY_SRC")"
+    fi
+  fi
   echo "wrote rules/engineering-policy.md"
 }
 
@@ -787,12 +910,15 @@ migrate_or_refresh_legacy() {
 
   if [ "$confirmed" -eq 1 ]; then
     take_backup "$target"
+    local removed_sha
+    removed_sha="$(sha256_of "$target")"
     if [ -L "$target" ]; then
       rm -f "$target"
       echo "removed the CLAUDE.md symlink (its target was left in place)"
     else
       rm -f "$target"
     fi
+    mark_written "CLAUDE.md" "$removed_sha" --removed
     echo "migrated legacy CLAUDE.md policy to rules/engineering-policy.md"
     MIGRATED=1
   else
@@ -830,6 +956,7 @@ fi
 
 # ---- step 11: official marketplace and plugins (unless --no-official/--purge-official) --
 
+OFFICIAL_FAILED=""
 if [ "$OFFICIAL" -eq 1 ] && [ "$PURGE_OFFICIAL" -eq 0 ]; then
   claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1 || true
   for p in superpowers context7 code-review playwright frontend-design claude-code-setup claude-md-management typescript-lsp pyright-lsp rust-analyzer-lsp gopls-lsp; do
@@ -849,6 +976,11 @@ sys.exit(0 if d.get("enabledPlugins", {}).get(key) is False else 1)
       echo "installed $p"
     else
       echo "WARN: could not install $p" >&2
+      if [ -n "$OFFICIAL_FAILED" ]; then
+        OFFICIAL_FAILED="$OFFICIAL_FAILED,$p"
+      else
+        OFFICIAL_FAILED="$p"
+      fi
     fi
   done
 fi
@@ -868,7 +1000,12 @@ print(json.dumps({
 ' "$INSTALLER_VERSION" "$TIMESTAMP" "$SETTINGS_MODE" "$POLICY_TARGET")"
 TMP_MARKER="$(mktemp)"
 printf '%s\n' "$MARKER_JSON" > "$TMP_MARKER"
-sw_write "$CFG/engineering-installer.json" "$TMP_MARKER" 0600 >/dev/null
+sw_write_result "$CFG/engineering-installer.json" "$TMP_MARKER" 0600 >/dev/null
+# The marker is written without a backup, so it is rolled back only when this run created it
+# (a rerun rewrites it with a fresh timestamp and leaves it in place on failure).
+if [ "$SW_RESULT" = "written" ] && [ "$MARKER_PREEXISTED" -eq 0 ]; then
+  mark_written "engineering-installer.json" "$(sha256_of "$TMP_MARKER")" --created
+fi
 rm -f "$TMP_MARKER"
 
 echo
@@ -892,3 +1029,10 @@ fi
 echo
 echo "Verify with:  claude plugin list   and   claude --print '/help' (look for /engineering:* skills)"
 echo "restart Claude Code if a session was already running, so it picks up the new policy and hook."
+
+# A failed official plugin leaves a usable installation: report it and exit 11 instead of
+# reporting success. Nothing is rolled back.
+if [ -n "$OFFICIAL_FAILED" ]; then
+  echo "partial: official plugin install failed: $OFFICIAL_FAILED" >&2
+  exit 11
+fi

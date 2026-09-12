@@ -35,7 +35,7 @@ Do not review, build, or test any package while others are still running.
 1. Collect every report. Reconcile assumptions that conflict across packages by editing the affected files directly; this is expected and is cheaper than a second implementer round.
 2. Diff the working tree against the plan's file list. Any file changed outside its package's ownership is a defect to resolve now. Cap a package at roughly 15 files; split larger ones.
 3. Run one integrated verification with `/engineering:verification-loop`: build, type check, lint, then the full test suite. Launch independent checks in parallel.
-4. On failure, compress the output with `engineering:test-triage`, then repair in the main session. Use `engineering:hard-repair` for a failure that survives two repair attempts. Rerun the exact failing check, then the full pass.
+4. On failure, dispatch `engineering:test-triage` with the captured failure output (it has no Bash and will not rerun anything), then repair in the main session. Use `engineering:hard-repair` for a failure that survives two repair attempts. Rerun the exact failing check, then the full pass.
 
 ## 4. Adversarial audit
 

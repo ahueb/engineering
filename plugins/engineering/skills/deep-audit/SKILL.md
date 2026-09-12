@@ -4,22 +4,12 @@ description: Perform an explicitly requested high-assurance adversarial audit of
 argument-hint: "[implementation, architecture, or audit scope]"
 disable-model-invocation: true
 context: fork
-agent: general-purpose
-model: fable
-effort: xhigh
+agent: engineering:auditor
 background: false
-disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact
 ---
 
 Audit $ARGUMENTS independently and adversarially. Do not modify the implementation.
 
-1. Establish requirements, invariants, architecture constraints, and acceptance criteria.
-2. Trace actual behavior and verification evidence rather than trusting summaries or passing tests.
-3. Examine applicable correctness, data integrity, concurrency, complexity, resource use, failure recovery, security, compatibility, operability, and test-quality risks.
-4. Try to falsify correctness with boundary, malformed, duplicate, reordered, repeated, interrupted, concurrent, partial-failure, and scale cases where relevant.
-5. Validate suspected defects with targeted evidence when practical. Do not promote speculation to confirmed failure.
-6. Use external documentation only when explicitly requested or when a material external/version-specific fact cannot be established locally. Do not expand into broad research without request.
-7. Avoid style-only findings, duplicate symptoms of one root cause, speculative abstractions, and immaterial micro-optimizations.
-8. Stop when material risk surfaces are covered and further work is unlikely to change readiness or uncertainty.
+The auditor runs at Fable/xhigh effort with Read, Grep, Glob, and Bash; its Bash is guarded by a plugin hook allowlist keyed to that agent, which blocks writes, redirection, and everything except a short list of read-only inspection commands. This is a guard against accidental mutation during the audit, not a sandbox: it cannot execute tests or builds. If the audit scope depends on test results, build output, or other command output, supply it in $ARGUMENTS or gather it yourself before dispatch; the auditor cannot produce it.
 
-Return: overall verdict/confidence; blocking findings; other material findings by severity; residual uncertainty; verification considered; readiness. For each finding include failure mechanism, evidence, remediation, and post-fix verification.
+Return the auditor's verdict, blocking findings, other material findings by severity, residual uncertainty, verification considered, and readiness, to the user or caller.

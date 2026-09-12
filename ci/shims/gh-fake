@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Fake `gh` for ci.sh's release scenarios. Records every invocation (one line
+# per call, the arguments space-joined) in $GH_FAKE_LOG and answers the calls
+# release.sh makes without any network:
+#   auth status        -> exit 0 (authenticated), unless GH_FAKE_AUTH_FAIL=1 -> exit 1
+#   pr create ...      -> prints a PR URL, exit 0
+#   pr checks ...      -> exit 0 (checks green)
+#   pr merge ...       -> exit 0 (merged)
+# Anything else exits 0 silently, so an added call shows up in the log rather
+# than failing the scenario for the wrong reason.
+set -euo pipefail
+
+if [ -n "${GH_FAKE_LOG:-}" ]; then
+  printf '%s\n' "$*" >> "$GH_FAKE_LOG"
+fi
+
+case "${1:-}" in
+  auth)
+    if [ "${GH_FAKE_AUTH_FAIL:-0}" = "1" ]; then
+      exit 1
+    fi
+    exit 0
+    ;;
+  pr)
+    case "${2:-}" in
+      create)
+        echo "https://github.com/ahueb/engineering/pull/1"
+        exit 0
+        ;;
+      checks)
+        echo "gh-fake: all checks passed"
+        exit 0
+        ;;
+      merge)
+        echo "gh-fake: merged"
+        exit 0
+        ;;
+    esac
+    ;;
+esac
+
+exit 0

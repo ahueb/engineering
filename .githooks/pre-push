@@ -2,8 +2,35 @@
 # Pre-push gate: refuses the push unless ./ci.sh passes on the working tree.
 # Enable with:  git config core.hooksPath .githooks   (install.sh does not do this; it is a maintainer setting)
 # Bypass only deliberately:  git push --no-verify
+#
+# Skipped only for a release.sh push: ENGINEERING_RELEASE=1 and every pushed
+# ref is a release branch (refs/heads/release/v*) or a version tag
+# (refs/tags/v*). Actions (not this hook) is the gate for those pushes.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ "${ENGINEERING_RELEASE:-}" = "1" ]; then
+  all_release_refs=1
+  saw_ref=0
+  # shellcheck disable=SC2034  # local_ref/remote_sha are unused; git supplies all four fields
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -n "$remote_ref" ] || continue
+    saw_ref=1
+    case "$local_sha" in
+      0000000000000000000000000000000000000000) all_release_refs=0 ;;
+    esac
+    case "$remote_ref" in
+      refs/heads/release/v*|refs/tags/v*) ;;
+      *) all_release_refs=0 ;;
+    esac
+  done
+  if [ "$saw_ref" = 1 ] && [ "$all_release_refs" = 1 ]; then
+    echo "pre-push: ENGINEERING_RELEASE=1 and every pushed ref is a release branch or version tag; skipping ci.sh (Actions gates this push)"
+    exit 0
+  fi
+  echo "pre-push: ENGINEERING_RELEASE=1 but not every pushed ref is a release branch/tag; running ci.sh"
+fi
+
 if [ -n "$(git -C "$HERE" status --porcelain)" ]; then
   echo "pre-push: working tree is dirty; commit or stash before pushing so CI checks what you push" >&2
   exit 1

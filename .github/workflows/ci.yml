@@ -1,0 +1,69 @@
+name: ci
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install shellcheck
+        run: sudo apt-get update -q && sudo apt-get install -y -q shellcheck
+      - name: Install verified Claude Code
+        run: scripts/ci/install-claude.sh
+      - name: CI default tier
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          ./ci.sh
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install shellcheck and gnupg
+        run: brew install shellcheck gnupg
+      - name: Install verified Claude Code
+        run: scripts/ci/install-claude.sh
+      - name: Force bash 3.2 for every script
+        # The shim lives in RUNNER_TEMP, created here at job time, rather than as a
+        # committed scripts/ci/bash32-shim/bash: a symlink to /bin/bash only makes
+        # sense on the macOS runner that has it.
+        run: |
+          mkdir -p "$RUNNER_TEMP/bash32"
+          ln -sf /bin/bash "$RUNNER_TEMP/bash32/bash"
+          echo "$RUNNER_TEMP/bash32" >> "$GITHUB_PATH"
+      - name: CI default tier under bash 3.2
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          bash --version | head -1
+          bash --version | head -1 | grep -q 'version 3\.2' || { echo "bash 3.2 not in effect" >&2; exit 1; }
+          ./ci.sh
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install verified Claude Code
+        shell: pwsh
+        run: scripts/ci/install-claude.ps1
+      - name: Unit tests under dev mode
+        shell: pwsh
+        run: python -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write
+      - name: Shell syntax under Git Bash
+        shell: bash
+        run: for f in install.sh release.sh ci.sh plugins/engineering/hooks/session-start.sh; do bash -n "$f"; done

@@ -1,0 +1,16 @@
+{
+ "session_id": "5ddd0fe2-a97a-4c7e-abc3-a186331d0109",
+ "transcript_path": "/tmp/live/transcript.jsonl",
+ "cwd": "/tmp/live/work",
+ "prompt_id": "2b66cbdb-656d-4352-beba-83d66ccb4b94",
+ "permission_mode": "acceptEdits",
+ "agent_id": "a695e41bf166fb8dd",
+ "agent_type": "engineering:auditor",
+ "hook_event_name": "PreToolUse",
+ "tool_name": "Bash",
+ "tool_input": {
+  "command": "touch created.txt",
+  "description": "Attempt to create a file named created.txt"
+ },
+ "tool_use_id": "toolu_01HKpNnGtJ3f6XVegD845hDK"
+}

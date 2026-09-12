@@ -613,6 +613,679 @@ class RestoreTests(TempDirCase):
         )
 
 
+class StampFormTests(TempDirCase):
+    def test_stamp_re_accepts_both_forms(self):
+        self.assertTrue(safe_write.STAMP_RE.match("20260101T000000Z-1"))
+        self.assertTrue(safe_write.STAMP_RE.match("20260101T000000.123456Z-1"))
+        self.assertFalse(safe_write.STAMP_RE.match("20260101T000000.123Z-1"))
+        self.assertFalse(safe_write.STAMP_RE.match("20260101T000000Z"))
+
+    def test_pre_restore_stamp_is_microsecond_form(self):
+        stamp = safe_write._pre_restore_stamp()
+        self.assertTrue(safe_write.STAMP_RE.match(stamp), stamp)
+        self.assertIn(".", stamp.rpartition("-")[0])
+
+    def test_same_second_mixed_forms_order_legacy_first(self):
+        eng = self.root / "cfg" / "backups" / "engineering"
+        eng.mkdir(parents=True)
+        names = [
+            "20260101T000000.500000Z-7",
+            "20260101T000000Z-9",
+            "20260101T000000.000001Z-3",
+            "20251231T235959.999999Z-9",
+        ]
+        for n in names:
+            (eng / n).mkdir()
+        self.assertEqual(
+            safe_write._list_stamps(str(eng)),
+            [
+                "20251231T235959.999999Z-9",
+                "20260101T000000Z-9",
+                "20260101T000000.000001Z-3",
+                "20260101T000000.500000Z-7",
+            ],
+        )
+
+    def test_latest_stamp_is_the_microsecond_one_from_the_same_second(self):
+        cfg = self.root / "cfg"
+        eng = cfg / "backups" / "engineering"
+        eng.mkdir(parents=True)
+        for n in ("20260101T000000Z-9", "20260101T000000.000001Z-3"):
+            (eng / n).mkdir()
+        self.assertEqual(
+            safe_write._resolve_stamp_dir(str(eng), None),
+            str(eng / "20260101T000000.000001Z-3"),
+        )
+
+    def test_prune_mixed_forms_drops_the_oldest_by_parsed_time(self):
+        eng = self.root / "cfg" / "backups" / "engineering"
+        eng.mkdir(parents=True)
+        names = [
+            "20260101T000000Z-9",  # oldest: same second, no fraction
+            "20260101T000000.000001Z-9",
+            "20260101T000000.000002Z-9",
+            "20260101T000000.000003Z-9",
+            "20260101T000000.000004Z-9",
+            "20260101T000000.000005Z-9",
+        ]
+        for n in names:
+            (eng / n).mkdir()
+        safe_write._prune(str(eng))
+        remaining = sorted(p.name for p in eng.iterdir())
+        self.assertEqual(len(remaining), 5)
+        self.assertNotIn("20260101T000000Z-9", remaining)
+
+
+class MarkWrittenTests(TempDirCase):
+    def _manifest(self, cfg, stamp):
+        path = cfg / "backups" / "engineering" / stamp / "manifest.json"
+        return json.loads(path.read_text())
+
+    @POSIX_ONLY
+    def test_mark_written_creates_stamp_dir_and_manifest(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        (cfg / "settings.json").write_bytes(b"{}")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg), stamp, "2.9.0", "settings.json", "a" * 64, created=True
+        )
+        manifest = self._manifest(cfg, stamp)
+        self.assertEqual(manifest["schema"], 1)
+        self.assertEqual(manifest["installer_version"], "2.9.0")
+        self.assertEqual(manifest["stamp"], stamp)
+        entry = manifest["files"][0]
+        self.assertEqual(entry["rel"], "settings.json")
+        self.assertEqual(entry["written_sha256"], "a" * 64)
+        self.assertTrue(entry["created"])
+        self.assertFalse(entry["removed"])
+        self.assertFalse(entry["was_symlink"])
+        self.assertIsNone(entry["link_target"])
+        self.assertNotIn("stored", entry)
+        self.assertEqual(
+            stat.S_IMODE(os.stat(cfg / "backups" / "engineering" / stamp).st_mode),
+            0o700,
+        )
+
+    def test_mark_written_created_records_live_symlink(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        outside = self.root / "outside"
+        outside.mkdir()
+        real = outside / "policy.md"
+        real.write_bytes(b"policy")
+        link = cfg / "CLAUDE.md"
+        link.symlink_to(real)
+
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg), stamp, "2.9.0", "CLAUDE.md", "b" * 64, created=True
+        )
+        entry = self._manifest(cfg, stamp)["files"][0]
+        self.assertTrue(entry["was_symlink"])
+        self.assertEqual(entry["link_target"], str(real))
+
+    def test_mark_written_after_backup_keeps_stored_mode_link_target(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        outside = self.root / "outside"
+        outside.mkdir()
+        real = outside / "settings.json"
+        real.write_bytes(b'{"a":1}')
+        link = cfg / "settings.json"
+        link.symlink_to(real)
+
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(link)])
+        before = self._manifest(cfg, stamp)["files"][0]
+        safe_write.mark_written(str(cfg), stamp, "2.9.0", "settings.json", "c" * 64)
+        entry = self._manifest(cfg, stamp)["files"][0]
+
+        self.assertEqual(entry["stored"], before["stored"])
+        self.assertEqual(entry["sha256"], before["sha256"])
+        self.assertEqual(entry["mode"], before["mode"])
+        self.assertEqual(entry["link_target"], before["link_target"])
+        self.assertTrue(entry["was_symlink"])
+        self.assertEqual(entry["written_sha256"], "c" * 64)
+        self.assertEqual(len(self._manifest(cfg, stamp)["files"]), 1)
+
+    def test_backup_after_mark_written_keeps_written_sha256(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"new")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg), stamp, "2.9.0", "settings.json", "d" * 64, created=True
+        )
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+        entry = self._manifest(cfg, stamp)["files"][0]
+        self.assertEqual(entry["written_sha256"], "d" * 64)
+        self.assertTrue(entry["created"])
+        self.assertEqual(entry["sha256"], safe_write.hashlib.sha256(b"new").hexdigest())
+        self.assertIn("stored", entry)
+
+    def test_mark_written_prunes_to_five_stamps(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        (cfg / "settings.json").write_bytes(b"x")
+        eng = cfg / "backups" / "engineering"
+        eng.mkdir(parents=True)
+        for i in range(5):
+            (eng / "2026010{}T000000Z-1".format(i + 1)).mkdir()
+        safe_write.mark_written(
+            str(cfg), "20260201T000000.000001Z-1", "2.9.0", "settings.json", "e" * 64
+        )
+        remaining = sorted(p.name for p in eng.iterdir() if p.is_dir())
+        self.assertEqual(len(remaining), 5)
+        self.assertNotIn("20260101T000000Z-1", remaining)
+        self.assertIn("20260201T000000.000001Z-1", remaining)
+
+    def test_list_written_predicate_exit_codes(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.main(
+                ["list", "--cfg", str(cfg), "--stamp", stamp, "--written"]
+            )
+        self.assertEqual(rc, 1)
+        self.assertEqual(captured, [])
+
+        safe_write.mark_written(str(cfg), stamp, "2.9.0", "settings.json", "f" * 64)
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.main(
+                ["list", "--cfg", str(cfg), "--stamp", stamp, "--written"]
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured, [])
+
+        # an unknown stamp is "nothing written", not an error
+        self.assertEqual(
+            safe_write.main(
+                ["list", "--cfg", str(cfg), "--stamp", "20260101T000000Z-2", "--written"]
+            ),
+            1,
+        )
+
+    def test_mark_written_protects_its_own_stamp_from_future_dated_stamps(self):
+        # Five pre-existing stamps that sort *after* this run's stamp (e.g. a clock
+        # skew or a manually copied backup) must not cause _prune to remove the
+        # stamp this run is writing to on its very first mark-written.
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        (cfg / "settings.json").write_bytes(b"x")
+        eng = cfg / "backups" / "engineering"
+        eng.mkdir(parents=True)
+        for i in range(5):
+            stamp_dir = eng / "20990101T00000{}Z-1".format(i)
+            stamp_dir.mkdir()
+            (stamp_dir / "manifest.json").write_text(
+                json.dumps({"schema": 1, "installer_version": "x", "files": []})
+            )
+        run_stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg), run_stamp, "2.9.0", "settings.json", "a" * 64
+        )
+        self.assertTrue((eng / run_stamp).is_dir(), sorted(p.name for p in eng.iterdir()))
+
+    def test_default_list_output_unchanged(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+        safe_write.mark_written(str(cfg), stamp, "2.9.0", "settings.json", "f" * 64)
+        self.assertEqual(
+            safe_write.list_backups(str(cfg)),
+            ["{}\t2.9.0\tsettings.json".format(stamp)],
+        )
+
+
+class OutsideCfgDisclosureTests(TempDirCase):
+    def _cfg_with_outside_symlink(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        outside = self.root / "dotfiles"
+        outside.mkdir()
+        real = outside / "settings.json"
+        real.write_bytes(b'{"a":1}')
+        link = cfg / "settings.json"
+        link.symlink_to(real)
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(link)])
+        real.write_bytes(b'{"a":2}')
+        return cfg, real, stamp
+
+    def test_disclosure_line_precedes_every_write(self):
+        cfg, real, stamp = self._cfg_with_outside_symlink()
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 0)
+        self.assertEqual(real.read_bytes(), b'{"a":1}')
+        disclosure = "outside config dir: settings.json -> {}".format(real)
+        self.assertIn(disclosure, captured)
+        self.assertEqual(captured.index(disclosure), 0)
+        self.assertTrue(captured[1].startswith("pre-restore backup: "), captured)
+        self.assertIn("restored settings.json", captured)
+
+    def test_no_outside_cfg_refuses_that_entry_with_exit_8(self):
+        cfg, real, stamp = self._cfg_with_outside_symlink()
+        # a second, ordinary in-$CFG entry is still restored
+        other = cfg / "rules" / "engineering-policy.md"
+        other.parent.mkdir()
+        other.write_bytes(b"policy")
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(other)])
+        other.write_bytes(b"edited")
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, no_outside_cfg=True)
+        self.assertEqual(rc, 8)
+        self.assertEqual(real.read_bytes(), b'{"a":2}')  # untouched
+        self.assertEqual(other.read_bytes(), b"policy")  # restored
+        self.assertIn("refused settings.json: outside config dir", captured)
+        self.assertIn(
+            "outside config dir: settings.json -> {}".format(real), captured
+        )
+
+    def test_no_outside_cfg_keeps_the_refused_entry_out_of_pre_restore_backup(self):
+        cfg, real, stamp = self._cfg_with_outside_symlink()
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, no_outside_cfg=True)
+        self.assertEqual(rc, 8)
+        self.assertEqual([l for l in captured if l.startswith("pre-restore backup")], [])
+
+
+class SymlinkedParentDirRestoreTests(TempDirCase):
+    def _cfg_with_symlinked_rules_dir(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        outside_dir = self.root / "dotfiles-rules"
+        outside_dir.mkdir()
+        (cfg / "rules").symlink_to(outside_dir)
+        x = cfg / "rules" / "x"
+        x.write_bytes(b"orig")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(x)])
+        return cfg, outside_dir, x, stamp
+
+    def test_target_under_symlinked_parent_dir_is_restored_and_disclosed(self):
+        # rules/ itself is a symlink to a directory outside $CFG; rules/x is an
+        # ordinary file entry (not itself a symlink). Without --no-outside-cfg it
+        # is restored (over the existing path) and disclosed, matching install.sh's
+        # documented behaviour.
+        cfg, outside_dir, x, stamp = self._cfg_with_symlinked_rules_dir()
+        x.write_bytes(b"modified")
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 0)
+        self.assertEqual(x.read_bytes(), b"orig")
+        self.assertTrue(
+            any(l.startswith("outside config dir: rules/x -> ") for l in captured),
+            captured,
+        )
+        self.assertIn("restored rules/x", captured)
+
+    def test_target_under_symlinked_parent_dir_refused_when_missing(self):
+        # A restore is never allowed to create a new path outside $CFG, even one
+        # that would land under a directory the user's own layout symlinks there.
+        cfg, outside_dir, x, stamp = self._cfg_with_symlinked_rules_dir()
+        x.unlink()
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 8)
+        self.assertFalse(x.exists())
+        self.assertIn("refused rules/x: restore target escapes $CFG", captured)
+
+
+class DanglingOutsideSymlinkRestoreTests(TempDirCase):
+    def test_dangling_symlink_target_outside_cfg_is_refused_not_created(self):
+        # The symlink entry itself is intact, but the file it points to outside
+        # $CFG is gone (dangling). Restore must not create it (or any missing
+        # parent directories) outside $CFG.
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        outside_dir = self.root / "outside"
+        outside_dir.mkdir()
+        real_target = outside_dir / "CLAUDE.md"
+        real_target.write_bytes(b"policy content")
+        link = cfg / "CLAUDE.md"
+        link.symlink_to(real_target)
+
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(link)])
+
+        real_target.unlink()
+        self.assertTrue(link.is_symlink())
+        self.assertFalse(link.exists())
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 8)
+        self.assertFalse(real_target.exists())
+        self.assertTrue(
+            any("outside $CFG is missing; not created" in l for l in captured),
+            captured,
+        )
+
+    def test_dangling_symlink_target_inside_cfg_still_created(self):
+        # The existing (pre-fix) behaviour for a dangling symlink whose recorded
+        # target is inside $CFG is unchanged: it is fine to create it there.
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        real_target = cfg / "sub" / "CLAUDE.md"
+        real_target.parent.mkdir()
+        real_target.write_bytes(b"policy content")
+        link = cfg / "CLAUDE.md"
+        link.symlink_to(real_target)
+
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(link)])
+
+        real_target.unlink()
+        real_target.parent.rmdir()
+        self.assertTrue(link.is_symlink())
+        self.assertFalse(link.exists())
+
+        rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 0)
+        self.assertEqual(real_target.read_bytes(), b"policy content")
+
+
+class OnlyRunFilesTests(TempDirCase):
+    def _cfg(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        return cfg
+
+    def test_exit_12_when_nothing_is_marked(self):
+        cfg = self._cfg()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+        with self.assertRaises(safe_write.SafeWriteError) as ctx:
+            safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(ctx.exception.code, 12)
+
+    def test_backed_up_entry_restored_when_unchanged_since_the_write(self):
+        cfg = self._cfg()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+        settings.write_bytes(b"new")
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "settings.json",
+            safe_write.hashlib.sha256(b"new").hexdigest(),
+        )
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertEqual(settings.read_bytes(), b"old")
+        self.assertIn("restored settings.json", captured)
+        self.assertEqual(len([l for l in captured if l.startswith("pre-restore")]), 1)
+
+    def test_backed_up_entry_changed_after_the_write_is_reported_not_reverted(self):
+        cfg = self._cfg()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+        settings.write_bytes(b"new")
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "settings.json",
+            safe_write.hashlib.sha256(b"new").hexdigest(),
+        )
+        settings.write_bytes(b"changed by someone else")
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertEqual(settings.read_bytes(), b"changed by someone else")
+        self.assertIn(
+            "not rolled back: settings.json changed after this run wrote it", captured
+        )
+
+    def test_created_entry_deleted_when_unchanged(self):
+        cfg = self._cfg()
+        rules = cfg / "rules"
+        rules.mkdir()
+        policy = rules / "engineering-policy.md"
+        policy.write_bytes(b"policy")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "rules/engineering-policy.md",
+            safe_write.hashlib.sha256(b"policy").hexdigest(),
+            created=True,
+        )
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertFalse(policy.exists())
+        self.assertIn("deleted rules/engineering-policy.md", captured)
+        self.assertTrue(rules.is_dir())  # the directory stays
+
+    def test_created_entry_changed_after_the_write_is_kept(self):
+        cfg = self._cfg()
+        marker = cfg / "engineering-installer.json"
+        marker.write_bytes(b"{}")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "engineering-installer.json",
+            safe_write.hashlib.sha256(b"{}").hexdigest(),
+            created=True,
+        )
+        marker.write_bytes(b'{"edited": true}')
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertTrue(marker.exists())
+        self.assertIn(
+            "not rolled back: engineering-installer.json changed after this run "
+            "wrote it",
+            captured,
+        )
+
+    def test_created_symlink_entry_unlinks_the_link_not_the_target(self):
+        cfg = self._cfg()
+        outside = self.root / "dotfiles"
+        outside.mkdir()
+        real = outside / "policy.md"
+        real.write_bytes(b"policy")
+        link = cfg / "CLAUDE.md"
+        link.symlink_to(real)
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "CLAUDE.md",
+            safe_write.hashlib.sha256(b"policy").hexdigest(),
+            created=True,
+        )
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertFalse(link.is_symlink())
+        self.assertTrue(real.exists())
+        self.assertEqual(real.read_bytes(), b"policy")
+        self.assertIn("deleted CLAUDE.md", captured)
+        self.assertIn(
+            "outside config dir: CLAUDE.md -> {}".format(real), captured
+        )
+
+    def test_created_entry_now_pointing_elsewhere_outside_cfg_is_refused(self):
+        cfg = self._cfg()
+        outside = self.root / "dotfiles"
+        outside.mkdir()
+        recorded = outside / "policy.md"
+        recorded.write_bytes(b"policy")
+        other = outside / "other.md"
+        other.write_bytes(b"policy")  # same bytes, different file
+        link = cfg / "CLAUDE.md"
+        link.symlink_to(recorded)
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "CLAUDE.md",
+            safe_write.hashlib.sha256(b"policy").hexdigest(),
+            created=True,
+        )
+        link.unlink()
+        link.symlink_to(other)
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 8)
+        self.assertTrue(link.is_symlink())
+        self.assertTrue(other.exists())
+        self.assertIn("refused CLAUDE.md: delete target escapes $CFG", captured)
+
+    def test_removed_entry_restored_only_when_absent(self):
+        cfg = self._cfg()
+        claude = cfg / "CLAUDE.md"
+        claude.write_bytes(b"legacy policy")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(claude)])
+        pre_sha = safe_write.hashlib.sha256(b"legacy policy").hexdigest()
+        claude.unlink()
+        safe_write.mark_written(
+            str(cfg), stamp, "2.9.0", "CLAUDE.md", pre_sha, removed=True
+        )
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertEqual(claude.read_bytes(), b"legacy policy")
+        self.assertIn("restored CLAUDE.md", captured)
+
+        # someone recreated the path since: leave it alone
+        claude.write_bytes(b"a new file the user made")
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertEqual(claude.read_bytes(), b"a new file the user made")
+        self.assertIn(
+            "not rolled back: CLAUDE.md changed after this run wrote it", captured
+        )
+
+    def test_unmarked_entries_are_ignored(self):
+        cfg = self._cfg()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        other = cfg / "other.json"
+        other.write_bytes(b"other-old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings), str(other)])
+        settings.write_bytes(b"new")
+        other.write_bytes(b"other-new")
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "settings.json",
+            safe_write.hashlib.sha256(b"new").hexdigest(),
+        )
+        rc = safe_write.restore(str(cfg), stamp=stamp, only_run_files=True)
+        self.assertEqual(rc, 0)
+        self.assertEqual(settings.read_bytes(), b"old")
+        self.assertEqual(other.read_bytes(), b"other-new")
+
+
+class PlainRestoreWithMarkedEntriesTests(TempDirCase):
+    def test_plain_restore_skips_created_entries_and_exits_0(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        settings = cfg / "settings.json"
+        settings.write_bytes(b"old")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(settings)])
+        settings.write_bytes(b"new")
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "settings.json",
+            safe_write.hashlib.sha256(b"new").hexdigest(),
+        )
+        marker = cfg / "engineering-installer.json"
+        marker.write_bytes(b"{}")
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "engineering-installer.json",
+            safe_write.hashlib.sha256(b"{}").hexdigest(),
+            created=True,
+        )
+
+        captured = []
+        with mock.patch("builtins.print", side_effect=lambda *a: captured.append(a[0])):
+            rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 0)
+        self.assertEqual(settings.read_bytes(), b"old")
+        self.assertTrue(marker.exists())
+        self.assertEqual(
+            [l for l in captured if "engineering-installer.json" in l], []
+        )
+
+    def test_plain_restore_puts_a_removed_entry_back(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        claude = cfg / "CLAUDE.md"
+        claude.write_bytes(b"legacy policy")
+        stamp = "20260101T000000.000001Z-1"
+        safe_write.backup(str(cfg), stamp, "2.9.0", [str(claude)])
+        claude.unlink()
+        safe_write.mark_written(
+            str(cfg),
+            stamp,
+            "2.9.0",
+            "CLAUDE.md",
+            safe_write.hashlib.sha256(b"legacy policy").hexdigest(),
+            removed=True,
+        )
+        rc = safe_write.restore(str(cfg), stamp=stamp)
+        self.assertEqual(rc, 0)
+        self.assertEqual(claude.read_bytes(), b"legacy policy")
+
+
 class CliTests(TempDirCase):
     def test_write_via_cli_stdin(self):
         target = self.root / "f.json"
@@ -706,6 +1379,33 @@ class CliTests(TempDirCase):
         target = self.root / "f.json"
         rc = safe_write.main(["check", "--target", str(target)])
         self.assertEqual(rc, 0)
+
+    def test_mark_written_cli_round_trip(self):
+        cfg = self.root / "cfg"
+        cfg.mkdir()
+        (cfg / "settings.json").write_bytes(b"{}")
+        stamp = "20260101T000000.000001Z-1"
+        rc = safe_write.main(
+            [
+                "mark-written",
+                "--cfg",
+                str(cfg),
+                "--stamp",
+                stamp,
+                "--version",
+                "2.9.0",
+                "--rel",
+                "settings.json",
+                "--written-sha",
+                "a" * 64,
+                "--created",
+            ]
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            safe_write.main(["list", "--cfg", str(cfg), "--stamp", stamp, "--written"]),
+            0,
+        )
 
     def test_list_cli_empty(self):
         cfg = self.root / "cfg"

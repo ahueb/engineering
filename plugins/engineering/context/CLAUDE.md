@@ -46,23 +46,23 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 
 ## Delegation policy
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `browser-tester` keep Bash and are told not to write; that is a prompt-level constraint. `deep-audit`, `docs-check`, and `literature-review` have no edit tools by frontmatter and keep Bash for non-mutating commands by instruction. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, `plan-auditor`, `test-triage`, `docs-check`, and `literature-review` are read-only by tool list (no Edit, Write, or Bash). `browser-tester` is also tool-list read-only, plus the Playwright MCP tools it needs to drive a browser. `deep-audit` forks to the plugin agent `engineering:auditor`, which keeps Bash but only within an allowlist enforced by a plugin `PreToolUse` hook keyed to that agent; the hook is a guard against accidental mutation, not a sandbox against a hostile repository. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
 
 | Agent | Use when | Tools |
 |---|---|---|
 | `scout` | narrow file, symbol, definition, or reference discovery; a cheap isolated lookup suffices | read-only |
-| `test-triage` | compress large test, compiler, or log output into the smallest causal failure set before a more expensive model sees it | Bash (non-mutating), no edit |
+| `test-triage` | compress large test, compiler, or log output into the smallest causal failure set before a more expensive model sees it; never reruns anything, refuses a dispatch without captured output or a log path | read-only, no Bash |
 | `mechanical-worker` | repetitive transformations with an explicit pattern and deterministic verification | full |
 | `bulk-implementer` | a bounded output-heavy implementation specifiable without transferring most of the main session context | full |
 | `architect` | cross-cutting, difficult-to-reverse design decisions whose invariants are not already clear | read-only |
 | `semantic-reviewer` | correctness properties not adequately covered by deterministic checks, or material semantic/concurrency/migration/compatibility/data-integrity risk | read-only |
 | `security-reviewer` | change touches a trust boundary: auth, secrets, external input, file/network access, supply chain, or CI | read-only |
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
-| `browser-tester` | one named user journey must be exercised in a real browser against a running app; returns pass/fail with snapshot, console, and network evidence, never edits | Bash (read-only), Playwright MCP, no edit |
+| `browser-tester` | one named user journey must be exercised in a real browser against a running app; returns pass/fail with snapshot, console, and network evidence, never edits | read-only + Playwright MCP, no Bash |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
-| `deep-audit` (user-invoked slash command) | Fable at xhigh effort, adversarial audit with no edit tools | Bash (non-mutating), no edit |
-| `docs-check` (skill) | Sonnet, one version-dependent fact confirmed against official docs | Bash (non-mutating), no edit |
-| `literature-review` (skill) | Opus, evidence-driven research synthesis for a consequential decision | Bash (non-mutating), no edit |
+| `deep-audit` (user-invoked slash command) | Fable at xhigh effort, adversarial audit with no edit tools | Bash guarded by a plugin hook allowlist (`engineering:auditor`), no edit |
+| `docs-check` (skill) | Sonnet, one version-dependent fact confirmed against official docs | no shell |
+| `literature-review` (skill) | Opus, evidence-driven research synthesis for a consequential decision | no shell |
 
 The `engineering` plugin also provides the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:browser-testing`, `/engineering:change-review`, `/engineering:checkpoint`, `/engineering:change-eval`, `/engineering:comment-cleanup`, and `/engineering:production-readiness-review`. The last is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command; it is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer` in one batch; the verdict stays with the main session. `browser-testing` owns every Playwright run: it launches the app once, dispatches `browser-tester` per journey with an explicit oracle, and codifies only journeys that will be rerun.
 

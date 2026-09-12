@@ -2,9 +2,31 @@
 
 Adapt prose length to the repository, but preserve this decision structure.
 
+The report's very first lines, before any heading or other text, are the machine-checkable
+verdict and gate block, one line each, values exactly as shown:
+
+```
+VERDICT: READY | CONDITIONALLY READY | NOT READY
+GATE G1: PASS | FAIL | UNKNOWN | N/A
+GATE G2: PASS | FAIL | UNKNOWN | N/A
+GATE G3: PASS | FAIL | UNKNOWN | N/A
+GATE G4: PASS | FAIL | UNKNOWN | N/A
+GATE G5: PASS | FAIL | UNKNOWN | N/A
+GATE G6: PASS | FAIL | UNKNOWN | N/A
+GATE G7: PASS | FAIL | UNKNOWN | N/A
+GATE G8: PASS | FAIL | UNKNOWN | N/A
+GATE G9: PASS | FAIL | UNKNOWN | N/A
+GATE G10: PASS | FAIL | UNKNOWN | N/A
+GATE G11: PASS | FAIL | UNKNOWN | N/A
+GATE G12: PASS | FAIL | UNKNOWN | N/A
+```
+
+Each `GATE G<n>:` value must match that gate's status in the hard-gate table below exactly.
+This block replaces the human `**Verdict:**` line so the two can never disagree; do not also
+print a prose `**Verdict:**` line elsewhere in the report.
+
 # Production Readiness Review
 
-**Verdict:** READY | CONDITIONALLY READY | NOT READY  
 **Evidence confidence:** High | Moderate | Low  
 **Candidate:** commit/artifact/branch + dirty status  
 **Proposed exposure:** exact exposure, or "not specified"  

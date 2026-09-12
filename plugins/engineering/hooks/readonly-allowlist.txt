@@ -1,0 +1,36 @@
+# Allowlist for the readonly-guard PreToolUse hook, applied only to the
+# engineering:auditor agent's Bash/PowerShell use. Format (fields separated by
+# "|", empty field = unconstrained):
+#   token|verb-whitelist|forbidden-argument-regex|max-operands
+# verb-whitelist: space-separated allowed values for the command's second
+#   token (its subcommand), or empty if any/no subcommand is fine.
+# forbidden-argument-regex: a command is denied if any argument matches this
+#   regex (re.search) after the command has been shell-style unquoted
+#   (shlex.split, posix mode); may itself contain "|" alternation.
+# Long options are matched by prefix because getopt_long accepts any unique
+# abbreviation (sort --outp=f); where a tool has a dangerous long option with
+# no short form (sort --compress-program, file --compile), every long option
+# of that tool is denied.
+# max-operands: the maximum count of non-flag arguments (tokens not starting
+#   with "-"), or empty if unconstrained.
+# This guards against accidental mutation by the auditor; it is not a sandbox
+# against a hostile repository, and this list is data that can drift.
+git|status log diff show blame ls-files rev-parse|^-[A-Za-z]*o|^--ou|^--ext-diff|^--textconv|
+ls|||
+cat|||
+head|||
+tail|||
+wc|||
+grep|||
+rg||^--pre|^--host|^--search-zip$|^-[A-Za-z]*z|
+find||^-(delete|exec|execdir|ok|okdir|fprint|fprint0|fprintf|fls)([^A-Za-z0-9]|$)|
+stat|||
+file||^-[A-Za-z]*C|^--|
+du|||
+tree||^-[A-Za-z]*o|^--|
+jq|||
+sort||^-[A-Za-z]*o|^--|
+uniq|||1
+cut|||
+diff|||
+cmp|||

@@ -2,6 +2,14 @@
 
 Fresh-session scenarios for judging audit quality. Each needs a representative repository; grade against the expectations listed.
 
+Each scenario below is implemented as an executable, outcome-graded eval case: scenario N is
+`evals/behaviour-prr-N` (`behaviour-prr-1` … `behaviour-prr-7`), relative to the plugin root
+(`plugins/engineering/`). Each case's `fixture.sh` builds the shared `evals/fixture-service.sh`
+orders-api repository and adds the scenario's distinguishing artefacts, and its graders check
+the report's machine-checkable `VERDICT:`/`GATE G<n>:` lines (see
+`../output-template.md`) plus an `llm` rubric drawn from the "Expectations" list below. See
+`evals/README.md` for the invocation and cost budget.
+
 ## 1. Audit the current repository for GA production readiness. The repo has strong unit tests and CI, but do not assume any external operational controls that are not evidenced.
 
 **Expected:** A gate-first readiness report that refuses to equate green CI with production readiness, explicitly marks material external operational evidence as UNKNOWN when absent, and returns NOT READY if those unknowns are necessary for GA.

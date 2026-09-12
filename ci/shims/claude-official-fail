@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Shim for ci.sh scenario 33: behaves as the real `claude` CLI except that
+#   * `plugin marketplace add anthropics/claude-plugins-official` succeeds
+#     without touching the network (so the scenario runs offline in the default
+#     tier), and
+#   * every `plugin install <name>@claude-plugins-official` fails.
+# Exercises install.sh's step-11 partial-failure path: engineering@engineering,
+# settings.json and the policy are in place, the marker is written, nothing is
+# rolled back, and the run exits 11 naming the failed plugins.
+set -euo pipefail
+
+find_real() {
+  if [ -n "${REAL_CLAUDE:-}" ]; then
+    printf '%s\n' "$REAL_CLAUDE"
+    return 0
+  fi
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  while IFS= read -r c; do
+    local rc
+    rc="$(cd "$(dirname "$c")" && pwd)/$(basename "$c")"
+    if [ "$rc" != "$self" ]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done < <(type -aP claude)
+  return 1
+}
+
+REAL="$(find_real)" || { echo "claude-official-fail shim: no real claude found on PATH" >&2; exit 127; }
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "marketplace" ] && [ "${3:-}" = "add" ] \
+   && [ "${4:-}" = "anthropics/claude-plugins-official" ]; then
+  # Pretend the official marketplace registered; no network, no settings change.
+  exit 0
+fi
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ]; then
+  case "${3:-}" in
+    *@claude-plugins-official)
+      echo "claude-official-fail shim: simulated official plugin install failure for ${3:-}" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+exec "$REAL" "$@"

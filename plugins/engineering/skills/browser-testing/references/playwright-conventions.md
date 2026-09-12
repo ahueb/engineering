@@ -16,6 +16,8 @@ One journey per dispatch, containing exactly:
 
 The agent returns `JOURNEY`, `RESULT` (PASS | FAIL | BLOCKED), `STEPS_EXECUTED`, `ORACLE_EVIDENCE`, `CONSOLE_ERRORS`, `NETWORK_FAILURES`, `ARTIFACTS`, `BLOCKERS`.
 
+`browser-tester` has no Bash: it confirms the application is reachable by calling `browser_navigate` itself (a failed navigation is a BLOCKED result), not by shelling out to curl or similar. Launch the app and confirm it answers before dispatch; the agent's own `browser_navigate` is its only reachability check.
+
 ## Locators
 
 Prefer, in order: `getByRole` with an accessible name, `getByLabel`, `getByPlaceholder`, `getByText` (exact where the text is short), `getByTestId`. Use CSS or XPath only for structure the page exposes no other way, and say why. Never depend on generated class names, DOM position, or `nth()` without a stable reason.

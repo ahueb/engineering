@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-# Shared scaffold for prr-trigger-* cases: a small but realistic service repository so the
-# readiness question has something to review. Runs in the empty eval workspace (cwd) as the
-# eval author, before Claude starts. Invoked from each case's fixture.sh with --scaffold.
+# Shared scaffold for prr-trigger-* and behaviour-prr-* cases: a small but realistic service
+# repository so the readiness question has something to review. Runs in the empty eval
+# workspace (cwd) as the eval author, before Claude starts. Invoked from each case's
+# fixture.sh with --scaffold.
+#
+# Pass --no-commit to skip the final `git init`/commit so a caller (a behaviour-prr-* case's
+# own fixture.sh) can add scenario-specific artefacts first and commit everything itself.
 set -euo pipefail
+NO_COMMIT=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-commit) NO_COMMIT=1 ;;
+  esac
+done
 mkdir -p src tests .github/workflows deploy docs
 cat > package.json <<'JSON'
 { "name": "orders-api", "version": "1.4.0", "private": true,
@@ -71,4 +81,6 @@ cat > README.md <<'MD'
 # orders-api
 Order service for the checkout flow. Owner: payments team. Alerts: none configured yet.
 MD
-git init -q && git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0 release candidate"
+if [ "$NO_COMMIT" -eq 0 ]; then
+  git init -q && git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0 release candidate"
+fi

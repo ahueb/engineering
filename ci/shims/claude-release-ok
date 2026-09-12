@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Fake `claude` for ci.sh's release scenarios: release.sh only needs
+# `plugin validate --strict` to pass, `plugin list` to answer, and (when the
+# plugin is installed locally) `plugin update` to succeed. The scratch clone
+# must not touch the real config directory or the network, so nothing is
+# delegated to the real CLI.
+#   --version        -> a version new enough for install.sh's precondition
+#   plugin validate  -> exit 0
+#   plugin list      -> empty listing (release.sh then skips the local update)
+#   plugin update    -> exit 0
+# Anything else exits 0 silently.
+set -euo pipefail
+
+if [ "${1:-}" = "--version" ]; then
+  echo "9.9.9 (Claude Code)"
+  exit 0
+fi
+
+if [ "${1:-}" = "plugin" ]; then
+  case "${2:-}" in
+    validate)
+      echo "claude-release-ok shim: validation passed"
+      exit 0
+      ;;
+    list)
+      case "${3:-}" in
+        --json) echo "[]" ;;
+        *) : ;;
+      esac
+      exit 0
+      ;;
+    update)
+      echo "claude-release-ok shim: updated"
+      exit 0
+      ;;
+  esac
+fi
+
+exit 0

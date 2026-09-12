@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Shim for ci.sh scenario 38: behaves as the real `claude` CLI except that
+#   * `plugin marketplace add anthropics/claude-plugins-official` succeeds
+#     without touching the network, and
+#   * the first `plugin install <name>@claude-plugins-official` appends a
+#     newline to $CLAUDE_CONFIG_DIR/settings.json (a change by "someone else"
+#     after this installer run wrote the file) and exits 0.
+# Exercises install.sh's rollback "not rolled back: ... changed after this
+# run wrote it" path end to end, when a later step fails.
+set -euo pipefail
+
+find_real() {
+  if [ -n "${REAL_CLAUDE:-}" ]; then
+    printf '%s\n' "$REAL_CLAUDE"
+    return 0
+  fi
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  while IFS= read -r c; do
+    local rc
+    rc="$(cd "$(dirname "$c")" && pwd)/$(basename "$c")"
+    if [ "$rc" != "$self" ]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done < <(type -aP claude)
+  return 1
+}
+
+REAL="$(find_real)" || { echo "claude-official-mutate shim: no real claude found on PATH" >&2; exit 127; }
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "marketplace" ] && [ "${3:-}" = "add" ] \
+   && [ "${4:-}" = "anthropics/claude-plugins-official" ]; then
+  exit 0
+fi
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ]; then
+  case "${3:-}" in
+    *@claude-plugins-official)
+      if [ ! -e "${CLAUDE_CONFIG_DIR:?}/.mutated" ]; then
+        printf '\n' >> "$CLAUDE_CONFIG_DIR/settings.json"
+        : > "$CLAUDE_CONFIG_DIR/.mutated"
+      fi
+      exit 0
+      ;;
+  esac
+fi
+
+exec "$REAL" "$@"
