@@ -11,7 +11,7 @@ git clone git@github.com:ahueb/engineering.git && cd engineering
 ./install.sh --source ahueb/engineering   # register the GitHub repo as the marketplace instead of this checkout
 ```
 
-The script backs up any existing `CLAUDE.md` and `settings.json`, copies the policy, merges the recommended settings key by key, registers the marketplace, and installs `engineering@engineering`. A plugin you have explicitly disabled stays disabled. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents.
+The script backs up any existing `CLAUDE.md` and `settings.json`, copies the policy, merges the recommended settings key by key, registers the marketplace, and installs `engineering@engineering`. A plugin you have explicitly disabled stays disabled. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models.
 
 Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
 

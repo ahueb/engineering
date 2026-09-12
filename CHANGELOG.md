@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.1 — 2026-09-12
+
+- Shorter `production-readiness-review` description.
+- `settings.recommended.json` sets `skillListingBudgetFraction` to 0.02: at the 1% default, 200K-context models drop the descriptions of the last skills in the listing, which disables automatic invocation for them.
+
 ## 2.4.0 — 2026-09-12
 
 - `production-readiness-review` skill: read-only, gate-first production readiness audit with hard gates, graded dimensions, domain overlays, adversarial falsification, and a bundled repository probe with tests. Evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer`.

@@ -1,6 +1,6 @@
 ---
 name: production-readiness-review
-description: Evaluate whether the current repository or release candidate is production-ready using evidence-backed hard gates, risk-relative readiness dimensions, and adversarial failure analysis. Use when asked whether a repo, service, app, feature, PR, branch, build, or release is ready to ship, launch, deploy, go live, hand to operations, or reach GA; for production/release/operational readiness reviews, release gates, go/no-go decisions, launch audits, or identifying blockers to production. Also use when explicitly asked to verify that the current repo is complete and safe for production. Do not use for ordinary code review, debugging, test writing, architecture discussion, or deployment execution unless a readiness judgment is requested.
+description: Evidence-first production readiness audit with non-compensable hard gates, graded dimensions, and adversarial falsification, returning READY, CONDITIONALLY READY, or NOT READY. Use when asked whether a repo, branch, PR, service, build, or release is ready to ship, launch, deploy, go live, or reach GA, or for a release gate, launch audit, or go/no-go. Not for ordinary code review, debugging, test writing, or deployment execution.
 ---
 
 # Production Readiness Review
