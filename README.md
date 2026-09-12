@@ -1,6 +1,6 @@
 # engineering
 
-Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, six process skills, four user-invoked escalation skills, and recommended settings. Everything except `CLAUDE.md` and settings ships as the `engineering` plugin so it can be updated in place.
+Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, seven process skills, four user-invoked escalation skills, and recommended settings. Everything except `CLAUDE.md` and settings ships as the `engineering` plugin so it can be updated in place.
 
 ## Install
 
@@ -50,7 +50,7 @@ Claude Code copies the plugin into a version-keyed cache and skips `plugin updat
 | Kind | Names |
 |---|---|
 | Agents | `engineering:scout` (haiku), `engineering:test-triage` (haiku, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high) |
-| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval` |
+| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
 | User-only escalations | `/engineering:deep-audit` (fable, xhigh), `independent-review` (opus, high), `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 
 `scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` have no Edit, Write, or Bash tool, so they cannot modify anything even under `--dangerously-skip-permissions`. `test-triage` keeps Bash to rerun a failing command and is told not to write; that is a prompt-level constraint, not a hard one.
@@ -58,6 +58,21 @@ Claude Code copies the plugin into a version-keyed cache and skips `plugin updat
 ## Executing plans
 
 `/engineering:plan-execution` is the fast path for a written plan. It partitions the plan into packages that own disjoint files and share explicit interfaces, dispatches every package to a parallel `bulk-implementer` in one batch with building and testing forbidden, merges the results, runs one integrated build-and-test pass, and then has `plan-auditor` and `semantic-reviewer` adversarially check the merged result against the plan for completeness and correctness. The policy routes superpowers' `executing-plans` and `subagent-driven-development` through this flow.
+
+## Production readiness review
+
+`/engineering:production-readiness-review` judges whether a repository or release candidate is ready for a specific production exposure. It is read-only and evidence-first: 12 non-compensable hard gates, 13 graded readiness dimensions, separate readiness-state and evidence-strength axes, domain overlays, and an adversarial pass that tries to falsify every apparent pass before the verdict of READY, CONDITIONALLY READY, or NOT READY. Repository absence never proves an operational fact; on-call, restore drills, live SLOs, and production configuration are marked unknown unless directly evidenced.
+
+The skill runs inline so it keeps the conversation's release context, and fans evidence collection out to `scout`, `security-reviewer`, and `semantic-reviewer`. Claude invokes it on readiness questions; `/engineering:production-readiness-review assess this branch for a 5% canary` invokes it directly. It is never run automatically by the other skills.
+
+A bundled probe emits read-only repository discovery as JSON, with no file contents or secret values:
+
+```bash
+python3 plugins/engineering/skills/production-readiness-review/scripts/repo_probe.py /path/to/repo
+python3 -m unittest plugins/engineering/skills/production-readiness-review/tests/test_repo_probe.py
+```
+
+Trigger-quality evals live in `plugins/engineering/evals/`; see its README.
 
 ## Working with superpowers
 
@@ -70,7 +85,8 @@ The policy maps superpowers' subagent roles onto engineering agents (implementer
 plugins/engineering/
   .claude-plugin/plugin.json      plugin manifest and version
   agents/                         nine agent definitions
-  skills/                         ten SKILL.md skills
+  skills/                         eleven SKILL.md skills; production-readiness-review bundles references, a probe, and tests
+  evals/                          claude plugin eval cases for skill trigger quality
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy
 settings.recommended.json         settings merged by install.sh

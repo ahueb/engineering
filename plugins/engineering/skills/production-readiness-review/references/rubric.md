@@ -1,0 +1,300 @@
+# Production Readiness Rubric
+
+Use this reference to make the gate and dimension judgments. It is a synthesis, not a verbatim reproduction of any one standard or vendor checklist.
+
+## Decision principle
+
+Production readiness is assurance for a specific **release-context pair**. The object under review is not merely source code: it includes the deployable candidate, configuration, data/migrations, dependencies, operating environment, observability, recovery mechanisms, operators, support process, and mandatory obligations relevant to the proposed exposure.
+
+Hard gates are non-compensable. Graded dimensions provide diagnostic depth after or alongside the gate decision; they never override a failed gate.
+
+## Hard gates
+
+### G1 Candidate identity and provenance
+
+**Question:** Is the exact thing being judged identifiable, reproducible, and traceable to what will be deployed?
+
+Look for:
+- commit/artifact/version identity;
+- clean or explicitly accounted-for working-tree differences;
+- deterministic or controlled build inputs and lockfiles;
+- configuration/schema/IaC version linkage;
+- artifact integrity/provenance/SBOM where risk warrants it;
+- promotion rules that prevent testing one candidate and deploying another.
+
+Fail/unknown patterns:
+- tests executed against a different commit/artifact;
+- undocumented manual build or production-only patching;
+- mutable/unpinned critical dependencies without bounded policy;
+- unknown production configuration or schema version.
+
+### G2 Critical functional correctness
+
+**Question:** Do the critical user/mission journeys satisfy explicit acceptance criteria under relevant normal and edge conditions?
+
+Look for:
+- identified critical journeys and requirements;
+- direct tests with meaningful oracles;
+- negative/edge/error-path and regression coverage;
+- integration/contract behavior where dependencies matter;
+- candidate-specific execution results.
+
+Fail/unknown patterns:
+- critical behavior untested or known incorrect;
+- tests assert transport success but not semantic/business correctness;
+- important manual assumptions without evidence;
+- unresolved defects that can violate acceptance criteria.
+
+### G3 Security, privacy, and supply chain
+
+**Question:** Are material attack, authorization, privacy, secret, dependency, build, and abuse risks acceptably controlled for this exposure?
+
+Look for:
+- threat/trust-boundary analysis proportional to risk;
+- authentication and authorization tests, including object/business-logic boundaries;
+- secret handling and least privilege;
+- dependency and included-code verification;
+- build provenance/integrity where relevant;
+- privacy/data classification, minimization, retention, encryption, and access controls;
+- abuse/rate-limit protections where relevant;
+- current vulnerability disposition, not scanner output alone.
+
+Fail/unknown patterns:
+- exploitable critical/high-impact vulnerability without accepted mitigation;
+- material authorization path not verified;
+- credentials/secrets embedded or uncontrolled;
+- unknown handling of sensitive data;
+- mandatory security/privacy requirement unmet.
+
+### G4 Data integrity and recoverability
+
+**Question:** Can state be preserved, migrated, restored, reconciled, and recovered within required limits?
+
+Look for:
+- data model/schema compatibility;
+- migration rehearsal and failure handling;
+- backup scope, retention, integrity, encryption, and restore evidence;
+- measured RPO/RTO where applicable;
+- reconciliation/idempotency and replay semantics;
+- data corruption/loss detection.
+
+Fail/unknown patterns:
+- backups exist but restore has not been demonstrated where recovery is material;
+- destructive migration with no tested recovery/forward-fix path;
+- unknown RPO/RTO against explicit business needs;
+- irreversible external side effects ignored by rollback plans.
+
+### G5 Safe deployment and reversion
+
+**Question:** Is change introduction repeatable, bounded, observable, stoppable, and recoverable?
+
+Look for:
+- automated/repeatable deployment path;
+- environment/config validation;
+- staged rollout, canary, feature flags, or other blast-radius controls as warranted;
+- rollback or forward-recovery strategy including schema/data/external effects;
+- pre/post-deploy checks and stop criteria;
+- tested rollback/recovery mechanics.
+
+Fail/unknown patterns:
+- one-shot manual production procedure;
+- rollback assumes code-only reversibility;
+- no stop condition for progressive rollout;
+- deployment path materially differs from the tested path without evidence.
+
+### G6 Observability and alertability
+
+**Question:** Can important user-impacting failure be detected, localized, and acted on quickly enough?
+
+Look for:
+- user/business-facing SLIs as well as infrastructure health;
+- logs/metrics/traces or equivalent diagnostics appropriate to the system;
+- actionable alerts tied to symptoms/SLOs, with ownership;
+- synthetic/critical-journey checks where appropriate;
+- diagnostic correlation and safe data handling;
+- evidence alerts and dashboards actually function.
+
+Fail/unknown patterns:
+- only host/process health while incorrect business output can remain green;
+- dashboards with no actionable alerting;
+- alerts without owner/runbook/escalation;
+- observability exists only in staging when production is the claim.
+
+### G7 Operational ownership and incident response
+
+**Question:** Can identifiable operators support, diagnose, stop, recover, and communicate during incidents?
+
+Look for:
+- named service ownership and escalation paths;
+- on-call/support coverage proportional to need;
+- production access and break-glass procedures;
+- exercised runbooks/playbooks;
+- incident communication/severity process;
+- training/handover and staffing depth;
+- post-incident learning loop.
+
+Fail/unknown patterns:
+- no accountable owner;
+- runbook exists but operators cannot execute it;
+- single-person recovery knowledge for a critical service;
+- missing production access or escalation path.
+
+### G8 Capacity and performance
+
+**Question:** Does the candidate meet latency, throughput, concurrency, resource, and growth needs with adequate headroom?
+
+Look for:
+- explicit performance/capacity objectives;
+- representative peak, burst, and concurrency tests;
+- tail latency, saturation, queueing, resource ceilings, storage growth;
+- dependency/provider quotas;
+- degradation behavior and autoscaling limits;
+- cost/resource implications at target scale.
+
+Fail/unknown patterns:
+- only average latency or nominal-load testing;
+- capacity ceiling unknown near expected demand;
+- unbounded queues/storage/cardinality;
+- critical provider quota below plausible demand.
+
+### G9 Resilience and dependency failure
+
+**Question:** Are foreseeable component/dependency failures isolated, bounded, and recoverable without unacceptable cascading impact?
+
+Look for:
+- dependency inventory and criticality;
+- timeouts, bounded retries/backoff/jitter, circuit breaking/load shedding as appropriate;
+- failure isolation and blast-radius design;
+- degraded-mode behavior;
+- failover/fault tests or direct evidence;
+- shared-fate analysis for redundant components.
+
+Fail/unknown patterns:
+- unbounded retry amplification;
+- nominal redundancy sharing a decisive failure domain;
+- single dependency outage cascades without bounded response;
+- failover exists only on architecture diagrams.
+
+### G10 Continuity and disaster recovery
+
+**Question:** For consequences that warrant it, can the service/business recover from site, region, account, control-plane, or systemic loss?
+
+Look for:
+- continuity/DR objectives linked to business impact;
+- recovery architecture and dependency assumptions;
+- exercised failover/restore/rebuild procedures;
+- alternate access/control paths;
+- measured recovery time/data loss;
+- communication and decision authority during disaster.
+
+Use N/A only when the impact/risk genuinely makes dedicated continuity controls unnecessary and the rationale is explicit.
+
+### G11 Known-risk closure
+
+**Question:** Are known defects, anomalies, exceptions, flaky checks, operational gaps, and residual risks understood and dispositioned?
+
+Look for:
+- blocker/critical defect inventory;
+- flaky/disabled test disposition;
+- risk register or equivalent for material residuals;
+- exception owner, scope, mitigation, expiry/review;
+- unexplained anomalies investigated;
+- release stop criteria tied to known risks.
+
+Fail/unknown patterns:
+- unexplained critical test/production anomaly;
+- ignored disabled/flaky test on a critical path;
+- overdue exception or residual risk without owner;
+- material "we think it is fine" assumption without evidence.
+
+### G12 Mandatory domain obligations
+
+**Question:** Are all applicable legal, regulatory, contractual, safety, accessibility, licensing, policy, and domain-specific requirements satisfied?
+
+Look for:
+- evidence that applicable obligations were identified;
+- required approvals/certifications/reviews;
+- license/notice obligations;
+- accessibility requirements for user-facing systems;
+- domain assurance for medical, financial, safety, scientific, real-time, AI, data, or other specialized systems.
+
+Fail/unknown patterns:
+- mandatory requirement not met;
+- applicability has never been assessed for a high-consequence domain;
+- generic software checklist used to waive domain-specific assurance.
+
+## Readiness dimensions
+
+Score each applicable dimension on the 0-4 readiness-state axis and E0-E4 evidence axis from SKILL.md. Do not average into a universal production score.
+
+### D1 Functional suitability and critical-journey correctness
+Completeness, correctness, business rules, edge/error cases, contracts, critical outcomes.
+
+### D2 Quality in use, UX, and accessibility
+User task success, usability, accessibility, error protection/recovery, client/device compatibility, documentation for intended users.
+
+### D3 Reliability, availability, durability, and recovery
+SLOs, failure rates, durability, failover, restore, RTO/RPO, graceful degradation, reliability under sustained operation.
+
+### D4 Performance, capacity, scalability, and resource efficiency
+Tail latency, throughput, concurrency, load shape, saturation, headroom, scaling limits, storage/resource growth.
+
+### D5 Security, privacy, abuse resistance, and supply-chain integrity
+Threats, identity, authorization, secrets, dependencies, build integrity, data protection, abuse/fraud paths.
+
+### D6 Observability, diagnostics, and production feedback
+User-impact signals, logs, metrics, traces, synthetic checks, alert quality, diagnostic usability, feedback loops.
+
+### D7 Incident response, operations, and business continuity
+Ownership, on-call/support, runbooks, escalation, drills, incident communication, recovery, continuity.
+
+### D8 Release, change, configuration, and migration safety
+CI/CD, artifact promotion, IaC/config, staged rollout, feature flags, rollback/forward fix, schema and client compatibility.
+
+### D9 Architecture, dependencies, interoperability, and blast radius
+Coupling, failure domains, critical dependencies, retries/timeouts, limits/quotas, compatibility, isolation.
+
+### D10 Maintainability, testability, and technical sustainability
+Modularity, testability, reviewability, upgrade path, reproducibility, technical debt, operability of future change.
+
+### D11 Ownership, staffing, governance, and long-term support
+Bus factor, accountable owners, staffing depth, training, handover, risk authority, lifecycle/retirement ownership.
+
+### D12 Economic and resource sustainability
+Cloud/runtime cost, observability/storage cardinality, licenses, quotas, vendor limits, operational labor, predictable scaling economics.
+
+### D13 Safety, compliance, and domain-specific assurance
+Hazards, regulatory constraints, scientific/numerical validity, accessibility, auditability, specialized independent verification.
+
+## Evidence interpretation
+
+Evidence is claim-specific. The same artifact can be E3 for one narrow claim and E0 for another.
+
+Prefer, in order:
+1. candidate-specific execution under representative/adverse conditions;
+2. reproducible automated verification tied to the candidate;
+3. direct but partial test/measurement evidence;
+4. implementation/configuration inspection;
+5. documentation/process/assertion.
+
+Documentation can prove that a procedure is defined. It cannot, by itself, prove that the procedure works.
+
+## Conditional-release discipline
+
+A conditional verdict must narrow the claim. Examples:
+- internal users only;
+- one region only;
+- 1% or explicitly capped traffic;
+- feature behind a kill switch;
+- read-only mode;
+- no sensitive data;
+- bounded time window with heightened support.
+
+For each condition record:
+- exact exposure boundary;
+- compensating control;
+- stop/rollback trigger;
+- accountable owner;
+- expiry or reassessment event.
+
+If the condition merely postpones a failed hard gate without bounding the consequence, the verdict is NOT READY.

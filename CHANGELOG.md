@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.0 — 2026-09-12
+
+- `production-readiness-review` skill: read-only, gate-first production readiness audit with hard gates, graded dimensions, domain overlays, adversarial falsification, and a bundled repository probe with tests. Evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer`.
+- `evals/`: twenty `claude plugin eval` trigger cases for the readiness skill.
+- Policy: the readiness review is standalone and never chained into implementation, verification, or plan execution.
+
 ## 2.3.0 — 2026-09-11
 
 - `plan-execution` skill: partitions a plan into disjoint-file packages, fans all of them out to parallel `bulk-implementer` agents with no per-package build or test, verifies once after merge, then audits adversarially.

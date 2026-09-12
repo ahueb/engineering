@@ -76,13 +76,15 @@ Use `engineering:plan-auditor` after a plan's packages are merged and the integr
 
 Use `engineering:hard-repair` only after a concrete persistent failure remains unresolved by the normal main-session repair loop. Give it the failing command, relevant output, changed files, and already-disproven hypotheses.
 
-The `engineering` plugin provides every agent above plus the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:change-review`, `/engineering:checkpoint`, and `/engineering:change-eval`.
+The `engineering` plugin provides every agent above plus the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:change-review`, `/engineering:checkpoint`, `/engineering:change-eval`, and `/engineering:production-readiness-review`.
 
 User-invoked escalations (hidden from the model; invoke by slash command only):
 - `/engineering:deep-audit` — Fable at xhigh effort, read-only adversarial audit.
 - `/engineering:independent-review` — Opus at high effort, read-only review; a tier above `engineering:semantic-reviewer`.
 - `/engineering:docs-check` — Sonnet, narrow authoritative documentation lookup.
 - `/engineering:literature-review` — Opus, evidence-driven research synthesis.
+
+`/engineering:production-readiness-review` is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command. It is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `engineering:scout`, `engineering:security-reviewer`, and `engineering:semantic-reviewer` in one batch; the verdict stays with the main session.
 
 Size each delegated work package so the agent finishes within roughly 200k tokens of context; split larger packages or have the agent checkpoint and hand off, because every turn re-reads the whole history.
 
