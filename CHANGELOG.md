@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.1 — 2026-09-11
+
+- Local CI gate `ci.sh` (lint, both manifests under `--strict`, probe tests, frontmatter and cross-reference checks, hook contract, scratch install) wired into `.githooks/pre-push` and `release.sh`. No GitHub Actions or server-side hooks.
+- Releases are signed tags `vX.Y.Z`; `.allowed_signers` committed for `git tag -v`. `main` is branch-protected (linear history, no force push or deletion, required signatures, enforced for admins).
+- `SECURITY.md`: reporting path, response expectations, verification and pinning instructions.
+- `docs/risk-register.md`: residual risks with owners and reassessment triggers.
+- README: verify, pin, and roll back a release; CI section; ownership.
+- Trigger evals: every positive case now scaffolds a fixture repository (`evals/fixture-service.sh`, `case.yaml` per case); readiness skill description covers operational/launch readiness, canary or GA assessment, on-call handover, and adversarial "disprove it is ready" requests. Results (20/20) recorded in `plugins/engineering/evals/RESULTS.md`.
+
 ## 2.5.0 — 2026-09-11
 
 - `install.sh`: parses and validates `settings.json` before touching `CLAUDE.md`; registers the marketplace before any file write and surfaces the real error; writes a `settings.json.bak-` only when the merged content actually changes; quote-safe opt-out check for config paths containing `'`; documents that `engineering@engineering` is always enabled.

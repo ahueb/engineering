@@ -30,13 +30,24 @@ The plugin's `hooks/session-start.sh` runs on `startup`, `resume`, `clear`, `com
 
 Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example to trial the setup in an empty directory first.
 
+## Verify, pin, and roll back
+
+- Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.5.1`.
+- Pin instead of tracking `main`: `claude plugin install engineering@engineering@2.5.1`.
+- Roll back a bad release: `claude plugin uninstall engineering@engineering && claude plugin install engineering@engineering@<previous version>`, then restart Claude Code. Stop criterion for a release: any session-start error or a `claude plugin validate --strict` failure on the installed cache; the fix is always a new patch version, never a rewritten one.
+- Security reports and support expectations: [SECURITY.md](SECURITY.md). Known residual risks: [docs/risk-register.md](docs/risk-register.md).
+
 ## Update
 
 Claude Code copies the plugin into a version-keyed cache and skips `plugin update` when the version is unchanged, so editing this repo changes nothing until the version is bumped.
 
-- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, commits, and refreshes the local install. Add `--no-commit` (in any position) to bump and refresh without committing. Push afterwards. `release.sh` refuses to run on a working tree with unrelated changes, restores the version if validation fails, and commits only `plugin.json` and `CHANGELOG.md`.
+- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, runs `./ci.sh`, commits, creates the signed tag `vX.Y.Z`, and refreshes the local install. Add `--no-commit` (in any position) to bump and refresh without committing. Push with `git push && git push --tags`. `release.sh` refuses to run on a working tree with unrelated changes, restores the version if validation fails, and commits only `plugin.json` and `CHANGELOG.md`.
 - Everyone else: `claude plugin update engineering@engineering`, then restart Claude Code.
 - Policy changes also need a fresh `~/.claude/CLAUDE.md`: rerun `./install.sh`, or copy `plugins/engineering/context/CLAUDE.md` over it.
+
+## CI
+
+There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the whole gate: shell lint, both manifests under `--strict`, probe unit tests, frontmatter and cross-reference checks, the hook contract, and a scratch-directory install. It runs on every push through `.githooks/pre-push` (enable once per clone with `git config core.hooksPath .githooks`) and inside `release.sh`. `./ci.sh --quick` skips the scratch install. Trigger-eval results are recorded in `plugins/engineering/evals/RESULTS.md`; rerun them with the commands in `plugins/engineering/evals/README.md`.
 
 ## Requirements
 
@@ -100,7 +111,12 @@ plugins/engineering/
 docs/plans/                       plan documents for planned work
 settings.recommended.json         settings merged by install.sh
 install.sh                        installer
-release.sh                        version bump and local refresh
+release.sh                        version bump, ci, signed tag, local refresh
+ci.sh                             local CI gate (also run by the pre-push hook)
+.githooks/pre-push                runs ci.sh before every push
+SECURITY.md                       reporting path and verification steps
+.allowed_signers                  SSH key that signs release tags
+docs/risk-register.md             known residual risks and their owners
 CHANGELOG.md                      release notes per version
 ```
 

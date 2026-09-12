@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Pre-push gate: refuses the push unless ./ci.sh passes on the working tree.
+# Enable with:  git config core.hooksPath .githooks   (install.sh does not do this; it is a maintainer setting)
+# Bypass only deliberately:  git push --no-verify
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -n "$(git -C "$HERE" status --porcelain)" ]; then
+  echo "pre-push: working tree is dirty; commit or stash before pushing so CI checks what you push" >&2
+  exit 1
+fi
+exec "$HERE/ci.sh"

@@ -3,7 +3,7 @@
 # Claude Code installs plugins into a version-keyed cache and skips `plugin update`
 # when the version is unchanged, so edits are invisible until this runs.
 #
-#   ./release.sh patch|minor|major     bump semver, commit, update local install
+#   ./release.sh patch|minor|major     bump semver, run ci.sh, commit, sign tag vX.Y.Z, update local install
 #   ./release.sh 2.3.0                 set an explicit version
 #   ./release.sh --no-commit patch     bump and update only (--no-commit may appear anywhere)
 #
@@ -79,6 +79,11 @@ if ! claude plugin validate "$HERE/plugins/engineering" --strict; then
   exit 1
 fi
 echo "validation passed"
+if ! "$HERE/ci.sh" >/dev/null; then
+  echo "ci.sh failed; version restored to $CUR" >&2
+  exit 1
+fi
+echo "ci passed"
 
 if [ "$COMMIT" = 1 ] && git -C "$HERE" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C "$HERE" add -- "$MANIFEST"
@@ -87,6 +92,7 @@ if [ "$COMMIT" = 1 ] && git -C "$HERE" rev-parse --is-inside-work-tree >/dev/nul
     echo "nothing to commit (version unchanged)"
   else
     git -C "$HERE" commit -qm "Release engineering $NEW" && echo "committed"
+    git -C "$HERE" tag -s "v$NEW" -m "engineering $NEW" && echo "tagged v$NEW (signed)"
   fi
 fi
 RELEASED=1
@@ -96,4 +102,5 @@ if claude plugin list 2>/dev/null | grep -q "engineering@engineering"; then
 else
   echo "engineering@engineering is not installed here; skipping local update"
 fi
+echo "Publish with: git push && git push --tags"
 echo "Recipients get $NEW with: claude plugin update engineering@engineering"
