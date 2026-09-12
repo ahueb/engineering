@@ -4,6 +4,22 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-09-12
+
+## [Unreleased]
+
+### Fixed
+
+- CI runner-only failures in the 2.9.0 tree, found by the first Actions run on `main` (run 34713026146): `ci.sh`'s doc cross-reference scan was a heredoc inside `$( )` whose text contains `)`, which bash 3.2 cannot parse (the `macos` job); the release and pre-push scenarios built their scratch repository with `git clone` of the checkout, which fails on the runner's shallow checkout, and now use `git archive` and report the underlying error (the `linux` job); `scripts/ci/install-claude.ps1` counted primary keys from a separate `gpg --list-keys` call that produced a different count on Windows, and now counts them from the same `--fingerprint` output it checks the fingerprint in, naming the count on failure (the `windows` job).
+- Three `safe_write` unit tests compared a disclosed path against the unresolved temp path and failed on macOS, where the temp directory is itself a symlink; `ci.sh` now prints the failing test names when the unit-test step fails. `scripts/ci/install-claude.ps1` hands gpg (the MSYS build from Git for Windows, which reads a Windows path as relative) every path in POSIX form (`/c/Users/...`) and keeps gpg's stderr for its failure message; the earlier Windows failures were an empty keyring caused by that path form, not a key problem. The `windows` unit-test step, running for the first time, showed eight symlink and replace-open-file tests failing on Windows semantics that are out of scope (risk register R5); they are now skipped on Windows, and `merge_settings.py` writes its JSON as UTF-8 regardless of the console code page (its non-ASCII round trip failed under cp1252).
+- The documented branch-protection command used `PATCH .../required_status_checks`, which returns 404 until status checks are enabled; the docs now give the `PUT .../protection` form that was actually used.
+
+- `release.sh pr` used `gh pr merge --rebase`, which GitHub refuses on `main` because the branch requires signed commits and GitHub cannot sign the commits a rebase merge rewrites (`Base branch requires signed commits. Rebase merges cannot be automatically signed`); it now squash-merges with the subject `Release engineering X.Y.Z`, which is what `release.sh tag` checks.
+
+### Notes
+
+- 2.9.0 reached `main` by a direct push made while the required status check was being applied (the documented `PATCH` command had failed silently), before the protection existed, and was never tagged. The first release through the PR flow with the required check in force is the next one.
+
 ## [2.9.0] - 2026-09-12
 
 ### Added
@@ -12,7 +28,7 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 - `install.sh` rollback: after the first file a run writes, an unexpected failure or an explicit exit 3-7 restores every file the run wrote or removed (and nobody else changed since) and exits with the original code; `--no-rollback` disables it and prints the manual restore command instead. `scripts/safe_write.py mark-written` records the post-write hash of every file an installer run actually writes or removes; `restore --only-run-files` uses it to scope a rollback and to refuse (exit 12) a stamp that marks nothing as written by an installer run.
 - `install.sh --restore` prints `outside config dir: <rel> -> <real path>` for every backed-up entry whose real target resolves outside the config directory, before writing anything; `--no-outside-cfg` refuses those entries (exit 8) instead of restoring through them.
 - Exit code 11: a run that installs `engineering@engineering`, `settings.json`, and the policy successfully but has one or more official plugins fail to install now says so and exits 11, instead of finishing silently as if nothing had failed.
-- `release.sh prepare <bump> [--no-pr]`, `release.sh pr X.Y.Z`, and `release.sh tag [X.Y.Z]`: a PR-based release flow that opens, watches, and rebase-merges a `release/vX.Y.Z` branch through `gh` before tagging, so every released commit has passed the required GitHub Actions check on a tree identical to what was merged.
+- `release.sh prepare <bump> [--no-pr]`, `release.sh pr X.Y.Z`, and `release.sh tag [X.Y.Z]`: a PR-based release flow that opens, watches, and squash-merges a `release/vX.Y.Z` branch through `gh` before tagging, so every released commit has passed the required GitHub Actions check on a tree identical to what was merged.
 - `plugins/engineering/agents/auditor.md`: the plugin agent `deep-audit` now forks to, running Read/Grep/Glob/Bash at Fable/xhigh with no worktree isolation; its Bash is restricted by the new plugin `PreToolUse` hook `plugins/engineering/hooks/readonly-guard.sh` (matcher `Bash|PowerShell`, keyed to `agent_type` `engineering:auditor`) against `plugins/engineering/hooks/readonly-allowlist.txt`, a read-only-command allowlist.
 - `scripts/ci/install-claude.sh`, `scripts/ci/install-claude.ps1`, `scripts/ci/claude-version.txt`, `scripts/ci/anthropic-release-key.asc`, `.github/CODEOWNERS`.
 
@@ -233,7 +249,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/ahueb/engineering/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/ahueb/engineering/compare/v2.7.2...v2.8.0
 [2.7.2]: https://github.com/ahueb/engineering/compare/v2.7.1...v2.7.2

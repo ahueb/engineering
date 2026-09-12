@@ -104,7 +104,14 @@ rm -rf "$PRR/tests/__pycache__" "$PRR/scripts/__pycache__"
 
 step "scripts unit tests (merge_settings, safe_write)"
 (cd "$HERE" && python3 -W error -m py_compile scripts/merge_settings.py scripts/safe_write.py) && ok "py_compile" || bad "py_compile"
-(cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write >/dev/null 2>&1) && ok "unit tests" || bad "unit tests"
+UT_TMP="$(mktemp)"
+if (cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write >"$UT_TMP" 2>&1); then
+  ok "unit tests"
+else
+  grep -E '^(FAIL|ERROR):|Error:' "$UT_TMP" | head -20 | sed 's/^/   /' >&2
+  bad "unit tests"
+fi
+rm -f "$UT_TMP"
 rm -rf "$HERE/scripts/__pycache__" "$HERE/scripts/tests/__pycache__"
 
 step "frontmatter, policy, and cross-references"
@@ -141,7 +148,10 @@ step "doc cross-reference (install.sh flags/env and release.sh subcommands vs RE
 # plan writes those README sections; until it has run, a STRICT item is a skip with the
 # missing items named. CI_DOCS_STRICT=1 promotes them to failures.
 doc_rc=0
-DOC_OUT="$(python3 - "$HERE/install.sh" "$HERE/release.sh" "$HERE/README.md" "$HERE/SECURITY.md" "$HERE/CHANGELOG.md" "$HERE/docs/risk-register.md" "$PLUGIN/context/CLAUDE.md" <<'PY'
+# The scan is run with its stdout in a file, not inside "$( )": bash 3.2 cannot parse a heredoc
+# inside a command substitution when the heredoc text contains ")".
+DOC_TMP="$(mktemp)"
+python3 - "$HERE/install.sh" "$HERE/release.sh" "$HERE/README.md" "$HERE/SECURITY.md" "$HERE/CHANGELOG.md" "$HERE/docs/risk-register.md" "$PLUGIN/context/CLAUDE.md" >"$DOC_TMP" <<'PY' || doc_rc=$?
 import re, sys
 install_sh, release_sh, readme, security, changelog, riskreg, policy = sys.argv[1:8]
 text = open(install_sh, encoding="utf-8").read()
@@ -187,7 +197,8 @@ if hard:
     sys.exit(1)
 sys.exit(3 if strict else 0)
 PY
-)" || doc_rc=$?
+DOC_OUT="$(cat "$DOC_TMP")"
+rm -f "$DOC_TMP"
 doc_hard="$(printf '%s\n' "$DOC_OUT" | grep '^HARD: ' || true)"
 doc_strict="$(printf '%s\n' "$DOC_OUT" | grep '^STRICT: ' || true)"
 case "$doc_rc" in
@@ -1538,7 +1549,11 @@ scratch_clone() {
   # touches WORKDIR/repo/.ci-stub-ran, which is how the pre-push scenario sees whether the
   # gate ran; release.sh has no CI-skip hook, so the stub is also what keeps S35 fast.
   local work="$1" repo="$1/repo"
-  git clone -q "$HERE" "$repo" || return 1
+  # Built from `git archive HEAD` rather than `git clone`, so a shallow or otherwise unusual
+  # checkout of this repo (a CI runner) can still seed the scenario.
+  mkdir -p "$repo" || return 1
+  git -C "$HERE" archive --format=tar HEAD | tar -x -C "$repo" || return 1
+  git -C "$repo" init -q || return 1
   git -C "$repo" config user.name "ci scenario" || return 1
   git -C "$repo" config user.email "ci@example.invalid" || return 1
   git -C "$repo" config commit.gpgsign false || return 1
@@ -1565,6 +1580,7 @@ STUB
   git -C "$repo" add -A || return 1
   git -C "$repo" commit -qm "ci scenario baseline" || return 1
   git -C "$repo" checkout -q -B main || return 1
+  git -C "$repo" remote add origin "$work/origin.git" 2>/dev/null || true
   git init -q --bare "$work/origin.git" || return 1
   git -C "$repo" remote set-url origin "$work/origin.git" || return 1
   git -C "$repo" push -q -u origin main || return 1
@@ -1576,8 +1592,8 @@ s35() {
   if ! command -v git >/dev/null 2>&1; then echo "   skip: git not available"; return; fi
   local work repo bindir
   work="$(mktemp -d)"; repo="$work/repo"; bindir="$work/bin"
-  if ! scratch_clone "$work" >/dev/null 2>&1; then
-    bad "S35: could not build the scratch clone"; rm -rf "$work"; return
+  if ! CLONE_ERR="$(scratch_clone "$work" 2>&1)"; then
+    bad "S35: could not build the scratch clone: $CLONE_ERR"; rm -rf "$work"; return
   fi
   mkdir -p "$bindir"
   ln -s "$HERE/ci/shims/claude-release-ok" "$bindir/claude"
@@ -1611,7 +1627,7 @@ s35() {
   [ "$gh_order" = "create checks merge " ] && ok "S35 pr: gh called create, checks, merge in order" || bad "S35 pr: gh call order was '$gh_order'"
   grep -q "^pr create --base main --head release/v$new " "$ghlog" && ok "S35 pr: pr create targets main from release/v$new" || bad "S35 pr: pr create arguments wrong: $(grep '^pr create' "$ghlog")"
   grep -q "^pr checks release/v$new --watch --fail-fast$" "$ghlog" && ok "S35 pr: pr checks watches the branch" || bad "S35 pr: pr checks arguments wrong"
-  grep -q "^pr merge release/v$new --rebase --delete-branch$" "$ghlog" && ok "S35 pr: pr merge rebases and deletes the branch" || bad "S35 pr: pr merge arguments wrong"
+  grep -q "^pr merge release/v$new --squash --subject Release engineering $new --delete-branch$" "$ghlog" && ok "S35 pr: pr merge squashes with the release subject and deletes the branch" || bad "S35 pr: pr merge arguments wrong: $(grep '^pr merge' "$ghlog")"
 
   # --- tag: refuses when origin/main's head is not the release commit
   if OUT="$(cd "$repo" && PATH="$bindir:$PATH" GH_FAKE_LOG="$ghlog" ./release.sh tag "$new" 2>&1)"; then RC=0; else RC=$?; fi
@@ -1667,7 +1683,7 @@ s35() {
     *) bad "S35 auth-fail: manual gh pr checks command missing: $OUT" ;;
   esac
   case "$OUT" in
-    *"gh pr merge release/v$new2 --rebase --delete-branch"*) ok "S35 auth-fail: prints the manual gh pr merge command" ;;
+    *"gh pr merge release/v$new2 --squash --subject \"Release engineering $new2\" --delete-branch"*) ok "S35 auth-fail: prints the manual gh pr merge command" ;;
     *) bad "S35 auth-fail: manual gh pr merge command missing: $OUT" ;;
   esac
   git -C "$work2/origin.git" show-ref --verify -q "refs/heads/release/v$new2" \
@@ -1682,8 +1698,8 @@ s36() {
   if ! command -v git >/dev/null 2>&1; then echo "   skip: git not available"; return; fi
   local work repo
   work="$(mktemp -d)"; repo="$work/repo"
-  if ! scratch_clone "$work" >/dev/null 2>&1; then
-    bad "S36: could not build the scratch clone"; rm -rf "$work"; return
+  if ! CLONE_ERR="$(scratch_clone "$work" 2>&1)"; then
+    bad "S36: could not build the scratch clone: $CLONE_ERR"; rm -rf "$work"; return
   fi
   rm -f "$repo/.ci-stub-ran"
 

@@ -126,12 +126,12 @@ Claude Code copies the plugin into a version-keyed cache and skips `plugin updat
 Releases go through a GitHub-required-check-gated PR flow; there is no direct push to `main`, including for the maintainer.
 
 - **`./release.sh prepare patch|minor|major|x.y.z [--no-pr]`.** Runs the version bump, changelog fold, validation, and `ci.sh` tier described above, then branches `release/vX.Y.Z`, commits, and pushes. Unless `--no-pr`, it continues into `pr` (below) automatically. `--no-pr` stops after the push and prints the manual `gh pr create`/`gh pr checks`/`gh pr merge` commands; a missing or unauthenticated `gh` behaves the same way (exit 1), leaving the pushed branch in place.
-- **`./release.sh pr X.Y.Z`.** For an already-pushed `release/vX.Y.Z` branch: `gh pr create` (base `main`), `gh pr checks --watch --fail-fast`, `gh pr merge --rebase --delete-branch`. This is also the rerun path after a `prepare --no-pr` or a failed `pr`: rerun `pr`, never a second `prepare`.
+- **`./release.sh pr X.Y.Z`.** For an already-pushed `release/vX.Y.Z` branch: `gh pr create` (base `main`), `gh pr checks --watch --fail-fast`, `gh pr merge --squash --subject "Release engineering X.Y.Z" --delete-branch`. This is also the rerun path after a `prepare --no-pr` or a failed `pr`: rerun `pr`, never a second `prepare`.
 - **`./release.sh tag [X.Y.Z]`.** Fetches `origin/main`, requires its head commit subject to be exactly `Release engineering X.Y.Z` and `plugin.json` at that commit to be `X.Y.Z` (defaults to `origin/main`'s `plugin.json` version), signs and pushes the tag `vX.Y.Z` from `origin/main`, then refreshes the local plugin install.
 
 `ENGINEERING_RELEASE=1` is set by `release.sh` around its own `git push` calls; `.githooks/pre-push` skips its own `ci.sh` run only when `ENGINEERING_RELEASE=1` is set and every pushed ref is a release branch (`refs/heads/release/v*`) or a version tag (`refs/tags/v*`) — GitHub Actions is the gate for those pushes instead.
 
-Two separate proofs, not one: the required `linux` check proves `./ci.sh` passed on a tree identical to `main`'s head (rebase-and-merge with `strict: true` keeps the merged tree identical to the checked PR head); the signed tag proves the maintainer released that commit. Commits on `main` are GitHub-signed (from the rebase merge), so `.allowed_signers` verifies tags, not commits. Tag pushes are not gated by any required check (see the risk register, R13). Direct pushes to `main`, including by the maintainer, are rejected by branch protection once the required check is applied (see CI below).
+Two separate proofs, not one: the required `linux` check proves `./ci.sh` passed on a tree identical to `main`'s head (squash-and-merge with `strict: true` keeps the merged tree identical to the checked PR head); the signed tag proves the maintainer released that commit. Commits on `main` are GitHub-signed (from the rebase merge), so `.allowed_signers` verifies tags, not commits. Tag pushes are not gated by any required check (see the risk register, R13). Direct pushes to `main`, including by the maintainer, are rejected by branch protection once the required check is applied (see CI below).
 
 ## CI
 
@@ -141,10 +141,15 @@ Two separate proofs, not one: the required `linux` check proves `./ci.sh` passed
 - **`macos`** (macos-latest): same install and verification, then prepends a `bash` → `/bin/bash` shim to `PATH` so every script runs under the system's bash 3.2 (asserted in the job log), installs shellcheck and gnupg via Homebrew, and runs `./ci.sh`. Proves bash 3.2 compatibility, which Linux runners (bash 5) cannot.
 - **`windows`** (windows-latest): installs the pinned, signature-verified Claude Code build via PowerShell, runs the Python unit tests under `python -X dev`, and runs `bash -n` under Git Bash on the shell scripts. Proves the Python helpers pass their unit tests and the shell scripts are syntactically valid on Windows; it does not run the `ci.sh` scratch-install scenarios there (informational only — see the risk register, R5).
 
-Apply the required check once `linux` is green on `main` (GitHub Actions' app id is `15368`):
+The required check was applied on 2026-09-12 with the command below (the `PATCH .../required_status_checks` endpoint returns 404 until status checks are enabled, so the whole protection object is `PUT`, restating the existing settings; GitHub Actions' app id is `15368`). A direct push to `main` is now rejected with `GH006: Protected branch update failed ... Required status check "linux" is expected`:
 
 ```
-gh api -X PATCH repos/ahueb/engineering/branches/main/protection/required_status_checks --input - <<< '{"strict": true, "checks": [{"context": "linux", "app_id": 15368}]}'
+cat > /tmp/protection.json <<'EOF'
+{"required_status_checks": {"strict": true, "checks": [{"context": "linux", "app_id": 15368}]},
+ "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null,
+ "required_linear_history": true, "allow_force_pushes": false, "allow_deletions": false}
+EOF
+gh api -X PUT repos/ahueb/engineering/branches/main/protection --input /tmp/protection.json
 ```
 
 `macos` becomes a required check only after two consecutive green releases on it.

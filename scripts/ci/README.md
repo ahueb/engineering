@@ -65,11 +65,17 @@ or reported version) fails the job.
 
 ## Applying branch protection
 
-Once the `linux` job is green on `main`, require it as a status check
-(GitHub Actions' app id is `15368`):
+Applied 2026-09-12. The `PATCH .../required_status_checks` endpoint returns 404 until
+status checks are enabled, so the whole protection object is `PUT`, restating the
+existing settings (GitHub Actions' app id is `15368`):
 
 ```
-gh api -X PATCH repos/ahueb/engineering/branches/main/protection/required_status_checks --input - <<< '{"strict": true, "checks": [{"context": "linux", "app_id": 15368}]}'
+cat > /tmp/protection.json <<'EOF'
+{"required_status_checks": {"strict": true, "checks": [{"context": "linux", "app_id": 15368}]},
+ "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null,
+ "required_linear_history": true, "allow_force_pushes": false, "allow_deletions": false}
+EOF
+gh api -X PUT repos/ahueb/engineering/branches/main/protection --input /tmp/protection.json
 ```
 
 `macos` becomes a required check only after two consecutive green releases

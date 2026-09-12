@@ -8,20 +8,33 @@ $Repo = "https://downloads.claude.ai/claude-code-releases"
 $Tmp = Join-Path $env:TEMP ("claude-verify-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $Tmp | Out-Null
 try {
-    $env:GNUPGHOME = Join-Path $Tmp "gnupg"; New-Item -ItemType Directory -Path $env:GNUPGHOME | Out-Null
+    # gpg here is the MSYS build from Git for Windows, which reads paths in POSIX form
+    # (C:\Users\x -> /c/Users/x; a Windows path is taken as relative). Every path handed to
+    # gpg goes through ToMsys, and gpg's stderr is kept for the failure message.
+    function ToMsys([string]$p) {
+        $p = $p -replace '\\', '/'
+        if ($p -match '^([A-Za-z]):/(.*)$') { return "/" + $Matches[1].ToLower() + "/" + $Matches[2] }
+        return $p
+    }
+    $GnupgHomeWin = Join-Path $Tmp "gnupg"
+    New-Item -ItemType Directory -Path $GnupgHomeWin | Out-Null
+    $GnupgHome = ToMsys $GnupgHomeWin
+    $env:GNUPGHOME = $GnupgHome
+    $KeyPath = ToMsys "$Here\anthropic-release-key.asc"
+    $gpgVersion = (& gpg --version 2>&1 | Select-Object -First 1)
 
     # 1. Key: the vendored key must carry the published fingerprint and must be the only
     #    primary key imported into this throwaway keyring.
-    & gpg --batch --import "$Here\anthropic-release-key.asc" 2>$null
-    $pubKeys = & gpg --batch --with-colons --list-keys 2>$null | Select-String -Pattern "^pub:"
-    if (@($pubKeys).Count -ne 1) { throw "more than one primary key imported" }
-    $fprs = & gpg --batch --with-colons --fingerprint 2>$null
+    $importOut = & gpg --homedir $GnupgHome --batch --import $KeyPath 2>&1
+    $fprs = @(& gpg --homedir $GnupgHome --batch --with-colons --fingerprint 2>&1 | ForEach-Object { "$_" })
+    $pubCount = @($fprs | Where-Object { $_ -match "^pub:" }).Count
+    if ($pubCount -ne 1) { throw "expected exactly one primary key in the keyring, found $pubCount ($gpgVersion; home $GnupgHome; import: $($importOut -join ' | '); list: $($fprs -join ' | '))" }
     if (-not ($fprs | Select-String -Pattern "^fpr:+${Fpr}:")) { throw "release key fingerprint mismatch" }
 
     # 2. Manifest: signature must verify against that key and be bound to the pinned fingerprint.
     Invoke-WebRequest -Uri "$Repo/$Version/manifest.json" -OutFile "$Tmp\manifest.json"
     Invoke-WebRequest -Uri "$Repo/$Version/manifest.json.sig" -OutFile "$Tmp\manifest.json.sig"
-    $status = & gpg --batch --status-fd 1 --verify "$Tmp\manifest.json.sig" "$Tmp\manifest.json" 2>$null
+    $status = & gpg --homedir $GnupgHome --batch --status-fd 1 --verify (ToMsys "$Tmp\manifest.json.sig") (ToMsys "$Tmp\manifest.json") 2>&1 | ForEach-Object { "$_" }
     if ($LASTEXITCODE -ne 0) { throw "manifest signature invalid for $Version" }
     if (-not ($status | Select-String -Pattern "^\[GNUPG:\] VALIDSIG .* $Fpr$")) { throw "manifest signature not bound to $Fpr" }
     if ($status | Select-String -Pattern "^\[GNUPG:\] (EXPKEYSIG|REVKEYSIG|KEYREVOKED|KEYEXPIRED|EXPSIG)") { throw "manifest signed by an expired or revoked key" }
