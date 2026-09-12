@@ -1,8 +1,7 @@
 ---
 name: docs-check
-description: Perform an explicitly requested narrow authoritative documentation check for a specific current or version-dependent technical fact or design decision.
+description: Narrow authoritative documentation check for one current or version-dependent technical fact. Use when a design or implementation decision depends on a library, API, protocol, platform, or CLI behavior that could have changed, when a version, default, deprecation, or compatibility claim must be confirmed against official docs, or when the user asks to verify or look up such a fact. Not for broad research or general programming knowledge.
 argument-hint: "[technical question]"
-disable-model-invocation: true
 context: fork
 agent: general-purpose
 model: sonnet

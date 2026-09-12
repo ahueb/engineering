@@ -60,8 +60,8 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
 | `deep-audit` (user-invoked slash command) | Fable at xhigh effort, adversarial audit with no edit tools | Bash (non-mutating), no edit |
-| `docs-check` (user-invoked slash command) | Sonnet, narrow authoritative documentation lookup | Bash (non-mutating), no edit |
-| `literature-review` (user-invoked slash command) | Opus, evidence-driven research synthesis | Bash (non-mutating), no edit |
+| `docs-check` (skill) | Sonnet, one version-dependent fact confirmed against official docs | Bash (non-mutating), no edit |
+| `literature-review` (skill) | Opus, evidence-driven research synthesis for a consequential decision | Bash (non-mutating), no edit |
 
 The `engineering` plugin also provides the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:change-review`, `/engineering:checkpoint`, `/engineering:change-eval`, and `/engineering:production-readiness-review`. The last is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command; it is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer` in one batch; the verdict stays with the main session.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.4 — 2026-09-12
+
+- `docs-check` and `literature-review` are model-invocable: `disable-model-invocation` removed and descriptions rewritten as trigger text. `deep-audit` remains user-only.
+
 ## 2.5.3 — 2026-09-12
 
 - `production-readiness-review`: per-run instruction load cut from about 10,600 to 8,300 tokens with no gate, dimension, overlay, decision rule, or report field removed. Every definition now lives in one place (SKILL.md); `evidence-protocol.md` folded into SKILL.md; `adversarial-checks.md` merged into each gate's "Defeaters" list in `rubric.md`, plus a closing "Final challenge". Before/after run on the fixture repository: same verdict and gate statuses, more accurate evidence-strength ratings, confidence rule now applied correctly, same turn count and cost.

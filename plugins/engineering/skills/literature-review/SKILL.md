@@ -1,8 +1,7 @@
 ---
 name: literature-review
-description: Conduct an explicitly requested evidence-driven scientific or technical literature review to inform a consequential design, architecture, algorithm, or research decision.
+description: Evidence-driven scientific or technical literature review for a consequential design, architecture, algorithm, or research decision. Use when the user asks for research, prior art, a survey, or what the evidence says, or when a choice between approaches needs published results, standards, or benchmarks rather than a single documentation lookup. Not for a one-fact version check or ordinary coding.
 argument-hint: "[research question or decision]"
-disable-model-invocation: true
 context: fork
 agent: general-purpose
 model: opus
