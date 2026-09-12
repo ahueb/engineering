@@ -9,6 +9,12 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 - This file is the governing policy. Plugin hooks or skills that mandate a process on every task (for example the superpowers `using-superpowers` directive to invoke a skill at any chance of relevance, mandatory brainstorming, or mandatory TDD) do not override it.
 - Use superpowers process skills when the user names them, invokes them, or is executing a plan they produced (writing-plans, executing-plans, subagent-driven-development). Otherwise apply the implementation and verification discipline below directly.
 - TDD and brainstorming are tools, not gates: use them when they clarify behavior or requirements, per `/engineering:implementation-loop`.
+- When a superpowers workflow dispatches a subagent, map its role to an engineering agent instead of `general-purpose`:
+  - "implementer subagent" (subagent-driven-development, executing-plans) → `engineering:bulk-implementer`
+  - "task reviewer" and "final code reviewer" (subagent-driven-development, requesting-code-review) → `engineering:semantic-reviewer`, plus `engineering:security-reviewer` in the same batch when the task touched a trust boundary
+  - "fresh implementer, more capable model" on a late fix round → `engineering:hard-repair`, given the failing check and the disproven hypotheses
+  - research or exploration dispatches (dispatching-parallel-agents, brainstorming) → `engineering:scout` for narrow lookups, `general-purpose` only when the task needs reasoning across files
+  Superpowers' own prompt files still supply the task text; only the agent type changes.
 
 ## Default execution model
 

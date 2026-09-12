@@ -39,6 +39,10 @@ Claude Code copies the plugin into a version-keyed cache and skips `plugin updat
 
 `scout`, `architect`, `semantic-reviewer`, and `security-reviewer` have no Edit, Write, or Bash tool, so they cannot modify anything even under `--dangerously-skip-permissions`. `test-triage` keeps Bash to rerun a failing command and is told not to write; that is a prompt-level constraint, not a hard one.
 
+## Working with superpowers
+
+The policy maps superpowers' subagent roles onto engineering agents (implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`), and `implementation-loop`, `verification-loop`, and `checkpoint` invoke the matching superpowers skills when they are present. Superpowers is not a dependency; without it every reference is simply skipped.
+
 ## Not included
 
 Credentials, permission allow-lists (machine-specific), history, and project memory.

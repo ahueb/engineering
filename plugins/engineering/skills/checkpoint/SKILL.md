@@ -5,7 +5,7 @@ description: Create or update an explicit handoff checkpoint for a long-running 
 
 # Checkpoint
 
-Create a concise handoff artifact that another session can trust without replaying the entire conversation.
+Create a concise handoff artifact that another session can trust without replaying the entire conversation. When the work follows a superpowers plan (`superpowers:writing-plans` output, executed by `superpowers:executing-plans` or `superpowers:subagent-driven-development`), reference the plan file and the task numbers completed so the next session resumes from the plan's own ledger.
 
 Include:
 - objective and acceptance criteria;

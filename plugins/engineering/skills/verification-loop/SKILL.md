@@ -16,3 +16,4 @@ Treat verification as evidence gathering, not ritual.
 7. Do not weaken tests, linters, types, security settings, or build configuration merely to make verification pass unless that change is itself required and justified.
 8. If a check cannot run because of environment, credentials, external services, unavailable hardware, or time limits, record that gap explicitly instead of inferring success.
 9. Finish with a compact evidence table: check, command or method, result, and remaining caveat.
+10. If the `superpowers:verification-before-completion` skill is available, invoke it before any completion claim; its evidence-before-assertion rule and this table are the same standard.
