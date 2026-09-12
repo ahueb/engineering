@@ -4,6 +4,50 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-09-12
+
+### Added
+
+- `install.sh` settings merge now supports two modes, `enforce` and `defaults` (`--settings-mode`), auto-selected from whether a prior install is evident so an upgrade never silently overwrites edited settings; a drift report is printed whenever `defaults` leaves a recommended value unapplied, ending with `apply the recommended values with: ./install.sh --settings-mode enforce`.
+- `--dry-run` previews the settings diff, drift report, policy action, marketplace action, and plugin actions without writing anything; it cannot be combined with `--restore` (exit 2).
+- `--restore [STAMP]` and `--list-backups` restore or list structured backups kept at `~/.claude/backups/engineering/<stamp>/` (newest 5 kept); backups are written immediately before any file the installer is about to change.
+- `--create-through-dangling` creates the target of a dangling `settings.json` symlink instead of refusing; without it the installer exits 4 with a message naming the flag.
+- The operating policy now installs as a standalone rules file, `~/.claude/rules/engineering-policy.md` (default, `--policy-target rules`), which Claude Code loads every session without the SessionStart hook; `--policy-target claude-md` keeps the legacy `CLAUDE.md` layout. A legacy `CLAUDE.md` policy copy is migrated automatically (with confirmation, or `--yes`; declined deterministically under `ENGINEERING_NO_PROMPT=1` or with no TTY) once the installed plugin version supports the rules file; otherwise the installer falls back to `CLAUDE.md` for that run and says why.
+- `--purge-official`, `--break-hardlinks`, and the installer marker `~/.claude/engineering-installer.json` (records installer version, timestamp, settings mode, and policy target; used to select the default settings mode on later runs).
+- `scripts/merge_settings.py` and `scripts/safe_write.py`: stdlib-only helpers implementing the settings merge and the write/backup/restore/list operations, each with a unit test suite.
+- `ci.sh` gains `--quick` and `--full` tiers alongside the existing default run; `--full` adds network-dependent scenarios and fails rather than silently skipping them unless `CI_ALLOW_SKIP=1`.
+
+### Changed
+
+- Settings merge now mirrors Claude Code's own combination rules exactly: single values replace, lists union with duplicates removed, nested blocks merge key by key, `extraKnownMarketplaces` and `managedMcpServers` entries replace whole by name, and `fallbackModel`/`modelPicker`/`availableModels` replace whole — previously the merge only overwrote scalars and merged objects, with no list union and no whole-entry replacement for marketplaces or MCP servers.
+- `--no-official` is no longer destructive: it now only skips registering the official marketplace and installing official plugins, and leaves any existing official marketplace/plugin entries in `settings.json` untouched. The previous destructive behaviour (removing existing official entries) moved to the new, explicitly opt-in `--purge-official` flag.
+- An explicit `engineering@engineering: false` opt-out in `settings.json` is no longer preserved: running the installer is treated as explicit consent, so `engineering@engineering` is always forced to `true`. This is a deliberate behaviour change from the previous "preserve any explicit `enabledPlugins` false" rule.
+- `release.sh` now runs `./ci.sh --full` instead of the default `./ci.sh` when `install.sh`, `ci.sh`, `scripts/`, or `ci/` changed since the previous tag, or when no tag exists yet.
+- File writes to `settings.json` and the policy files go through a symlink- and hard-link-aware, atomic write helper (temp file plus `fsync` and `os.replace`) instead of writing the target path directly.
+
+### Fixed
+
+- The SessionStart hook prints a one-line refresh notice when the installed policy copy differs from the plugin's bundled policy, so a plugin update no longer leaves an outdated policy in place silently.
+- `repo_probe.py` counts files above the per-file text cap (1,000,000 bytes) as skipped and reports them under limitations; previously they were dropped without mention.
+- `comment-cleanup` now protects machine-read comments (lint and type suppressions, build and codegen directives, tooling markers, test directives, generator-consumed docs) and reverts any comment change that alters formatter, lint, type-check, or test results.
+- README and SECURITY pinning guidance: a GitHub marketplace can be pinned to a signed tag with `claude plugin marketplace add ahueb/engineering@vX.Y.Z` (verified); the local-clone path remains for signature verification.
+- `ci.sh` requires ShellCheck unless `CI_ALLOW_SKIP=1`.
+
+- The installer now writes through an existing symlinked `settings.json`, `rules/` directory, or `CLAUDE.md` instead of replacing the link with a regular file, and preserves the target's existing file mode.
+- A hard-linked `settings.json` or policy file is refused before any write (exit 5) instead of being silently detached from its other links by `os.replace`; `--break-hardlinks` opts back in.
+- List-valued settings (for example `permissions.allow`) are now unioned instead of being dropped or fully overwritten by the recommendation.
+- `extraKnownMarketplaces` and `managedMcpServers` entries are now replaced whole by name per the merge rules, instead of being merged field-by-field, which previously could leave stale sub-keys mixed with new ones.
+- An empty or whitespace-only `settings.json` is now treated as `{}` with a printed notice instead of failing to parse.
+- The legacy `CLAUDE.md` write (and the `settings.json` write) is now atomic (temp file, fsync, rename) instead of writing the destination path directly, which previously could leave a partially written file if the process was interrupted mid-write.
+- A backup taken later in the same run no longer overwrites an earlier backup's manifest entries wholesale; manifests from multiple backups written during one run are now merged instead of the later write clobbering the earlier one.
+- `--restore` no longer recreates a backed-up symlink outside your config directory: a missing symlink is now restored only when its recorded target already exists with content identical to the backup, otherwise that entry is refused instead of creating a file at an attacker-controlled path; `--restore` also now takes its own pre-restore backup, printed as `pre-restore backup: <dir>`, before restoring regular files unconditionally, so edits made after the backup being restored are recoverable instead of silently lost.
+- The backup/restore manifest's `stored` filenames are now validated as flat names before use, instead of being trusted as written, closing a path-traversal opening in a hand-edited or corrupted manifest.
+- Restored file modes are now masked to permission bits only, instead of applying a raw stored mode value verbatim.
+- The drift report and the `--dry-run` settings diff now redact `env` values and any key containing `key`, `token`, `secret`, `password`, or `credential`, plus `apiKeyHelper`, as `<redacted>` instead of printing secret values in plain text.
+- `--purge-official` no longer misidentifies plugins the user never opted into through the official path as purgeable, so it removes only entries the installer itself registered as official.
+- The installer's `set -E` error trap now propagates into functions and subshells as intended, instead of silently not firing for an error raised inside a function call.
+- `-h`/`--help` output is no longer truncated.
+
 ## [2.7.2] - 2026-09-12
 
 ### Changed
@@ -153,7 +197,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.7.2...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/ahueb/engineering/compare/v2.7.2...v2.8.0
 [2.7.2]: https://github.com/ahueb/engineering/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/ahueb/engineering/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/ahueb/engineering/compare/v2.6.0...v2.7.0
