@@ -116,7 +116,6 @@ plugins/engineering/
   evals/                          claude plugin eval cases for skill trigger quality
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy
-docs/plans/                       plan documents for planned work
 settings.recommended.json         settings merged by install.sh
 install.sh                        installer
 release.sh                        version bump, ci, signed tag, local refresh
