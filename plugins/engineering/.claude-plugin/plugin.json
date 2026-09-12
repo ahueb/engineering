@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "engineering",
   "description": "Evidence-first engineering: operating policy, cost-tiered agents, process skills, and user-invoked escalations.",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "author": {
     "name": "Alan",
     "email": "alan@hueb.org"
