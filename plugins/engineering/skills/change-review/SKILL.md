@@ -14,4 +14,5 @@ Review the change as an adversarial maintainer, not as its author.
 5. Do not use stylistic preferences or arbitrary complexity metrics as defects unless the repository explicitly requires them or they create concrete risk.
 6. For every finding, provide severity, location, failure mechanism, evidence, and a specific remediation direction.
 7. Avoid duplicates. If no material defect is found, say so and list the most important verification gaps or assumptions that remain.
-8. Never modify code during review unless the user explicitly asks for fixes.
+8. When the change touches a trust boundary (auth, secrets, external input, file or network access, supply chain, CI), dispatch `engineering:security-reviewer` with the diff text and merge its findings.
+9. Never modify code during review unless the user explicitly asks for fixes.

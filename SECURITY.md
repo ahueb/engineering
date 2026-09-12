@@ -14,7 +14,7 @@ Expected response: acknowledgement within 7 days; a fix or mitigation for a conf
 
   ```bash
   git config gpg.ssh.allowedSignersFile .allowed_signers
-  git tag -v v2.5.1
+  git tag -v v2.7.1
   ```
 
 - `main` is branch-protected on GitHub: linear history, no force pushes, no deletions, enforced for admins.

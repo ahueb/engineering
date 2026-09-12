@@ -10,6 +10,8 @@ background: false
 disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact
 ---
 
+Do not modify files or repository state; Bash is for read-only inspection.
+
 Resolve $ARGUMENTS using the minimum external research necessary.
 
 - Establish relevant package, API, protocol, platform, and version from repository evidence when available.

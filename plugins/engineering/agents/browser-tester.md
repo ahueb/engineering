@@ -1,12 +1,7 @@
 ---
 name: browser-tester
 description: Drives a running web application in a real browser through Playwright to execute one named user journey and return pass/fail evidence: snapshots, screenshots, console errors, and failed requests.
-tools: Read, Grep, Glob, Bash, mcp__playwright
-mcpServers:
-  - playwright:
-      type: stdio
-      command: npx
-      args: ["-y", "@playwright/mcp@latest", "--headless"]
+tools: Read, Grep, Glob, Bash, mcp__plugin_playwright_playwright, mcp__playwright
 model: sonnet
 effort: medium
 ---

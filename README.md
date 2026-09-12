@@ -10,7 +10,7 @@ Everything except settings ships as the `engineering` plugin; the policy (`CLAUD
 - **Fix a bug with evidence.** `/engineering:implementation-loop` inspects the repo, reproduces the failure, makes the smallest fix, and closes with `verification-loop`, which reports exactly which checks ran, passed, or could not run.
 - **Confirm a UI change in a real browser.** `/engineering:browser-testing "add item to cart and see the badge update"` starts the app, dispatches a headless Playwright agent with an explicit pass condition, and returns screenshots, console errors, and failed requests.
 - **Decide go or no-go before a release.** `/engineering:production-readiness-review assess this branch for a 5% canary` audits twelve non-compensable gates, tries to falsify every apparent pass, and returns READY, CONDITIONALLY READY, or NOT READY with evidence strength per gate.
-- **Review a pull request without noise.** `/engineering:change-review` reports concrete defects with location, failure mechanism, and fix direction, adding a security reviewer when the diff touches auth, secrets, or external input.
+- **Review a pull request without noise.** `/engineering:change-review` reports concrete defects with location, failure mechanism, and fix direction, and dispatches `security-reviewer` when the diff touches auth, secrets, or external input.
 - **Check one fact that may have changed.** `/engineering:docs-check "does Next.js 16 still support the pages router?"` answers from version-matched official docs with citations, on Sonnet, without editing anything.
 - **Make comments orient a stranger.** `/engineering:comment-cleanup` scans every comment in the repo, strips dates, phase and plan references, and history, and rewrites what remains into one concise sentence about the code it annotates.
 - **Hand work to the next session.** `/engineering:checkpoint` writes what is done, what failed and why, what was verified, and the next safe step.
@@ -25,13 +25,13 @@ git clone git@github.com:ahueb/engineering.git && cd engineering
 ./install.sh --source ahueb/engineering   # register the GitHub repo as the marketplace instead of this checkout
 ```
 
-The script validates your `settings.json`, registers the marketplace, copies the policy to `CLAUDE.md`, merges the recommended settings key by key, and installs `engineering@engineering`, in that order; a marketplace failure stops it before anything is written. A file is backed up as `<name>.bak-<timestamp>` only when the install would change it, so an identical rerun leaves no new backups. A plugin you have explicitly disabled stays disabled, except `engineering@engineering` itself, which the installer always enables. `--no-official` also removes previously enabled `claude-plugins-official` entries from `settings.json`, because Claude Code auto-installs any enabled official plugin at the next session start. If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models.
+The script validates your `settings.json`, registers the marketplace, copies the policy to `CLAUDE.md`, merges the recommended settings key by key, and installs `engineering@engineering`, in that order; a marketplace failure stops it before anything is written. A file is backed up as `<name>.bak-<timestamp>` only when the install would change it, so an identical rerun leaves no new backups. A plugin you have explicitly disabled stays disabled, except `engineering@engineering` itself, which the installer always enables. `--no-official` also removes previously enabled `claude-plugins-official` entries from `settings.json`, because Claude Code auto-installs any enabled official plugin at the next session start. If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
 
 Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
 
 ### How the policy loads
 
-The plugin's `hooks/session-start.sh` runs on `startup`, `resume`, `clear`, `compact`, and `fork`. The hook is silent only when the first line of `$CFG/CLAUDE.md` is exactly `# Agent operating policy`; the file is then the source. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used.
+The plugin's `hooks/session-start.sh` runs on `startup`, `resume`, `clear`, `compact`, and `fork`. The hook is silent only when the first line of `$CFG/CLAUDE.md` is `# Agent operating policy` (a UTF-8 BOM and CRLF are tolerated); the file is then the source. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used.
 
 ### What `install.sh` writes
 
@@ -46,12 +46,12 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 
 ## Verify, pin, and roll back
 
-- Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.5.1`.
+- Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`.
 - Pin instead of tracking `main`. A GitHub-sourced marketplace always serves the version on `main` (`engineering@engineering@<version>` is accepted but resolves to `main`, verified 2026-09-12), so pin by checking out the signed tag and registering the clone as a directory marketplace:
 
   ```bash
-  git clone https://github.com/ahueb/engineering.git && cd engineering && git checkout v2.5.1
-  git tag -v v2.5.1   # after: git config gpg.ssh.allowedSignersFile .allowed_signers
+  git clone https://github.com/ahueb/engineering.git && cd engineering && git checkout v2.7.1
+  git tag -v v2.7.1   # after: git config gpg.ssh.allowedSignersFile .allowed_signers
   claude plugin marketplace remove engineering; claude plugin marketplace add "$PWD"
   claude plugin install engineering@engineering
   ```
@@ -73,10 +73,10 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 
 ## Requirements
 
-- **Claude Code v2.1.267 or later.** Fable 5.1 resolves from the `fable` alias from v2.1.257; the `effort` frontmatter on Fable and Opus 4.7+ models takes effect from v2.1.267.
+- **Claude Code v2.1.267 or later** to use the plugin; **v2.1.269 or later** to run the trigger evals (`claude plugin eval`). Fable 5.1 resolves from the `fable` alias from v2.1.257; the `effort` frontmatter on models with a pinned default effort (Fable 5, Opus 4.7, Opus 4.8) takes effect from v2.1.267.
 - **Model access.** Agents and skills use the `haiku`, `sonnet`, `opus`, and `fable` aliases, so they resolve to your provider's current models. On Amazon Bedrock, Google Vertex, or Microsoft Foundry, pin them with `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and `ANTHROPIC_DEFAULT_FABLE_MODEL`.
-- **1M context** is on by default for Fable and Sonnet 5 on the API. On subscription plans Fable usage may bill to usage credits depending on plan and seat tier; check the model picker's `Requires usage credits` label. Drop the `[1m]` suffix or set `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` to stay at 200K.
-- If your account has no Fable access, set `model` to `opus[1m]`, set `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=opus` or change `deep-audit`'s `model`.
+- **1M context.** Fable and Sonnet 5 have a native 1M window on the API; `fable[1m]` in the recommended settings makes the choice explicit. On subscription plans Fable usage may bill to usage credits depending on plan and seat tier; check the model picker's `Requires usage credits` label. Drop the `[1m]` suffix or set `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` to stay at 200K.
+- If your account has no Fable access, set `model` to `opus[1m]` and either change `deep-audit`'s `model` or set `CLAUDE_CODE_SUBAGENT_MODEL=opus` with `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`, which forces that model onto every subagent and forked skill.
 - **bash** for the SessionStart hook. Windows users need Git Bash on `PATH`, or should run `install.sh` so the policy is a file and the hook is not needed.
 
 ### Tuning
@@ -84,19 +84,18 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 - `maxEffortLevel` caps the highest `effort` value agents and skills may request.
 - `skillOverrides` / `skillListingMaxDescChars` control per-skill description length in the listing budget.
 - `--plugin-dir ./plugins` runs against this checkout's plugin code without a version bump, for trying edits.
-- `claude plugin eval --threshold` gates the trigger evals in CI.
+- `claude plugin eval --threshold` can gate the trigger evals in a CI job; `ci.sh` does not run them because each run bills model usage.
 
 ## What you get
 
 | Kind | Names |
 |---|---|
 | Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, has Bash and Playwright MCP) |
-| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
+| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review`, `comment-cleanup` (forked, sonnet, medium, edits comments only) |
 | Research skills (forked, read-only) | `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
-| Forked edit skill | `comment-cleanup` (sonnet, medium, edits comments only) |
 | User-only escalation | `/engineering:deep-audit` (fable, xhigh) |
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `browser-tester`, and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `browser-tester` keep Bash and are told not to write; that is a prompt-level constraint. `deep-audit`, `docs-check`, and `literature-review` have no edit tools by frontmatter and keep Bash for non-mutating commands by instruction.
 
 ## Executing plans
 
@@ -104,9 +103,9 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 
 ## Browser testing
 
-`/engineering:browser-testing` is the only path through which the plugin drives a browser. It finds the app's own launch path (`playwright.config` `webServer`, package scripts, compose files), starts the app once, and requires an explicit oracle for every journey before anything is clicked. Exploratory runs dispatch `engineering:browser-tester`, which carries its own Playwright MCP server (`npx -y @playwright/mcp@latest --headless`, declared in the agent's `mcpServers` frontmatter, so it works whether or not the official `playwright` plugin is enabled) and returns a fixed evidence block: result, steps executed, oracle evidence, console errors, same-origin network failures, artifact paths, blockers. It never edits files. Journeys that will be rerun are codified as `@playwright/test` specs under the conventions in `skills/browser-testing/references/playwright-conventions.md` (user-facing locators, web-first assertions, no fixed sleeps, no assertion loosening to hide a defect, three-run flake rule) and run with `npx playwright test`. `verification-loop` and `implementation-loop` route user-facing web changes here; the readiness review may use one `browser-tester` dispatch per critical journey as G2 evidence.
+`/engineering:browser-testing` is the only path through which the plugin drives a browser. It finds the app's own launch path (`playwright.config` `webServer`, package scripts, compose files), starts the app once, and requires an explicit oracle for every journey before anything is clicked. Exploratory runs dispatch `engineering:browser-tester`, which uses the Playwright MCP server from the official `playwright` plugin (enabled by `install.sh`) or a user-configured MCP server named `playwright`; plugin agents cannot bundle their own MCP server, Claude Code ignores `mcpServers` in a plugin agent. It returns a fixed evidence block: result, steps executed, oracle evidence, console errors, same-origin network failures, artifact paths, blockers. It never edits files. Journeys that will be rerun are codified as `@playwright/test` specs under the conventions in `skills/browser-testing/references/playwright-conventions.md` (user-facing locators, web-first assertions, no fixed sleeps, no assertion loosening to hide a defect, three-run flake rule) and run with `npx playwright test`. `verification-loop` and `implementation-loop` route user-facing web changes here; the readiness review may use one `browser-tester` dispatch per critical journey as G2 evidence.
 
-Requirements: Node with `npx`; Playwright browsers installed (`npx playwright install --with-deps chromium`; the conventions reference has the agent ask before installing). The first `browser-tester` dispatch downloads `@playwright/mcp` on demand.
+Requirements: the official `playwright` plugin enabled (or a `playwright` MCP server in your own config), Node with `npx`, and Playwright browsers installed (`npx playwright install --with-deps chromium`; the conventions reference has the agent ask before installing).
 
 ## Production readiness review
 

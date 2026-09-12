@@ -46,13 +46,13 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 
 ## Delegation policy
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `browser-tester`, and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `browser-tester` keep Bash and are told not to write; that is a prompt-level constraint. `deep-audit`, `docs-check`, and `literature-review` have no edit tools by frontmatter and keep Bash for non-mutating commands by instruction. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
 
 | Agent | Use when | Tools |
 |---|---|---|
 | `scout` | narrow file, symbol, definition, or reference discovery; a cheap isolated lookup suffices | read-only |
 | `test-triage` | compress large test, compiler, or log output into the smallest causal failure set before a more expensive model sees it | Bash (non-mutating), no edit |
-| `mechanical-worker` | repetitive transformations with an explicit pattern and deterministic verification | per task |
+| `mechanical-worker` | repetitive transformations with an explicit pattern and deterministic verification | full |
 | `bulk-implementer` | a bounded output-heavy implementation specifiable without transferring most of the main session context | full |
 | `architect` | cross-cutting, difficult-to-reverse design decisions whose invariants are not already clear | read-only |
 | `semantic-reviewer` | correctness properties not adequately covered by deterministic checks, or material semantic/concurrency/migration/compatibility/data-integrity risk | read-only |

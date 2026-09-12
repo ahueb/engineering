@@ -10,6 +10,8 @@ background: false
 disallowed-tools: Edit, Write, NotebookEdit, Agent, Skill, Artifact
 ---
 
+Do not modify files or repository state; Bash is for read-only inspection.
+
 Review $ARGUMENTS for decision-relevant evidence rather than source count.
 
 1. Define the decision, scope, constraints, credible alternatives, and evidence that could change the recommendation.

@@ -9,12 +9,12 @@ cd plugins/engineering
 claude plugin eval . --tag prr-trigger --scaffold --trust-plugin        # positive cases
 claude plugin eval . --tag prr-no-trigger                                # negative cases
 claude plugin eval . --case 'prr-*' --runs 1 --scaffold --trust-plugin   # full suite, one run each
-claude plugin eval . --case 'prr-*' --scaffold --trust-plugin --threshold 1.0  # CI gate: fail on any grader miss
+claude plugin eval . --case 'prr-*' --scaffold --trust-plugin --ablation none --threshold 1.0  # CI gate: fail on any grader miss
 ```
 
 Negative cases pass trivially on the without-plugin arm; run them with `--ablation none` to make the check meaningful.
 
-Run with the session default model. On a 200K-context model such as Haiku the skill listing overruns its default budget and later skills lose their descriptions, so trigger cases fail for a reason unrelated to the description text; `settings.recommended.json` raises `skillListingBudgetFraction` to 0.02 for normal sessions, but eval runs do not read user settings.
+Run with the session default model. On a 200K-context model such as Haiku the skill listing overruns its default budget and the least-invoked skills lose their descriptions, so trigger cases fail for a reason unrelated to the description text; `settings.recommended.json` raises `skillListingBudgetFraction` to 0.02 for normal sessions, but eval runs do not read user settings (the eval sandbox loads no user settings, hooks, or other plugins).
 
 Every run is a model call on your account (about 9 USD for the full suite at one run per case). Raw results land in `evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`.
 

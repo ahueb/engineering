@@ -44,7 +44,7 @@ For large repositories, dispatch read-only evidence collection in one batch and 
 - `engineering:semantic-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Examine the critical-journey tests for gate G2 and report weak oracles, mocked contracts, and untested failure modes.
 - `engineering:browser-tester`: only when the candidate is a web application that can be run locally without new dependencies. One dispatch per critical journey via `/engineering:browser-testing` step 3; the result is direct G2 evidence for that journey and nothing else.
 
-All three are read-only by tool list. Their output is evidence to be weighed under the rubric; none of them decides a gate.
+The first three are read-only by tool list; `browser-tester` has Bash and Playwright but is told not to edit. Their output is evidence to be weighed under the rubric; none of them decides a gate.
 
 ## Run high-value validation safely
 Prefer commands already declared by the repository's CI, task runner, package manager, or contributor documentation, run only what is safe locally without installing new dependencies or mutating remote/prod systems, and prioritize build/reproducibility checks, tests relevant to critical journeys, lint/type/static-analysis that guards real defects, project-configured security/dependency/supply-chain checks, and local smoke/performance/failure checks already part of the project.
