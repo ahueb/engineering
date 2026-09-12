@@ -20,6 +20,7 @@ def run_cli(args, cwd=None):
     return subprocess.run(
         [sys.executable, str(SCRIPT)] + args,
         text=True,
+        encoding="utf-8",  # the CLI writes UTF-8 regardless of the console code page
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
