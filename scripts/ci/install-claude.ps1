@@ -13,9 +13,9 @@ try {
     # 1. Key: the vendored key must carry the published fingerprint and must be the only
     #    primary key imported into this throwaway keyring.
     & gpg --batch --import "$Here\anthropic-release-key.asc" 2>$null
-    $pubKeys = & gpg --batch --with-colons --list-keys 2>$null | Select-String -Pattern "^pub:"
-    if (@($pubKeys).Count -ne 1) { throw "more than one primary key imported" }
-    $fprs = & gpg --batch --with-colons --fingerprint 2>$null
+    $fprs = @(& gpg --batch --with-colons --fingerprint 2>$null)
+    $pubCount = @($fprs | Where-Object { $_ -match "^pub:" }).Count
+    if ($pubCount -ne 1) { throw "expected exactly one primary key in the keyring, found $pubCount (gpg output: $($fprs -join ' | '))" }
     if (-not ($fprs | Select-String -Pattern "^fpr:+${Fpr}:")) { throw "release key fingerprint mismatch" }
 
     # 2. Manifest: signature must verify against that key and be bound to the pinned fingerprint.

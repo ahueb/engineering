@@ -141,10 +141,15 @@ Two separate proofs, not one: the required `linux` check proves `./ci.sh` passed
 - **`macos`** (macos-latest): same install and verification, then prepends a `bash` → `/bin/bash` shim to `PATH` so every script runs under the system's bash 3.2 (asserted in the job log), installs shellcheck and gnupg via Homebrew, and runs `./ci.sh`. Proves bash 3.2 compatibility, which Linux runners (bash 5) cannot.
 - **`windows`** (windows-latest): installs the pinned, signature-verified Claude Code build via PowerShell, runs the Python unit tests under `python -X dev`, and runs `bash -n` under Git Bash on the shell scripts. Proves the Python helpers pass their unit tests and the shell scripts are syntactically valid on Windows; it does not run the `ci.sh` scratch-install scenarios there (informational only — see the risk register, R5).
 
-Apply the required check once `linux` is green on `main` (GitHub Actions' app id is `15368`):
+The required check was applied on 2026-09-12 with the command below (the `PATCH .../required_status_checks` endpoint returns 404 until status checks are enabled, so the whole protection object is `PUT`, restating the existing settings; GitHub Actions' app id is `15368`). A direct push to `main` is now rejected with `GH006: Protected branch update failed ... Required status check "linux" is expected`:
 
 ```
-gh api -X PATCH repos/ahueb/engineering/branches/main/protection/required_status_checks --input - <<< '{"strict": true, "checks": [{"context": "linux", "app_id": 15368}]}'
+cat > /tmp/protection.json <<'EOF'
+{"required_status_checks": {"strict": true, "checks": [{"context": "linux", "app_id": 15368}]},
+ "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null,
+ "required_linear_history": true, "allow_force_pushes": false, "allow_deletions": false}
+EOF
+gh api -X PUT repos/ahueb/engineering/branches/main/protection --input /tmp/protection.json
 ```
 
 `macos` becomes a required check only after two consecutive green releases on it.

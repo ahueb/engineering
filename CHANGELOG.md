@@ -4,6 +4,17 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Fixed
+
+- CI runner-only failures in the 2.9.0 tree, found by the first Actions run on `main` (run 34713026146): `ci.sh`'s doc cross-reference scan was a heredoc inside `$( )` whose text contains `)`, which bash 3.2 cannot parse (the `macos` job); the release and pre-push scenarios built their scratch repository with `git clone` of the checkout, which fails on the runner's shallow checkout, and now use `git archive` and report the underlying error (the `linux` job); `scripts/ci/install-claude.ps1` counted primary keys from a separate `gpg --list-keys` call that produced a different count on Windows, and now counts them from the same `--fingerprint` output it checks the fingerprint in, naming the count on failure (the `windows` job).
+- The documented branch-protection command used `PATCH .../required_status_checks`, which returns 404 until status checks are enabled; the docs now give the `PUT .../protection` form that was actually used.
+
+### Notes
+
+- 2.9.0 reached `main` by a direct push made while the required status check was being applied (the documented `PATCH` command had failed silently), before the protection existed, and was never tagged. The first release through the PR flow with the required check in force is the next one.
+
 ## [2.9.0] - 2026-09-12
 
 ### Added
