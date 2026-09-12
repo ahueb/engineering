@@ -1,6 +1,6 @@
 # engineering
 
-Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), eight cost-tiered agents, five process skills, four user-invoked escalation skills, and recommended settings. Everything except `CLAUDE.md` and settings ships as the `engineering` plugin so it can be updated in place.
+Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, six process skills, four user-invoked escalation skills, and recommended settings. Everything except `CLAUDE.md` and settings ships as the `engineering` plugin so it can be updated in place.
 
 ## Install
 
@@ -49,11 +49,15 @@ Claude Code copies the plugin into a version-keyed cache and skips `plugin updat
 
 | Kind | Names |
 |---|---|
-| Agents | `engineering:scout` (haiku), `engineering:test-triage` (haiku, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high) |
-| Process skills | `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval` |
+| Agents | `engineering:scout` (haiku), `engineering:test-triage` (haiku, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high) |
+| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval` |
 | User-only escalations | `/engineering:deep-audit` (fable, xhigh), `independent-review` (opus, high), `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 
-`scout`, `architect`, `semantic-reviewer`, and `security-reviewer` have no Edit, Write, or Bash tool, so they cannot modify anything even under `--dangerously-skip-permissions`. `test-triage` keeps Bash to rerun a failing command and is told not to write; that is a prompt-level constraint, not a hard one.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` have no Edit, Write, or Bash tool, so they cannot modify anything even under `--dangerously-skip-permissions`. `test-triage` keeps Bash to rerun a failing command and is told not to write; that is a prompt-level constraint, not a hard one.
+
+## Executing plans
+
+`/engineering:plan-execution` is the fast path for a written plan. It partitions the plan into packages that own disjoint files and share explicit interfaces, dispatches every package to a parallel `bulk-implementer` in one batch with building and testing forbidden, merges the results, runs one integrated build-and-test pass, and then has `plan-auditor` and `semantic-reviewer` adversarially check the merged result against the plan for completeness and correctness. The policy routes superpowers' `executing-plans` and `subagent-driven-development` through this flow.
 
 ## Working with superpowers
 
@@ -65,8 +69,8 @@ The policy maps superpowers' subagent roles onto engineering agents (implementer
 .claude-plugin/marketplace.json   marketplace manifest; lists the engineering plugin
 plugins/engineering/
   .claude-plugin/plugin.json      plugin manifest and version
-  agents/                         eight agent definitions
-  skills/                         nine SKILL.md skills
+  agents/                         nine agent definitions
+  skills/                         ten SKILL.md skills
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy
 settings.recommended.json         settings merged by install.sh

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.0 — 2026-09-11
+
+- `plan-execution` skill: partitions a plan into disjoint-file packages, fans all of them out to parallel `bulk-implementer` agents with no per-package build or test, verifies once after merge, then audits adversarially.
+- `plan-auditor` agent: read-only, `opus` at high effort, proves completeness and correctness of a merged implementation against its plan.
+- `bulk-implementer` builds and tests only when the parent asks.
+- Policy routes superpowers `executing-plans` and `subagent-driven-development` through `plan-execution`.
+
 ## 2.2.0 — 2026-09-11
 
 - Policy maps superpowers subagent roles onto engineering agents: implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`.

@@ -10,7 +10,8 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 - Use superpowers process skills when the user names them, invokes them, or is executing a plan they produced (writing-plans, executing-plans, subagent-driven-development). Otherwise apply the implementation and verification discipline below directly.
 - TDD and brainstorming are tools, not gates: use them when they clarify behavior or requirements, per `/engineering:implementation-loop`.
 - When a superpowers workflow dispatches a subagent, map its role to an engineering agent instead of `general-purpose`:
-  - "implementer subagent" (subagent-driven-development, executing-plans) → `engineering:bulk-implementer`
+  - executing a written plan (executing-plans, subagent-driven-development) → `/engineering:plan-execution`: all tasks fan out to parallel `engineering:bulk-implementer` agents at once with no per-task build or test, verification runs once after everything is merged, then `engineering:plan-auditor` audits the result against the plan. Superpowers' sequential implement-then-review loop is replaced by this flow; its plan format and prompt files are still used.
+  - a single "implementer subagent" outside a plan → `engineering:bulk-implementer`
   - "task reviewer" and "final code reviewer" (subagent-driven-development, requesting-code-review) → `engineering:semantic-reviewer`, plus `engineering:security-reviewer` in the same batch when the task touched a trust boundary
   - "fresh implementer, more capable model" on a late fix round → `engineering:hard-repair`, given the failing check and the disproven hypotheses
   - research or exploration dispatches (dispatching-parallel-agents, brainstorming) → `engineering:scout` for narrow lookups, `general-purpose` only when the task needs reasoning across files
@@ -20,6 +21,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 
 - The main session owns context-rich autonomous feature work end to end: inspect, reason, edit, run checks, repair, and finish.
 - Keep dependent work in the main session when planning, implementation, and verification share substantial context.
+- For a written plan with more than one task, use `/engineering:plan-execution`: partition into disjoint-file packages, implement all of them in parallel without building or testing, verify once after merge, then audit adversarially.
 - Delegate only when the delegated role is bounded enough that a fresh subagent context is cheaper or more reliable than keeping the work in the main conversation.
 - Do not create a generic escalation ladder. Escalate only from concrete evidence or before work when the task is clearly high-risk and difficult to reverse.
 - Do not use agent teams for ordinary dependent feature work.
@@ -70,9 +72,11 @@ Use `engineering:semantic-reviewer` only when important correctness properties a
 
 Use `engineering:security-reviewer` when a change touches a trust boundary: authentication, authorization, secrets, external input, file or network access, supply chain, or CI.
 
+Use `engineering:plan-auditor` after a plan's packages are merged and the integrated build and tests pass, to prove completeness and correctness against the plan itself.
+
 Use `engineering:hard-repair` only after a concrete persistent failure remains unresolved by the normal main-session repair loop. Give it the failing command, relevant output, changed files, and already-disproven hypotheses.
 
-The `engineering` plugin provides every agent above plus the process skills `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:change-review`, `/engineering:checkpoint`, and `/engineering:change-eval`.
+The `engineering` plugin provides every agent above plus the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:change-review`, `/engineering:checkpoint`, and `/engineering:change-eval`.
 
 User-invoked escalations (hidden from the model; invoke by slash command only):
 - `/engineering:deep-audit` — Fable at xhigh effort, read-only adversarial audit.

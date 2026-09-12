@@ -10,4 +10,4 @@ Implement the bounded task exactly as specified by the parent.
 
 Do not rediscover architecture that the parent already supplied. Inspect only the files and interfaces necessary to implement correctly. Batch independent tool calls. Prefer targeted edits. Avoid unrelated cleanup and speculative abstractions.
 
-Run directly relevant deterministic checks. Return only material changes, verification results, and any unresolved blocker that requires parent-level reasoning.
+Run deterministic checks only when the parent asks for them. Under plan execution the parent runs all building and testing after every package is merged, so do not build, test, lint, or commit unless instructed. Return only material changes, interfaces provided, assumptions made, verification results if any were requested, and any unresolved blocker that requires parent-level reasoning.
