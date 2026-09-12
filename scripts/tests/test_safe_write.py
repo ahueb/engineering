@@ -13,6 +13,11 @@ from scripts import safe_write  # noqa: E402
 
 
 POSIX_ONLY = unittest.skipUnless(os.name == "posix", "mode/umask semantics are POSIX-only")
+# Windows symlink resolution (short 8.3 names, junction semantics) and replacing an open file
+# are out of scope for the installer on Windows (risk register R5); the behaviour is only
+# specified for POSIX.
+SYMLINKS_POSIX_ONLY = unittest.skipUnless(os.name == "posix", "symlink semantics are POSIX-only (risk register R5)")
+REPLACE_OPEN_POSIX_ONLY = unittest.skipUnless(os.name == "posix", "replacing an open file is refused on Windows (exit 7)")
 
 
 class TempDirCase(unittest.TestCase):
@@ -77,6 +82,7 @@ class WriteTests(TempDirCase):
         finally:
             os.umask(old)
 
+    @SYMLINKS_POSIX_ONLY
     def test_symlinked_file_kept_target_updated(self):
         real = self.root / "real.json"
         real.write_bytes(b"old")
@@ -166,6 +172,7 @@ class WriteTests(TempDirCase):
         ]
         self.assertEqual(leftover, [])
 
+    @REPLACE_OPEN_POSIX_ONLY
     def test_concurrent_reader_on_old_fd_sees_old_bytes(self):
         target = self.root / "f.json"
         target.write_bytes(b"old-bytes")
@@ -442,6 +449,7 @@ class RestoreTests(TempDirCase):
         # nothing outside cfg or at absolute paths got written
         self.assertFalse((self.root / "evil.json").exists())
 
+    @SYMLINKS_POSIX_ONLY
     def test_restore_recreates_missing_symlink_only_when_target_unchanged(self):
         cfg = self.root / "cfg"
         cfg.mkdir()
@@ -707,6 +715,7 @@ class MarkWrittenTests(TempDirCase):
             0o700,
         )
 
+    @SYMLINKS_POSIX_ONLY
     def test_mark_written_created_records_live_symlink(self):
         cfg = self.root / "cfg"
         cfg.mkdir()
@@ -863,6 +872,7 @@ class OutsideCfgDisclosureTests(TempDirCase):
         real.write_bytes(b'{"a":2}')
         return cfg, real, stamp
 
+    @SYMLINKS_POSIX_ONLY
     def test_disclosure_line_precedes_every_write(self):
         cfg, real, stamp = self._cfg_with_outside_symlink()
         captured = []
@@ -952,6 +962,7 @@ class SymlinkedParentDirRestoreTests(TempDirCase):
 
 
 class DanglingOutsideSymlinkRestoreTests(TempDirCase):
+    @SYMLINKS_POSIX_ONLY
     def test_dangling_symlink_target_outside_cfg_is_refused_not_created(self):
         # The symlink entry itself is intact, but the file it points to outside
         # $CFG is gone (dangling). Restore must not create it (or any missing
@@ -982,6 +993,7 @@ class DanglingOutsideSymlinkRestoreTests(TempDirCase):
             captured,
         )
 
+    @SYMLINKS_POSIX_ONLY
     def test_dangling_symlink_target_inside_cfg_still_created(self):
         # The existing (pre-fix) behaviour for a dangling symlink whose recorded
         # target is inside $CFG is unchanged: it is fine to create it there.
@@ -1116,6 +1128,7 @@ class OnlyRunFilesTests(TempDirCase):
             captured,
         )
 
+    @SYMLINKS_POSIX_ONLY
     def test_created_symlink_entry_unlinks_the_link_not_the_target(self):
         cfg = self._cfg()
         outside = self.root / "dotfiles"

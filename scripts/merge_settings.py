@@ -429,6 +429,11 @@ def _build_arg_parser():
 
 
 def main(argv=None):
+    # The output is JSON consumed by install.sh through a pipe; it is UTF-8 regardless of the
+    # console code page (Windows defaults to cp1252, which cannot encode every settings value).
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     args = _build_arg_parser().parse_args(argv)
 
     try:
