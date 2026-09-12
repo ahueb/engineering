@@ -259,6 +259,16 @@ class RepoProbeTests(unittest.TestCase):
                 self.assertEqual(2, proc.returncode)
                 self.assertEqual("", proc.stdout)
 
+    def test_per_file_cap_is_reported_even_under_a_large_total_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "huge.md").write_bytes(b"rollback " * (1_000_000 // 8 + 1))  # above the per-file cap MAX_TEXT_BYTES
+            (root / "small.md").write_text("rollback\n", encoding="utf-8")
+            report = run_probe(root)
+            self.assertEqual(1, report["scan"]["text_files_skipped_oversize"])
+            self.assertFalse(report["scan"]["text_budget_exhausted"])
+            self.assertTrue(any("not content-scanned" in l for l in report["limitations"]))
+
     def test_text_budget_stops_content_scanning_but_not_classification(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "haiku",
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "high"
+    }
+  },
+  "env": {
+    "FOO": "bar"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(ls)"
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "widgets": {
+      "source": {
+        "source": "github",
+        "repo": "acme/widgets",
+        "ref": "v1.2.3"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "sample@claude-plugins-official": false
+  }
+}

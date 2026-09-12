@@ -1,0 +1,29 @@
+{
+  "model": "sonnet",
+  "modelSettings": {
+    "claude-sonnet-5": {
+      "effortLevel": "low"
+    }
+  },
+  "env": {
+    "OTHERVAR": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff)"
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "widgets": {
+      "source": {
+        "source": "github",
+        "repo": "acme/widgets"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "engineering@engineering": true,
+    "sample@claude-plugins-official": true
+  }
+}

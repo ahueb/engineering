@@ -2,7 +2,7 @@
 
 Evidence-first engineering for Claude Code. One operating policy plus ten cost-tiered agents and nine process skills that route each job to the cheapest model that can do it, verify with real checks before claiming success, and report what was actually proven. Includes parallel plan execution, adversarial code and plan audits, a production readiness review with hard gates, Playwright browser testing, and narrow research skills for documentation and literature. Works standalone or alongside superpowers.
 
-Everything except settings ships as the `engineering` plugin; the policy (`CLAUDE.md`) also ships inside it and `install.sh` copies it to your config directory.
+Everything except settings ships as the `engineering` plugin; the policy also ships inside it, and `install.sh` installs it as a standalone rules file that Claude Code loads every session without a hook.
 
 ## Example use cases
 
@@ -21,40 +21,82 @@ Everything except settings ships as the `engineering` plugin; the policy (`CLAUD
 ```bash
 git clone git@github.com:ahueb/engineering.git && cd engineering
 ./install.sh                 # into ~/.claude, or $CLAUDE_CONFIG_DIR if set
-./install.sh --no-official   # do not enable or install the claude-plugins-official plugins
+./install.sh --no-official   # do not register or install the claude-plugins-official marketplace/plugins
 ./install.sh --source ahueb/engineering   # register the GitHub repo as the marketplace instead of this checkout
 ```
 
-The script validates your `settings.json`, registers the marketplace, copies the policy to `CLAUDE.md`, merges the recommended settings key by key, and installs `engineering@engineering`, in that order; a marketplace failure stops it before anything is written. A file is backed up as `<name>.bak-<timestamp>` only when the install would change it, so an identical rerun leaves no new backups. A plugin you have explicitly disabled stays disabled, except `engineering@engineering` itself, which the installer always enables. `--no-official` also removes previously enabled `claude-plugins-official` entries from `settings.json`, because Claude Code auto-installs any enabled official plugin at the next session start. If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
+The script validates your `settings.json`, registers the marketplace, installs `engineering@engineering`, merges the recommended settings into `settings.json`, installs the operating policy (as a rules file by default, or `CLAUDE.md` with `--policy-target claude-md`), installs official plugins, and writes the installer marker, in that order; a marketplace failure stops it before anything is written. A file is backed up before any change that would alter it (see Backups below), so an identical rerun leaves no new backup. A plugin you have explicitly disabled stays disabled, except `engineering@engineering` itself, which the installer always enables (see Changed behaviour below). If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `fable[1m]` (Fable 5.1 with 1M context) at low effort, Sonnet 5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
 
-Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
+Flags: `--no-official` (skip registering the official marketplace and installing official plugins; leaves any existing official entries alone), `--purge-official` (also remove previously registered official marketplace/plugin entries from `settings.json`, backed up first; an explicit `false` you set is kept), `--source X` (register `X` — a directory or a GitHub `owner/repo` — as the `engineering` marketplace instead of this checkout), `--settings-mode enforce|defaults` (override the auto-selected merge mode; see the mode table below), `--policy-target rules|claude-md` (install the policy as `~/.claude/rules/engineering-policy.md`, the default, or keep the legacy `~/.claude/CLAUDE.md` layout), `--dry-run` (print the settings diff, drift report, policy action, marketplace action, and plugin actions without writing anything; cannot be combined with `--restore`, which exits 2), `--yes` (assume yes to any confirmation, including legacy-policy migration, without a TTY prompt), `--break-hardlinks` (allow the installer to replace a hard-linked target instead of refusing), `--create-through-dangling` (when `settings.json` is a dangling symlink, create the target through the link instead of refusing; without it the installer exits 4 with "settings.json is a dangling symlink; check out the dotfiles target or pass --create-through-dangling"), `--restore [STAMP]` (restore the given backup, or the latest one, from `~/.claude/backups/engineering/`), `--list-backups` (list available backup stamps and the files each one holds), `-h` (help).
+
+Environment variables: `ENGINEERING_NO_PROMPT=1` declines any interactive confirmation deterministically, the same as running without a TTY (used for the legacy-policy migration prompt); `ENGINEERING_RECOMMENDED=PATH` points the installer at an alternate recommended-settings file whenever it is set, printing "recommendation file overridden by ENGINEERING_RECOMMENDED: <path>" (test and CI use only; the default is `settings.recommended.json` beside `install.sh`). The pointed-to file replaces the whole recommendation, including hooks, `env`, and permissions, so only set this deliberately — a hostile file could grant itself broad settings through this variable.
+
+Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy every session until you run `install.sh` to install it as a rules file (or a legacy `CLAUDE.md`, with `--policy-target claude-md`).
 
 ### How the policy loads
 
-The plugin's `hooks/session-start.sh` runs on `startup`, `resume`, `clear`, `compact`, and `fork`. The hook is silent only when the first line of `$CFG/CLAUDE.md` is `# Agent operating policy` (a UTF-8 BOM and CRLF are tolerated); the file is then the source. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used.
+The plugin's `hooks/session-start.sh` runs on `startup`, `resume`, `clear`, `compact`, and `fork`. The hook is silent when the first line of either `$CFG/rules/engineering-policy.md` or `$CFG/CLAUDE.md` is `# Agent operating policy` (a UTF-8 BOM and CRLF are tolerated); that file is then the source, and Claude Code loads any file under `$CFG/rules/` in every session on its own, without the hook. If that installed copy differs from the policy bundled with the installed plugin version, the hook prints a one-line notice asking you to rerun `install.sh` rather than a second copy. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used, and an outdated copy is announced instead of silently kept.
+
+`install.sh` installs the policy as `$CFG/rules/engineering-policy.md` by default. A legacy `$CFG/CLAUDE.md` whose first line is the policy header is recognised as the installer's own copy: it is offered for migration (confirmed on a TTY, or with `--yes`; declined automatically under `ENGINEERING_NO_PROMPT=1` or with no TTY available) by backing it up, deleting it (a symlink has only the link removed; its target is left alone), and writing the rules file. If migration is declined, the legacy `CLAUDE.md` is instead refreshed in place, and the installer prints the exact command to migrate later. The installer never touches a `CLAUDE.md` that is not its own copy. `--policy-target claude-md` keeps the legacy layout permanently for a given run (backup, replace, skip when identical) instead of migrating. If the run falls back to, or is explicitly told, `--policy-target claude-md` while `rules/engineering-policy.md` is already installed, the installer does not write `CLAUDE.md` and instead prints "rules/engineering-policy.md is already installed; not writing CLAUDE.md (remove the rules file or use --policy-target rules)".
+
+The installer also gates on what the installed plugin version actually supports: it greps the installed cached hook for `rules/engineering-policy.md`, and when that string is absent it falls back to `CLAUDE.md` for the run and prints "installed plugin <version> does not support the rules-file policy; keeping the policy in CLAUDE.md".
+
+### Merge rules
+
+`settings.json` is merged with `settings.recommended.json` the same way Claude Code itself combines settings sources, in this order:
+
+1. A single scalar value: the higher-priority source replaces it.
+2. A list (for example `permissions.allow`/`deny`, `sandbox.network.allowedDomains`): the lists are unioned, with duplicates removed.
+3. A nested block (for example `env`, `sandbox`, `modelSettings`): merged key by key, recursively.
+4. `extraKnownMarketplaces` and `managedMcpServers`: each named entry is replaced whole by name.
+5. `fallbackModel`, `modelPicker`, `availableModels`: replaced whole.
+
+### Settings modes
+
+| Mode | Behaviour |
+|---|---|
+| `enforce` | The recommended value wins at every path above: lists still union, but marketplace/MCP entries, `fallbackModel`, `modelPicker`, and `availableModels` are replaced whole by the recommendation. |
+| `defaults` | A recommended value is applied only where the path is absent from your settings; lists still union; a marketplace or MCP entry already present by name is left untouched; `enabledPlugins` gains only missing entries. Every path where your value differs from the recommendation is printed as a drift report, ending with the line `apply the recommended values with: ./install.sh --settings-mode enforce`. |
+
+The mode is chosen automatically unless `--settings-mode` is given: `defaults` once the installer marker `~/.claude/engineering-installer.json` is present from a prior run; `defaults` with a prominent drift report and a first-run notice when the marker is absent but a prior installation is otherwise evident (an enabled `engineering@engineering` or a legacy policy copy) — this covers the first run of a rewritten installer on an existing configuration; `enforce` only on a genuinely first install, where neither signal exists. An explicit `--settings-mode` always wins.
+
+The drift report and the `--dry-run` settings diff both redact sensitive values as `<redacted>`: anything under an `env` block, any key containing `key`, `token`, `secret`, `password`, or `credential`, and `apiKeyHelper`.
+
+### Backups and the marker
+
+Before any write that would change a file, the installer copies it to `~/.claude/backups/engineering/<UTC timestamp>-<pid>/`, alongside a manifest; the newest 5 stamped backups are kept and older ones pruned automatically. `--restore [STAMP]` restores the given backup (or the latest one if omitted); `--list-backups` lists the available stamps and the files each one holds. A run that changes nothing creates no new backup.
+
+`--restore` first takes its own pre-restore backup of every file it is about to overwrite, under a new stamp printed as `pre-restore backup: <dir>`, so any edits made after the backup being restored are still recoverable. It then restores regular files unconditionally. A symlink recorded in the backup that is now missing is recreated only when its recorded target already exists on disk with content identical to what was backed up; otherwise the restore of that entry is refused and nothing is created outside the config directory. Restored file modes are masked to the permission bits only. The manifest's `stored` names are validated as flat filenames before use, in both backup and restore.
+
+The installer also writes `~/.claude/engineering-installer.json` at the end of every successful run (installer version, timestamp, settings mode used, policy target); this marker is not itself backed up, listed, or restored, and is the durable signal that later runs use to select `defaults` mode by default.
+
+File modes: an existing `settings.json` keeps its current mode across a write; only a `settings.json` that did not exist before the run is newly created at 0600. This means a `settings.json` the CLI created earlier under a permissive umask keeps that mode through the installer — see SECURITY.md.
 
 ### What `install.sh` writes
 
 | Target | Action |
 |---|---|
-| `CLAUDE.md` | Replaced with `plugins/engineering/context/CLAUDE.md`; a differing previous file is kept as `CLAUDE.md.bak-<timestamp>` |
-| `settings.json` | Merged from `settings.recommended.json`; a previous file that the merge changes is kept as `settings.json.bak-<timestamp>`. Scalars are overwritten, objects are merged, and an `enabledPlugins` entry you set to `false` is left alone |
+| policy | Installed as `rules/engineering-policy.md` by default, or `CLAUDE.md` with `--policy-target claude-md`; a legacy `CLAUDE.md` policy copy is migrated to the rules file (with confirmation) or refreshed in place if migration is declined; a user's own `CLAUDE.md` or rules file is never touched |
+| `settings.json` | Merged from `settings.recommended.json` per the merge rules above, in `enforce` or `defaults` mode |
 | marketplaces | `engineering` registered from this checkout, or from `--source`; `claude-plugins-official` registered unless `--no-official` |
-| plugins | `engineering@engineering` installed at user scope; each official plugin installed unless `--no-official` or disabled in your settings |
+| plugins | `engineering@engineering` installed at user scope and always enabled; each official plugin installed unless `--no-official` or disabled in your settings; `--purge-official` removes previously registered official entries instead |
+| backups | Any file the run would change is copied to `~/.claude/backups/engineering/<stamp>/` first; see Backups above |
+| `--dry-run` | Prints the settings diff, drift report (in `defaults` mode), policy action, marketplace action, and plugin actions; writes nothing |
 
 Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example to trial the setup in an empty directory first.
 
 ## Verify, pin, and roll back
 
 - Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`.
-- Pin instead of tracking `main`. A GitHub-sourced marketplace always serves the version on `main` (`engineering@engineering@<version>` is accepted but resolves to `main`, verified 2026-09-12), so pin by checking out the signed tag and registering the clone as a directory marketplace:
+- Pin instead of tracking `main`. Pin the marketplace source to a signed tag with `@ref` (verified 2026-09-12: `claude plugin marketplace add ahueb/engineering@v2.7.1` installs 2.7.1); `claude plugin marketplace update engineering` then follows that tag, not `main`. The plugin-version form `engineering@engineering@<version>` does not pin.
 
   ```bash
-  git clone https://github.com/ahueb/engineering.git && cd engineering && git checkout v2.7.1
-  git tag -v v2.7.1   # after: git config gpg.ssh.allowedSignersFile .allowed_signers
-  claude plugin marketplace remove engineering; claude plugin marketplace add "$PWD"
+  claude plugin marketplace remove engineering
+  claude plugin marketplace add ahueb/engineering@v2.7.1
   claude plugin install engineering@engineering
   ```
+
+  To verify the tag signature yourself, clone, `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`, check out the tag, and register the clone as a directory marketplace instead.
 
 - Roll back a bad release the same way with the previous tag, then restart Claude Code. Stop criterion for a release: any session-start error or a `claude plugin validate --strict` failure on the installed cache; the fix is always a new patch version, never a rewritten one.
 - Security reports and support expectations: [SECURITY.md](SECURITY.md). Known residual risks: [docs/risk-register.md](docs/risk-register.md).
@@ -63,13 +105,13 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 
 Claude Code copies the plugin into a version-keyed cache and skips `plugin update` when the version is unchanged, so editing this repo changes nothing until the version is bumped.
 
-- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, runs `./ci.sh`, commits, creates the signed tag `vX.Y.Z`, and refreshes the local install. Add `--no-commit` (in any position) to bump and refresh without committing. Push with `git push && git push --tags`. `release.sh` refuses to run on a working tree with unrelated changes, restores the version if validation fails, and commits only `plugin.json` and `CHANGELOG.md`.
+- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, runs `./ci.sh` (or `./ci.sh --full` when `install.sh`, `ci.sh`, `scripts/`, or `ci/` changed since the previous tag, or when no tag exists), commits, creates the signed tag `vX.Y.Z`, and refreshes the local install. Add `--no-commit` (in any position) to bump and refresh without committing. Push with `git push && git push --tags`. `release.sh` refuses to run on a working tree with unrelated changes, restores the version if validation fails, and commits only `plugin.json` and `CHANGELOG.md`.
 - Everyone else: `claude plugin update engineering@engineering`, then restart Claude Code.
-- Policy changes also need a fresh `~/.claude/CLAUDE.md`: rerun `./install.sh`, or copy `plugins/engineering/context/CLAUDE.md` over it.
+- Policy changes also need a refreshed installed policy: rerun `./install.sh` (updates the rules file, or `CLAUDE.md` with `--policy-target claude-md`).
 
 ## CI
 
-There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the whole gate: shell lint, both manifests under `--strict`, probe unit tests, frontmatter and cross-reference checks, the hook contract, and a scratch-directory install. It runs on every push through `.githooks/pre-push` (enable once per clone with `git config core.hooksPath .githooks`) and inside `release.sh`. `./ci.sh --quick` skips the scratch install. Trigger-eval results are recorded in `plugins/engineering/evals/RESULTS.md`; rerun them with the commands in `plugins/engineering/evals/README.md`.
+There is no GitHub Actions workflow and no server-side hook. CI has three tiers: `./ci.sh --quick` runs static checks and unit tests only; `./ci.sh` (no flags) adds every offline scratch-install scenario and is what `.githooks/pre-push` (enable once per clone with `git config core.hooksPath .githooks`) and `release.sh` normally run; `./ci.sh --full` adds two scenarios that need network and credentials — the default official-plugin install path, and a rules-file load check via `claude -p --model haiku` — and fails rather than skipping them unless `CI_ALLOW_SKIP=1` is set. Unit tests run under `python3 -X dev` so resource warnings and other dev-mode diagnostics fail the suite. ShellCheck is required; a machine without it fails the lint step unless `CI_ALLOW_SKIP=1` is set. Scratch-install scenarios also cover: a foreign marketplace binding refusal, `--dry-run` against the dangling-symlink and legacy-`CLAUDE.md` states, `--restore` with a backed-up symlink whose recorded target is outside the config directory, a failed plugin install leaving `settings.json` exactly as the CLI left it, a manifest merge across two backups taken in one run, an installed-version probe with a distractor plugin present, and a cache fallback that picks the highest semver. The interactive-accept branch of the legacy-policy migration prompt is exercised with a pseudo-terminal when Python's `pty` module works on the host; see risk register R11 when that scenario is skipped. Trigger-eval results are recorded in `plugins/engineering/evals/RESULTS.md`; rerun them with the commands in `plugins/engineering/evals/README.md`.
 
 ## Requirements
 
@@ -77,7 +119,7 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 - **Model access.** Agents and skills use the `haiku`, `sonnet`, `opus`, and `fable` aliases, so they resolve to your provider's current models. On Amazon Bedrock, Google Vertex, or Microsoft Foundry, pin them with `ANTHROPIC_DEFAULT_HAIKU_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_OPUS_MODEL`, and `ANTHROPIC_DEFAULT_FABLE_MODEL`.
 - **1M context.** Fable and Sonnet 5 have a native 1M window on the API; `fable[1m]` in the recommended settings makes the choice explicit. On subscription plans Fable usage may bill to usage credits depending on plan and seat tier; check the model picker's `Requires usage credits` label. Drop the `[1m]` suffix or set `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` to stay at 200K.
 - If your account has no Fable access, set `model` to `opus[1m]` and either change `deep-audit`'s `model` or set `CLAUDE_CODE_SUBAGENT_MODEL=opus` with `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1`, which forces that model onto every subagent and forked skill.
-- **bash** for the SessionStart hook. Windows users need Git Bash on `PATH`, or should run `install.sh` so the policy is a file and the hook is not needed.
+- **bash** for the SessionStart hook. Windows users need Git Bash on `PATH`, or should run `install.sh` so the policy is a rules file and the hook is not needed. On Windows, `install.sh` reports a failed write with "close Claude Code and rerun" if the target file is held open by a running session; MSYS-style symlink resolution is out of scope (see the risk register, R5).
 
 ### Tuning
 
@@ -139,6 +181,8 @@ plugins/engineering/
   context/CLAUDE.md               the operating policy
 settings.recommended.json         settings merged by install.sh
 install.sh                        installer
+scripts/                          settings-merge and safe-write/backup/restore helpers used by install.sh
+ci/                                fixtures and shims used by ci.sh's scratch-install scenarios
 release.sh                        version bump, ci, signed tag, local refresh
 ci.sh                             local CI gate (also run by the pre-push hook)
 .githooks/pre-push                runs ci.sh before every push
@@ -153,9 +197,10 @@ CHANGELOG.md                      release notes per version
 ```bash
 claude plugin uninstall engineering@engineering
 claude plugin marketplace remove engineering
+rm ~/.claude/rules/engineering-policy.md ~/.claude/engineering-installer.json
 ```
 
-Then restore `CLAUDE.md` and `settings.json` from the `.bak-<timestamp>` files the installer left in your config directory (written only when an install changed the file), or edit them by hand.
+Then restore `settings.json` (and `CLAUDE.md`, if you used `--policy-target claude-md`) from a backup with `./install.sh --restore` (see `--list-backups` above), or edit them by hand.
 
 ## Not included
 

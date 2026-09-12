@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Shim for ci.sh scenario 26: `plugin list --json` returns an empty list, so
+# install.sh cannot learn the installed version from the CLI and must fall back
+# to scanning $CFG/plugins/cache/engineering/engineering/*. `plugin install
+# engineering@engineering` is a successful no-op so the real CLI never creates a
+# cache directory of its own: the only candidates are the ones the scenario
+# seeds (0.9.0 and 0.10.0), which is what makes the highest-semver choice
+# observable (a lexicographic pick would take 0.9.0, whose hook does not support
+# the rules file). Everything else execs the real `claude` found on PATH.
+set -euo pipefail
+
+find_real() {
+  if [ -n "${REAL_CLAUDE:-}" ]; then
+    printf '%s\n' "$REAL_CLAUDE"
+    return 0
+  fi
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  while IFS= read -r c; do
+    local rc
+    rc="$(cd "$(dirname "$c")" && pwd)/$(basename "$c")"
+    if [ "$rc" != "$self" ]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done < <(type -aP claude)
+  return 1
+}
+
+REAL="$(find_real)" || { echo "claude-empty-list shim: no real claude found on PATH" >&2; exit 127; }
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ]; then
+  echo '[]'
+  exit 0
+fi
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ] && [ "${3:-}" = "engineering@engineering" ]; then
+  echo "claude-empty-list shim: pretending to install engineering@engineering"
+  exit 0
+fi
+
+exec "$REAL" "$@"

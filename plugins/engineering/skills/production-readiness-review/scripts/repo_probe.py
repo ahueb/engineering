@@ -242,9 +242,10 @@ def should_scan_text(path: Path, root: Path | None = None) -> bool:
     if path.suffix.lower() not in TEXT_SUFFIXES and path.name not in {"Dockerfile", "Containerfile", "Makefile", "Jenkinsfile"}:
         return False
     try:
-        return path.stat().st_size <= MAX_TEXT_BYTES
+        path.stat()
     except OSError:
         return False
+    return True
 
 
 def warning_error_name(exc: OSError) -> str:
@@ -349,8 +350,8 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
             size = path.stat().st_size
         except OSError:
             size = 0
-        if size > max_text_bytes:
-            text_files_skipped_oversize += 1  # one oversized file does not end scanning for the rest
+        if size > MAX_TEXT_BYTES or size > max_text_bytes:
+            text_files_skipped_oversize += 1  # per-file cap or total budget; either way the omission is reported
             continue
         if text_bytes_total + size > max_text_bytes:
             text_budget_exhausted = True  # budget genuinely consumed; content scanning stops, classification continues
@@ -397,7 +398,7 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
     if git.get("is_repo") and toplevel != root:
         limitations.append(f"Scan root {root} is inside repository {toplevel}; files outside the scan root were not inspected.")
     if text_files_skipped_oversize:
-        limitations.append(f"{text_files_skipped_oversize} text files larger than max_text_bytes={max_text_bytes} were not content-scanned.")
+        limitations.append(f"{text_files_skipped_oversize} text files larger than the per-file cap ({MAX_TEXT_BYTES} bytes) or max_text_bytes={max_text_bytes} were not content-scanned.")
     if text_budget_exhausted:
         limitations.append(f"Text content scanning stopped at max_text_bytes={max_text_bytes}; content signals are incomplete.")
 

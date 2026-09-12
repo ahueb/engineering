@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Shim for ci.sh scenario 25: behaves as the real `claude` CLI (including a real,
+# successful `plugin install`), except that `plugin list --json` returns a listing
+# whose FIRST entry is a distractor plugin ("data-engineering@x", version 9.9.9)
+# and whose second entry is engineering@engineering with the version the real CLI
+# reports. install.sh's installed-version probe must skip the distractor and use
+# the real version, so the capability gate finds the real cached hook and keeps
+# --policy-target rules. A sloppy match (substring, or "first entry wins") would
+# yield 9.9.9, whose cache directory does not exist, and fall back to CLAUDE.md.
+set -euo pipefail
+
+find_real() {
+  if [ -n "${REAL_CLAUDE:-}" ]; then
+    printf '%s\n' "$REAL_CLAUDE"
+    return 0
+  fi
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  while IFS= read -r c; do
+    local rc
+    rc="$(cd "$(dirname "$c")" && pwd)/$(basename "$c")"
+    if [ "$rc" != "$self" ]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done < <(type -aP claude)
+  return 1
+}
+
+REAL="$(find_real)" || { echo "claude-distractor shim: no real claude found on PATH" >&2; exit 127; }
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ]; then
+  version="$("$REAL" plugin list --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+if isinstance(data, dict):
+    for key in ("plugins", "installed", "entries"):
+        if isinstance(data.get(key), list):
+            data = data[key]
+            break
+if not isinstance(data, list):
+    sys.exit(0)
+for e in data:
+    if not isinstance(e, dict):
+        continue
+    for key in ("id", "name"):
+        if e.get(key) == "engineering@engineering" and isinstance(e.get("version"), str):
+            print(e["version"])
+            sys.exit(0)
+' || true)"
+  [ -n "$version" ] || version="0.0.0"
+  printf '[{"id":"data-engineering@x","version":"9.9.9"},{"id":"engineering@engineering","version":"%s"}]\n' "$version"
+  exit 0
+fi
+
+exec "$REAL" "$@"
