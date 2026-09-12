@@ -870,7 +870,7 @@ class OutsideCfgDisclosureTests(TempDirCase):
             rc = safe_write.restore(str(cfg), stamp=stamp)
         self.assertEqual(rc, 0)
         self.assertEqual(real.read_bytes(), b'{"a":1}')
-        disclosure = "outside config dir: settings.json -> {}".format(real)
+        disclosure = "outside config dir: settings.json -> {}".format(os.path.realpath(real))
         self.assertIn(disclosure, captured)
         self.assertEqual(captured.index(disclosure), 0)
         self.assertTrue(captured[1].startswith("pre-restore backup: "), captured)
@@ -893,7 +893,7 @@ class OutsideCfgDisclosureTests(TempDirCase):
         self.assertEqual(other.read_bytes(), b"policy")  # restored
         self.assertIn("refused settings.json: outside config dir", captured)
         self.assertIn(
-            "outside config dir: settings.json -> {}".format(real), captured
+            "outside config dir: settings.json -> {}".format(os.path.realpath(real)), captured
         )
 
     def test_no_outside_cfg_keeps_the_refused_entry_out_of_pre_restore_backup(self):
@@ -1142,7 +1142,7 @@ class OnlyRunFilesTests(TempDirCase):
         self.assertEqual(real.read_bytes(), b"policy")
         self.assertIn("deleted CLAUDE.md", captured)
         self.assertIn(
-            "outside config dir: CLAUDE.md -> {}".format(real), captured
+            "outside config dir: CLAUDE.md -> {}".format(os.path.realpath(real)), captured
         )
 
     def test_created_entry_now_pointing_elsewhere_outside_cfg_is_refused(self):

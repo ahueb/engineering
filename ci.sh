@@ -104,7 +104,14 @@ rm -rf "$PRR/tests/__pycache__" "$PRR/scripts/__pycache__"
 
 step "scripts unit tests (merge_settings, safe_write)"
 (cd "$HERE" && python3 -W error -m py_compile scripts/merge_settings.py scripts/safe_write.py) && ok "py_compile" || bad "py_compile"
-(cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write >/dev/null 2>&1) && ok "unit tests" || bad "unit tests"
+UT_TMP="$(mktemp)"
+if (cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write >"$UT_TMP" 2>&1); then
+  ok "unit tests"
+else
+  grep -E '^(FAIL|ERROR):|Error:' "$UT_TMP" | head -20 | sed 's/^/   /' >&2
+  bad "unit tests"
+fi
+rm -f "$UT_TMP"
 rm -rf "$HERE/scripts/__pycache__" "$HERE/scripts/tests/__pycache__"
 
 step "frontmatter, policy, and cross-references"
