@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.1 — 2026-09-12
+
+- Fixed: `browser-tester` declared an inline `mcpServers` block, which Claude Code ignores for plugin agents; the agent's `mcp__playwright` tool pattern also never matched the official plugin's scoped server. The agent now allows `mcp__plugin_playwright_playwright` (official `playwright` plugin, enabled by `install.sh`) and `mcp__playwright` (a user-configured server). The 2.6.0 claim that it works without the official plugin was wrong.
+- Docs audit against current Claude Code documentation: `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` takes `1` and forces `CLAUDE_CODE_SUBAGENT_MODEL`, not a model name; the skill listing drops descriptions of the least-invoked skills, not the last listed; `claude plugin eval` needs v2.1.269; pin and verify examples reference the current tag; `comment-cleanup` listed with the process skills.
+- `change-review` now dispatches `security-reviewer` at a trust boundary, as the README already claimed; `docs-check` and `literature-review` state their read-only Bash constraint; readiness review text corrected for `browser-tester`; risk register R3 reopened until the trigger evals are rerun.
+- Tag `v2.7.0` was signed after the fact; 2.7.0 had been committed without `release.sh`.
+
 ## 2.7.0 — 2026-09-12
 
 - New process skill `comment-cleanup`: repository-wide comment audit that removes dates, phase, plan, spec, ticket, and history references and rewrites the rest so each comment orients an unfamiliar reader in one concise sentence. Runs forked on Sonnet at medium effort with edit tools but no subagents; comment-only edits; formatter and lint run afterwards.
