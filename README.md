@@ -15,12 +15,28 @@ The script backs up any existing `CLAUDE.md` and `settings.json`, copies the pol
 
 Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy until you copy it to `~/.claude/CLAUDE.md`.
 
+### How the policy loads
+
+The plugin's `hooks/session-start.sh` runs on `startup`, `clear`, `compact`, and `fork`. If `CLAUDE.md` in the config directory begins with `# Agent operating policy`, the hook exits silently and the file is the source. Otherwise the hook prints `context/CLAUDE.md`, which Claude Code adds to the session context. The policy therefore reaches every session exactly once, whichever install path was used.
+
+### What `install.sh` writes
+
+| Target | Action |
+|---|---|
+| `CLAUDE.md` | Replaced with `plugins/engineering/context/CLAUDE.md`; the previous file is kept as `CLAUDE.md.bak-<timestamp>` |
+| `settings.json` | Merged from `settings.recommended.json`; the previous file is kept as `settings.json.bak-<timestamp>`. Scalars are overwritten, objects are merged, and an `enabledPlugins` entry you set to `false` is left alone |
+| marketplaces | `engineering` registered from this checkout, or from `--source`; `claude-plugins-official` registered unless `--no-official` |
+| plugins | `engineering@engineering` installed at user scope; each official plugin installed unless `--no-official` or disabled in your settings |
+
+Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example to trial the setup in an empty directory first.
+
 ## Update
 
 Claude Code copies the plugin into a version-keyed cache and skips `plugin update` when the version is unchanged, so editing this repo changes nothing until the version is bumped.
 
-- Maintainer: `./release.sh patch|minor|major` bumps `plugin.json`, validates, commits, and refreshes the local install.
-- Everyone else: `claude plugin update engineering@engineering`.
+- Maintainer: `./release.sh patch|minor|major` (or an explicit `2.3.0`) bumps `plugin.json`, validates with `claude plugin validate --strict`, commits, and refreshes the local install. Add `--no-commit` to bump and refresh without committing. Push afterwards.
+- Everyone else: `claude plugin update engineering@engineering`, then restart Claude Code.
+- Policy changes also need a fresh `~/.claude/CLAUDE.md`: rerun `./install.sh`, or copy `plugins/engineering/context/CLAUDE.md` over it.
 
 ## Requirements
 
@@ -42,6 +58,31 @@ Claude Code copies the plugin into a version-keyed cache and skips `plugin updat
 ## Working with superpowers
 
 The policy maps superpowers' subagent roles onto engineering agents (implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`), and `implementation-loop`, `verification-loop`, and `checkpoint` invoke the matching superpowers skills when they are present. Superpowers is not a dependency; without it every reference is simply skipped.
+
+## Repository layout
+
+```
+.claude-plugin/marketplace.json   marketplace manifest; lists the engineering plugin
+plugins/engineering/
+  .claude-plugin/plugin.json      plugin manifest and version
+  agents/                         eight agent definitions
+  skills/                         nine SKILL.md skills
+  hooks/                          SessionStart hook and its script
+  context/CLAUDE.md               the operating policy
+settings.recommended.json         settings merged by install.sh
+install.sh                        installer
+release.sh                        version bump and local refresh
+CHANGELOG.md                      release notes per version
+```
+
+## Uninstall
+
+```bash
+claude plugin uninstall engineering@engineering
+claude plugin marketplace remove engineering
+```
+
+Then restore `CLAUDE.md` and `settings.json` from the `.bak-<timestamp>` files the installer left in your config directory, or edit them by hand.
 
 ## Not included
 

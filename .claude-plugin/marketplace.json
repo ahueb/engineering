@@ -6,7 +6,7 @@
     {
       "name": "engineering",
       "source": "./plugins/engineering",
-      "description": "Agent operating policy, seven cost-tiered agents, a security reviewer, process skills, and user-invoked escalations.",
+      "description": "Agent operating policy, eight cost-tiered agents including a security reviewer, five process skills, and four user-invoked escalation skills.",
       "category": "development"
     }
   ]
