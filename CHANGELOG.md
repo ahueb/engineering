@@ -4,6 +4,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-09-12
+
 ### Added
 
 - `.github/workflows/ci.yml`: `linux`, `macos`, and `windows` jobs on every PR to `main`, push to `main`, and `v*` tag push, each installing Claude Code at the version pinned in `scripts/ci/claude-version.txt` and verified against a vendored Anthropic release key (fingerprint `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE`) and the release manifest's SHA256 before running `./ci.sh` (or, on `windows`, the Python unit tests and a shell syntax pass); `linux` is the required status check on `main`, applied via `scripts/ci/README.md`'s documented `gh api` command.
@@ -231,7 +233,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/ahueb/engineering/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/ahueb/engineering/compare/v2.7.2...v2.8.0
 [2.7.2]: https://github.com/ahueb/engineering/compare/v2.7.1...v2.7.2
 [2.7.1]: https://github.com/ahueb/engineering/compare/v2.7.0...v2.7.1
