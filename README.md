@@ -1,6 +1,6 @@
 # engineering
 
-Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, seven process skills, four user-invoked escalation skills, and recommended settings. Everything except settings ships as the `engineering` plugin; the policy also ships inside it and `install.sh` copies it to `CLAUDE.md`.
+Portable Claude Code configuration: an evidence-first operating policy (`CLAUDE.md`), nine cost-tiered agents, seven process skills, three user-invoked escalation skills, and recommended settings. Everything except settings ships as the `engineering` plugin; the policy also ships inside it and `install.sh` copies it to `CLAUDE.md`.
 
 ## Install
 
@@ -78,9 +78,9 @@ There is no GitHub Actions workflow and no server-side hook. `./ci.sh` is the wh
 |---|---|
 | Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, has Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high) |
 | Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review` |
-| User-only escalations | `/engineering:deep-audit` (fable, xhigh), `independent-review` (opus, high), `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
+| User-only escalations | `/engineering:deep-audit` (fable, xhigh), `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `deep-audit`, and `independent-review` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint.
 
 ## Executing plans
 
@@ -112,7 +112,7 @@ The policy maps superpowers' subagent roles onto engineering agents (implementer
 plugins/engineering/
   .claude-plugin/plugin.json      plugin manifest and version
   agents/                         nine agent definitions
-  skills/                         eleven SKILL.md skills; production-readiness-review bundles references, a probe, and tests
+  skills/                         ten SKILL.md skills; production-readiness-review bundles references, a probe, and tests
   evals/                          claude plugin eval cases for skill trigger quality
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy

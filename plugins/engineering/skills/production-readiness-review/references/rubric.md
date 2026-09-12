@@ -24,11 +24,12 @@ Look for:
 - source integrity (protected history, required review) as distinct from build provenance;
 - where an SBOM is claimed, its contents: component name, version, supplier, hash, license, dependency relationship, generation timestamp and tool, known unknowns.
 
-Fail/unknown patterns:
+Defeaters:
 - tests executed against a different commit/artifact;
 - undocumented manual build or production-only patching;
 - mutable/unpinned critical dependencies without bounded policy;
-- unknown production configuration or schema version.
+- unknown production configuration or schema version;
+- dirty working tree or generated file substituted between test and deploy (candidate drift).
 
 ### G2 Critical functional correctness
 
@@ -41,11 +42,15 @@ Look for:
 - integration/contract behavior where dependencies matter;
 - candidate-specific execution results.
 
-Fail/unknown patterns:
+Defeaters:
 - critical behavior untested or known incorrect;
 - tests assert transport success but not semantic/business correctness;
 - important manual assumptions without evidence;
-- unresolved defects that can violate acceptance criteria.
+- unresolved defects that can violate acceptance criteria;
+- green suite omits a critical journey, concurrency condition, or integration boundary (green-test false assurance);
+- test mocks the exact component whose contract is at risk (weak oracle);
+- high coverage used as a proxy while critical behavior stays unexercised (coverage theater);
+- flaky, disabled, or quarantined tests suppress a real signal on a critical path (flake masking).
 
 ### G3 Security, privacy, and supply chain
 
@@ -62,12 +67,16 @@ Look for:
 - current vulnerability disposition, not scanner output alone;
 - CI token permissions minimized, branch protection and required checks, signed releases or attestations, vulnerability reporting path.
 
-Fail/unknown patterns:
+Defeaters:
 - exploitable critical/high-impact vulnerability without accepted mitigation;
 - material authorization path not verified;
 - credentials/secrets embedded or uncontrolled;
 - unknown handling of sensitive data;
-- mandatory security/privacy requirement unmet.
+- mandatory security/privacy requirement unmet;
+- clean dependency/SAST/DAST scan coexists with broken object or business-logic authorization (scanner equivalence);
+- a queue, admin path, webhook, build runner, or AI tool wrongly treated as trusted (trust-boundary omission);
+- source/build/dependency provenance can be substituted or tampered with after verification (supply-chain gap);
+- deletion, retention, export, backup copies, or support access unaddressed after collection/encryption (privacy lifecycle gap).
 
 ### G4 Data integrity and recoverability
 
@@ -83,11 +92,13 @@ Look for:
 - restore test recency relative to the last schema or storage change;
 - sampled-restore evidence with a date.
 
-Fail/unknown patterns:
+Defeaters:
 - backups exist but restore has not been demonstrated where recovery is material;
 - destructive migration with no tested recovery/forward-fix path;
 - unknown RPO/RTO against explicit business needs;
-- irreversible external side effects ignored by rollback plans.
+- irreversible external side effects ignored by rollback plans;
+- restore would fail because encryption keys, control-plane services, credentials, or human access are unavailable in the same disaster (restore dependency trap);
+- old and new application versions cannot safely coexist during rollout, with unbounded locks, backfills, or retries (migration trap).
 
 ### G5 Safe deployment and reversion
 
@@ -104,11 +115,14 @@ Look for:
 - a named metric that triggers rollback;
 - an emergency change path that is tested and audited.
 
-Fail/unknown patterns:
+Defeaters:
 - one-shot manual production procedure;
 - rollback assumes code-only reversibility;
 - no stop condition for progressive rollout;
-- deployment path materially differs from the tested path without evidence.
+- deployment path materially differs from the tested path without evidence;
+- rollback's version-skew re-enable path is untested or its trigger metric is undefined (rollback fiction);
+- runtime flags, secrets, quotas, schema, or feature toggles are not versioned/promoted consistently with code (configuration divergence);
+- staging/local success may not represent production due to topology, scale, data, or dependency differences (environment-fidelity gap).
 
 ### G6 Observability and alertability
 
@@ -123,11 +137,12 @@ Look for:
 - evidence alerts and dashboards actually function;
 - SLO target with owner, approval date, and an error-budget consequence.
 
-Fail/unknown patterns:
+Defeaters:
 - only host/process health while incorrect business output can remain green;
 - dashboards with no actionable alerting;
 - alerts without owner/runbook/escalation;
-- observability exists only in staging when production is the claim.
+- observability exists only in staging when production is the claim;
+- alert reaches no one with access, authority, context, or a tested next action (alert dead end).
 
 ### G7 Operational ownership and incident response
 
@@ -142,11 +157,12 @@ Look for:
 - training/handover and staffing depth;
 - post-incident learning loop.
 
-Fail/unknown patterns:
+Defeaters:
 - no accountable owner;
-- runbook exists but operators cannot execute it;
+- runbook exists but operators cannot execute it under incident conditions;
 - single-person recovery knowledge for a critical service;
-- missing production access or escalation path.
+- missing production access or escalation path;
+- a quiet incident history is treated as reliability proof despite low traffic or no failure exercises (no-incidents fallacy).
 
 ### G8 Capacity and performance
 
@@ -160,11 +176,13 @@ Look for:
 - degradation behavior and autoscaling limits;
 - cost/resource implications at target scale.
 
-Fail/unknown patterns:
+Defeaters:
 - only average latency or nominal-load testing;
 - capacity ceiling unknown near expected demand;
 - unbounded queues/storage/cardinality;
-- critical provider quota below plausible demand.
+- critical provider quota below plausible demand;
+- target capacity inferred from a much smaller test without validated scaling behavior (capacity extrapolation);
+- autoscaling, cardinality, egress, or retry storms produce unacceptable cost before technical saturation (cost cliff).
 
 ### G9 Resilience and dependency failure
 
@@ -180,11 +198,13 @@ Look for:
 - a failure-mode analysis artifact for critical journeys;
 - distinguish fault injection exercised in a representative environment (E3) from staging-only (E2).
 
-Fail/unknown patterns:
+Defeaters:
 - unbounded retry amplification;
 - nominal redundancy sharing a decisive failure domain;
 - single dependency outage cascades without bounded response;
-- failover exists only on architecture diagrams.
+- failover exists only on architecture diagrams;
+- system behaves unsafely when a dependency is slow, stale, or returns invalid data rather than cleanly down (partial failure);
+- queues, retries, dead letters, or temporary files grow without bound during degradation (queue/backlog runaway).
 
 ### G10 Continuity and disaster recovery
 
@@ -200,7 +220,7 @@ Look for:
 
 Use N/A only when the impact/risk genuinely makes dedicated continuity controls unnecessary and the rationale is explicit.
 
-Fail/unknown patterns:
+Defeaters:
 - failover only on diagrams;
 - unmeasured RTO/RPO;
 - shared control plane or account between primary and recovery;
@@ -218,11 +238,13 @@ Look for:
 - unexplained anomalies investigated;
 - release stop criteria tied to known risks.
 
-Fail/unknown patterns:
+Defeaters:
 - unexplained critical test/production anomaly;
 - ignored disabled/flaky test on a critical path;
 - overdue exception or residual risk without owner;
-- material "we think it is fine" assumption without evidence.
+- material "we think it is fine" assumption without evidence;
+- certificates, tokens, quotas, licenses, or provider deprecations will fail later despite launch success (time-bomb dependency);
+- dependencies, runtime, or data cannot be upgraded, exported, or retired without unsafe manual work (upgrade/retirement gap).
 
 ### G12 Mandatory domain obligations
 
@@ -237,10 +259,12 @@ Look for:
 - change authorization and audit record where SOC 2 CC8.1 or ISO 27001 A.8.32 is in scope;
 - EU CRA vulnerability-handling and reporting obligations where the product is sold in the EU.
 
-Fail/unknown patterns:
+Defeaters:
 - mandatory requirement not met;
 - applicability has never been assessed for a high-consequence domain;
-- generic software checklist used to waive domain-specific assurance.
+- generic software checklist used to waive domain-specific assurance;
+- the same team relies mainly on its own assertions without independent reproduction or review (reviewer capture);
+- a metric such as coverage, deployment frequency, or uptime is optimized while real outcomes worsen (Goodhart/metric gaming).
 
 ## Readiness dimensions
 
@@ -285,35 +309,14 @@ Cloud/runtime cost, observability/storage cardinality, licenses, quotas, vendor 
 ### D13 Safety, compliance, and domain-specific assurance
 Hazards, regulatory constraints, scientific/numerical validity, accessibility, auditability, specialized independent verification.
 
-## Evidence interpretation
+## Conditions
 
-Evidence is claim-specific. The same artifact can be E3 for one narrow claim and E0 for another.
+Record for each condition attached to a CONDITIONALLY READY verdict: exact exposure boundary; compensating control; stop/rollback trigger; accountable owner; expiry or reassessment event.
+See SKILL.md for the verdict, confidence, and condition-conversion decision rules.
 
-Prefer, in order:
-1. candidate-specific execution under representative/adverse conditions;
-2. reproducible automated verification tied to the candidate;
-3. direct but partial test/measurement evidence;
-4. implementation/configuration inspection;
-5. documentation/process/assertion.
+## Final challenge
 
-Documentation can prove that a procedure is defined. It cannot, by itself, prove that the procedure works.
+For every gate marked PASS, ask:
+> What realistic event would make this claim false, and what direct evidence shows that event is prevented, bounded, detected, or recoverable?
 
-## Conditional-release discipline
-
-A conditional verdict must narrow the claim. Examples:
-- internal users only;
-- one region only;
-- 1% or explicitly capped traffic;
-- feature behind a kill switch;
-- read-only mode;
-- no sensitive data;
-- bounded time window with heightened support.
-
-For each condition record:
-- exact exposure boundary;
-- compensating control;
-- stop/rollback trigger;
-- accountable owner;
-- expiry or reassessment event.
-
-A condition never converts a failed applicable hard gate. If any applicable hard gate is FAIL, the verdict is NOT READY regardless of bounding.
+If the answer is only an assertion, plan, architecture label, or proxy metric, downgrade the evidence strength and reconsider the gate.

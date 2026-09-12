@@ -46,7 +46,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 
 ## Delegation policy
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage`, `deep-audit`, and `independent-review` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint. Every dispatch states objective, output format, allowed tools or sources, and file boundaries; agents return at most about 2,000 tokens of findings, not narrative.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, and `plan-auditor` are read-only by tool list (no Edit, Write, or Bash). `test-triage` and `deep-audit` keep Bash for non-mutating commands and are told not to write; that is a prompt-level constraint. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
 
 | Agent | Use when | Tools |
 |---|---|---|
@@ -60,7 +60,6 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
 | `deep-audit` (user-invoked slash command) | Fable at xhigh effort, adversarial audit with no edit tools | Bash (non-mutating), no edit |
-| `independent-review` (user-invoked slash command) | Opus at high effort, review with no edit tools; a tier above `semantic-reviewer` | Bash (non-mutating), no edit |
 | `docs-check` (user-invoked slash command) | Sonnet, narrow authoritative documentation lookup | Bash (non-mutating), no edit |
 | `literature-review` (user-invoked slash command) | Opus, evidence-driven research synthesis | Bash (non-mutating), no edit |
 
@@ -83,7 +82,7 @@ Size each delegated work package so the agent finishes within roughly 200k token
 
 ## Context and cost discipline
 
-- Keep progress narration short. Spend output on code, tool arguments, evidence, and decisions rather than essays about the work. Avoid unnecessary model switches inside a live session because model caches are separate.
+- Say in a line what you are about to do, give brief updates while you work, and close with a recap that stands on its own. Spend the rest of the output on code, tool arguments, evidence, and decisions. Avoid unnecessary model switches inside a live session because model caches are separate.
 - Do not invoke a subagent merely to restate context already present in the main conversation. Do not pass a subagent the full transcript when a focused task statement, relevant paths, and concrete evidence are sufficient.
 - Avoid arbitrary turn limits that can terminate useful work before verification; use semantic stopping conditions instead. Stop when the requested behavior is implemented, relevant verification passes, and no material uncovered risk remains.
 

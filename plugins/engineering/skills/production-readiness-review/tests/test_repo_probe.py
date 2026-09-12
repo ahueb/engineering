@@ -166,6 +166,13 @@ class RepoProbeTests(unittest.TestCase):
 
             self.assertIsInstance(report, dict)
             self.assertTrue(report["warnings"], "expected a warning for the unreadable subdirectory")
+            encoded = json.dumps(report["warnings"])
+            self.assertNotIn(str(root), encoded)
+            for warning in report["warnings"]:
+                self.assertIsInstance(warning, dict)
+                self.assertIn("path", warning)
+                self.assertIn("error", warning)
+                self.assertFalse(Path(warning["path"]).is_absolute())
 
     @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "running as root bypasses permission checks")
     def test_unreadable_root_exits_3(self) -> None:
@@ -281,6 +288,16 @@ class RepoProbeTests(unittest.TestCase):
             self.assertEqual(1, report["scan"]["file_count"])
             self.assertNotIn("outside.md", json.dumps(report))
             self.assertTrue(any("inside repository" in x for x in report["limitations"]))
+
+    def test_signal_path_cap_truncation_is_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for i in range(30):
+                (root / f"f{i}.test.js").write_text("// test\n", encoding="utf-8")
+
+            report = run_probe(root)
+            self.assertEqual(25, len(report["signals"]["tests"]))
+            self.assertIn("tests", report["truncated_signals"])
 
     def test_sensitivity_is_relative_to_scan_root(self) -> None:
         with tempfile.TemporaryDirectory() as td:

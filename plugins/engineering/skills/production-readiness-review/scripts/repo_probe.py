@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import collections
 import datetime as dt
+import errno
 import json
 import os
 import re
@@ -20,11 +21,14 @@ import time
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 DEFAULT_MAX_FILES = 50000
 MAX_TEXT_BYTES = 1_000_000
-MAX_PATHS_PER_SIGNAL = 80
-MAX_CONTENT_PATHS_PER_SIGNAL = 30
+MAX_PATHS_PER_SIGNAL = 25
+MAX_CONTENT_PATHS_PER_SIGNAL = 10
+MAX_SUFFIXES_REPORTED = 15
+MAX_WARNINGS_REPORTED = 20
+COMPACT_CONTENT_PATHS_PER_SIGNAL = 3
 DEFAULT_MAX_SECONDS = 20.0
 DEFAULT_MAX_TEXT_BUDGET_BYTES = 200_000_000
 
@@ -243,14 +247,26 @@ def should_scan_text(path: Path, root: Path | None = None) -> bool:
         return False
 
 
-def iter_files(root: Path, max_files: int, deadline: float) -> tuple[list[Path], bool, bool, list[str]]:
+def warning_error_name(exc: OSError) -> str:
+    """A short, non-sensitive label for a scan error: the errno symbol when known, else the
+    exception class name. Never includes the free-text strerror message."""
+    if exc.errno is not None:
+        try:
+            return errno.errorcode[exc.errno]
+        except KeyError:
+            pass
+    return type(exc).__name__
+
+
+def iter_files(root: Path, max_files: int, deadline: float) -> tuple[list[Path], bool, bool, list[dict[str, str]]]:
     files: list[Path] = []
-    warnings: list[str] = []
+    warnings: list[dict[str, str]] = []
     capped = False
     time_exhausted = False
 
     def onerror(exc: OSError) -> None:
-        warnings.append(f"scan error: {exc.filename or '<unknown>'}: {exc.strerror or exc}")
+        rel = relpath(Path(exc.filename), root) if exc.filename else "<unknown>"
+        warnings.append({"path": rel, "error": warning_error_name(exc)})
 
     for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False, onerror=onerror):
         if time.monotonic() >= deadline:
@@ -277,13 +293,17 @@ def iter_files(root: Path, max_files: int, deadline: float) -> tuple[list[Path],
     return files, capped, time_exhausted, warnings
 
 
-def add_limited(bucket: dict[str, list[str]], key: str, value: str, limit: int) -> None:
+def add_limited(bucket: dict[str, list[str]], key: str, value: str, limit: int, truncated: set[str]) -> None:
     values = bucket.setdefault(key, [])
-    if len(values) < limit and value not in values:
+    if value in values:
+        return
+    if len(values) < limit:
         values.append(value)
+    else:
+        truncated.add(key)
 
 
-def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes: int) -> dict:
+def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes: int, compact: bool = False) -> dict:
     toplevel, git = git_info(start)
     root = start  # scan only what the caller asked for, never the enclosing repository
     start_time = time.monotonic()  # the budget covers the scan, not the git metadata calls
@@ -293,6 +313,7 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
     suffix_counts: collections.Counter[str] = collections.Counter()
     signals: dict[str, list[str]] = {}
     content_signals: dict[str, list[str]] = {}
+    truncated_signals: set[str] = set()
     text_scanned = 0
     unreadable_text = 0
     text_bytes_total = 0
@@ -315,11 +336,11 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
 
         if not is_sensitive(path, root):
             for category in classify_path(rel):
-                add_limited(signals, category, rel, MAX_PATHS_PER_SIGNAL)
+                add_limited(signals, category, rel, MAX_PATHS_PER_SIGNAL, truncated_signals)
             if nlower == "security.md" or lower.endswith(".well-known/security.txt"):
-                add_limited(content_signals, "vuln_reporting", rel, MAX_CONTENT_PATHS_PER_SIGNAL)
+                add_limited(content_signals, "vuln_reporting", rel, MAX_CONTENT_PATHS_PER_SIGNAL, truncated_signals)
             if nlower in DEPENDENCY_AUTOMATION_NAMES:
-                add_limited(content_signals, "dependency_automation", rel, MAX_CONTENT_PATHS_PER_SIGNAL)
+                add_limited(content_signals, "dependency_automation", rel, MAX_CONTENT_PATHS_PER_SIGNAL, truncated_signals)
 
         if text_budget_exhausted or not should_scan_text(path, root):
             continue
@@ -346,9 +367,9 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
 
         for category, pattern in CONTENT_PATTERNS.items():
             if pattern.search(text):
-                add_limited(content_signals, category, rel, MAX_CONTENT_PATHS_PER_SIGNAL)
+                add_limited(content_signals, category, rel, MAX_CONTENT_PATHS_PER_SIGNAL, truncated_signals)
         if lower.startswith(".github/workflows/") and CI_PERMISSIONS_RE.search(text):
-            add_limited(content_signals, "ci_permissions", rel, MAX_CONTENT_PATHS_PER_SIGNAL)
+            add_limited(content_signals, "ci_permissions", rel, MAX_CONTENT_PATHS_PER_SIGNAL, truncated_signals)
 
     for values in signals.values():
         values.sort()
@@ -380,28 +401,39 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
     if text_budget_exhausted:
         limitations.append(f"Text content scanning stopped at max_text_bytes={max_text_bytes}; content signals are incomplete.")
 
+    content_signal_files = dict(sorted(content_signals.items()))
+    if compact:
+        content_signal_files = {
+            key: values[:COMPACT_CONTENT_PATHS_PER_SIGNAL] for key, values in content_signal_files.items()
+        }
+
+    scan_block = {
+        "file_count": len(files),
+        "files_classified": files_classified,
+        "capped": capped,
+        "max_files": max_files,
+        "text_files_scanned_for_signal_presence": text_scanned,
+        "suffix_counts": dict(suffix_counts.most_common(MAX_SUFFIXES_REPORTED)),
+        "max_seconds": max_seconds,
+        "elapsed_seconds": elapsed_seconds,
+        "time_budget_exhausted": time_budget_exhausted,
+        "max_text_bytes": max_text_bytes,
+        "text_budget_exhausted": text_budget_exhausted,
+        "text_files_skipped_oversize": text_files_skipped_oversize,
+    }
+    if compact:
+        del scan_block["suffix_counts"]
+
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at_utc": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
         "root": str(root),
         "git": git,
-        "scan": {
-            "file_count": len(files),
-            "files_classified": files_classified,
-            "capped": capped,
-            "max_files": max_files,
-            "text_files_scanned_for_signal_presence": text_scanned,
-            "suffix_counts": dict(suffix_counts.most_common(40)),
-            "max_seconds": max_seconds,
-            "elapsed_seconds": elapsed_seconds,
-            "time_budget_exhausted": time_budget_exhausted,
-            "max_text_bytes": max_text_bytes,
-            "text_budget_exhausted": text_budget_exhausted,
-            "text_files_skipped_oversize": text_files_skipped_oversize,
-        },
+        "scan": scan_block,
         "signals": dict(sorted(signals.items())),
-        "content_signal_files": dict(sorted(content_signals.items())),
-        "warnings": scan_warnings[:20],
+        "content_signal_files": content_signal_files,
+        "truncated_signals": sorted(truncated_signals),
+        "warnings": scan_warnings[:MAX_WARNINGS_REPORTED],
         "limitations": limitations,
     }
 
@@ -414,6 +446,14 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES, help=f"Maximum files to enumerate (default: {DEFAULT_MAX_FILES}).")
     parser.add_argument("--max-seconds", type=float, default=DEFAULT_MAX_SECONDS, help=f"Maximum wall-clock seconds to spend scanning (default: {DEFAULT_MAX_SECONDS}).")
     parser.add_argument("--max-text-bytes", type=int, default=DEFAULT_MAX_TEXT_BUDGET_BYTES, help=f"Maximum total bytes of text content to scan for signals (default: {DEFAULT_MAX_TEXT_BUDGET_BYTES}).")
+    parser.add_argument(
+        "--compact",
+        action="store_true",
+        help=(
+            "Further reduce output volume by omitting scan.suffix_counts and capping "
+            f"content_signal_files to {COMPACT_CONTENT_PATHS_PER_SIGNAL} paths per category (default: off)."
+        ),
+    )
     return parser.parse_args(list(argv))
 
 
@@ -443,7 +483,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         return 3
 
     try:
-        report = build_report(start, args.max_files, args.max_seconds, args.max_text_bytes)
+        report = build_report(start, args.max_files, args.max_seconds, args.max_text_bytes, args.compact)
         json.dump(report, sys.stdout, indent=2, sort_keys=False)
         sys.stdout.write("\n")
         return 0

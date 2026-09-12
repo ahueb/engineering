@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.3 — 2026-09-12
+
+- `production-readiness-review`: per-run instruction load cut from about 10,600 to 8,300 tokens with no gate, dimension, overlay, decision rule, or report field removed. Every definition now lives in one place (SKILL.md); `evidence-protocol.md` folded into SKILL.md; `adversarial-checks.md` merged into each gate's "Defeaters" list in `rubric.md`, plus a closing "Final challenge". Before/after run on the fixture repository: same verdict and gate statuses, more accurate evidence-strength ratings, confidence rule now applied correctly, same turn count and cost.
+- Probe: signal path caps 25/10, top-15 suffixes, structured warnings without absolute paths, `truncated_signals`, `--compact`; schema 2.1. Output on this repository 27% smaller.
+- Prompt audit (Fable 5.1): removed the numeric per-agent output cap and the progress-narration suppressor from the policy; plan-auditor no longer presumes incompleteness; `independent-review` removed as a duplicate of `semantic-reviewer` and `change-review` (`deep-audit` remains the escalation).
+- `.allowed_signers` is now actually committed (a stray `.gitignore` had excluded it since 2.5.1); the stray ignore file is removed.
+
 ## 2.5.2 — 2026-09-12
 
 - Docs: `engineering@engineering@<version>` does not pin for a GitHub-sourced marketplace; pinning and rollback now documented via signed-tag checkout plus a directory marketplace, verified in a scratch config. All commits on `main` are signed and GitHub enforces signatures.
