@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# plan-execution benchmark harness (decision 5).
+# plan-execution benchmark harness.
 #
 # Compares the shipped plan-execution skill ("current") against a variant
 # with one added bounded package-local check ("bounded-check") across
@@ -108,7 +108,7 @@ if [[ -n "$BUDGET_USD" && ! "$BUDGET_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
   exit 2
 fi
 if [[ -z "$BUDGET_USD" ]]; then
-  echo "error: --budget-usd is required for a real run (set from the Task 0.6 pilot: 1.5 * single-run cost * 18)" >&2
+  echo "error: --budget-usd is required for a real run (set from the pilot: 1.5 * single-run cost * 18)" >&2
   exit 2
 fi
 

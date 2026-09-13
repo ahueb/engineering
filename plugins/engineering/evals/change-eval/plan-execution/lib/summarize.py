@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Read results.jsonl and write a markdown summary applying decision 5's rule.
+"""Read results.jsonl and write a markdown summary applying the pre-registered decision rule.
 
 Usage: summarize.py <results.jsonl> <out.md> <runs-per-cell>
 
-Decision rule (verbatim from decision 5): adopt the bounded-check variant
+Decision rule (pre-registered before the run): adopt the bounded-check variant
 only if every completed fixture pair shows equal or better correctness on
 every run and the variant's worst-run cost is within 20% of the current
 variant's worst-run cost for that fixture; an incomplete pair, or a
@@ -57,7 +57,7 @@ def main():
     lines.append("# plan-execution benchmark: current vs. bounded-check")
     lines.append("")
     lines.append(
-        "Decision rule (verbatim, decision 5): adopt the bounded-check variant "
+        "Decision rule (pre-registered before the run): adopt the bounded-check variant "
         "only if every completed fixture pair shows equal or better correctness "
         "on every run and the variant's worst-run cost is within 20% of the "
         "current variant's worst-run cost for that fixture; an incomplete pair, "

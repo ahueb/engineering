@@ -1,9 +1,9 @@
-# plan-execution benchmark (decision 5)
+# plan-execution benchmark
 
 Compares two variants of the `plan-execution` skill across three frozen
 fixtures, per the change-eval methodology
-(`plugins/engineering/skills/change-eval/SKILL.md`) and decision 5 of
-`docs/plans/2026-09-12-assurance-root-causes.md`.
+(`plugins/engineering/skills/change-eval/SKILL.md`), using the
+pre-registered decision rule below.
 
 This benchmark does not modify the shipped skill. It runs the shipped
 skill ("current") and a patched copy ("bounded-check") side by side and
@@ -30,8 +30,8 @@ separately, from the results, in a follow-up release (out of scope here).
   (`total_cost_usd` from the final `result` event), and repair rounds
   (count of `Bash` invocations of the fixture's test command, minus the
   first).
-- `lib/summarize.py` — reads `results.jsonl` and applies the decision-5
-  rule to produce `summary.md`.
+- `lib/summarize.py` — reads `results.jsonl` and applies the pre-registered
+  decision rule to produce `summary.md`.
 - `run.sh` — orchestrator; see `--dry-run` output and header comment for
   the exact invocation.
 
@@ -43,7 +43,7 @@ separately, from the results, in a follow-up release (out of scope here).
 ./run.sh --dry-run
 
 # Real run. --budget-usd is required and must come from the caller
-# (set from the Task 0.6 pilot: 1.5 * single-run cost * 18).
+# (set from the pilot: 1.5 * single-run cost * 18).
 ./run.sh --budget-usd 3.00 [--output-dir DIR] [--runs 3]
 ```
 
@@ -62,7 +62,7 @@ Each real run:
    Agent Skill Grep Glob` inside the fixture repository, capturing the
    `stream-json` transcript.
 5. Parses the transcript for fan-out (a run without an `Agent`/`Task`
-   tool use is recorded `valid: false`, per decision 5 / Task 0.6), cost,
+   tool use is recorded `valid: false`), cost,
    and repair rounds.
 6. Independently runs the fixture's own test command
    (`python3 -m unittest discover -s tests -t .`) in the resulting repo
@@ -76,9 +76,9 @@ After each completed pair (both variants for the same fixture and run
 index), the cumulative recorded cost is compared to `--budget-usd`; once
 it is exceeded, the run stops (the per-cell stop rule). Stopping mid-way
 through a fixture leaves that fixture's pair incomplete, which
-`summarize.py` reports as "no decision" for that fixture, per decision 5.
+`summarize.py` reports as "no decision" for that fixture.
 
-## Decision rule (verbatim, decision 5)
+## Decision rule (pre-registered before the run)
 
 > adopt the bounded-check variant only if every completed fixture pair
 > shows equal or better correctness on every run and the variant's
@@ -92,8 +92,7 @@ fixture is incomplete or has excess cost spread; otherwise reject.
 
 ## Assumptions
 
-- The exact `claude -p` invocation in decision 5 / the shared contract
-  is used verbatim, with no added flags. If the installed CLI requires
+- The `claude -p` invocation above is used verbatim, with no added flags. If the installed CLI requires
   `--verbose` for `--output-format stream-json` under `-p`, set
   `EXTRA_CLAUDE_FLAGS="--verbose"` in the environment before invoking
   `run.sh`; the script appends `$EXTRA_CLAUDE_FLAGS` to the command but
