@@ -1,6 +1,6 @@
 # plan-execution benchmark: current vs. bounded-check
 
-Decision rule (verbatim, decision 5): adopt the bounded-check variant only if every completed fixture pair shows equal or better correctness on every run and the variant's worst-run cost is within 20% of the current variant's worst-run cost for that fixture; an incomplete pair, or a within-cell cost spread above 20%, makes the result "no decision".
+Decision rule (pre-registered before the run): adopt the bounded-check variant only if every completed fixture pair shows equal or better correctness on every run and the variant's worst-run cost is within 20% of the current variant's worst-run cost for that fixture; an incomplete pair, or a within-cell cost spread above 20%, makes the result "no decision".
 
 ## Fixture: two-package-refactor
 

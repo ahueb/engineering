@@ -1,7 +1,7 @@
 """Safe, atomic file writes plus structured backup/restore for the installer.
 
-Python >= 3.8, stdlib only. See docs/plans/2026-09-12-installer-merge-hardening.md
-(decisions 4-5) and the shared interface contract for the exact behaviour.
+Python >= 3.8, stdlib only. The exact behaviour of each subcommand is documented
+below and in scripts/tests/test_safe_write.py.
 
 Subcommands: write, backup, mark-written, restore, list, check, mode.
 """

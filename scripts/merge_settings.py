@@ -2,8 +2,8 @@
 """Merge a user's Claude Code settings.json with the repo's recommended
 settings, mirroring how Claude Code itself combines settings sources.
 
-Python >= 3.8, stdlib only. See docs/plans/2026-09-12-installer-merge-hardening.md
-(decision 3-4) and the Task 1 interface contract for the exact rules.
+Python >= 3.8, stdlib only. The exact merge rules are documented below and in
+scripts/tests/test_merge_settings.py.
 
 Importable API:
     load_current(path) -> dict          (raises UnusableSettings)
