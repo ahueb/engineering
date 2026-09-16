@@ -25,13 +25,7 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 - `session-start.sh`'s opening comment described the policy-injection fallback backwards.
 - `production-readiness-review/SKILL.md` said `browser-tester` has Bash.
 
-### Notes
-
-- This changelog contains a second `## [Unreleased]` heading below `## [2.9.1] - 2026-09-12`, left for the maintainer to resolve at release time.
-
 ## [2.9.1] - 2026-09-12
-
-## [Unreleased]
 
 ### Fixed
 

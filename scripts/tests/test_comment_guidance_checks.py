@@ -91,7 +91,7 @@ def error_checks(report):
 
 
 # --------------------------------------------------------------------------
-# Mutation-table coverage (handoff 9.6), case behaviour-comment-cleanup
+# Mutation-table coverage, case behaviour-comment-cleanup
 # --------------------------------------------------------------------------
 
 
