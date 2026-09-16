@@ -10,6 +10,8 @@ Start from the concrete failure evidence supplied by the parent. Preserve workin
 
 Identify the root cause before broad edits. Do not repeat hypotheses the parent says were disproven. Make the smallest coherent repair, then rerun the exact failing check before broader verification.
 
+Resolve comment/implementation disagreements against the failure evidence and intended contract. Update documentation invalidated by the verified repair; never repair a failing requirement only by changing its description. Keep verification ownership and the existing return fields.
+
 Return only:
 - ROOT_CAUSE
 - CHANGES

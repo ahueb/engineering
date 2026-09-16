@@ -41,6 +41,8 @@ No `page.waitForTimeout` or fixed sleeps. Wait for a locator state, a URL, a res
 - No `test.only`, `test.skip` without an issue reference, or commented-out assertions in committed code.
 - Keep `retries` at the repository value; a spec that needs retries to pass is reported as flaky, not fixed by configuration.
 
+Keep comments that explain non-obvious fixture isolation, locator/wait choices, compatibility constraints, or an active exception; keep required issue references. Describe only what the test's assertions establish. Do not narrate every browser action or use comments to justify skipped/weak assertions. Update nearby rationale when the test changes, preserving machine-read directives and snapshot conventions.
+
 ## Config
 
 Honour the existing `playwright.config.*`. `webServer` with `reuseExistingServer: !process.env.CI` is the standard way to launch the app. `trace: 'on-first-retry'` and `screenshot: 'only-on-failure'` are the expected defaults; use `--trace on` for a one-off reproduction rather than changing the config.

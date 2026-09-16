@@ -63,7 +63,10 @@ jobs:
         run: scripts/ci/install-claude.ps1
       - name: Unit tests under dev mode
         shell: pwsh
-        run: python -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write
+        run: python -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write scripts.tests.test_comment_guidance_checks
+      - name: Comment-guidance structure check
+        shell: pwsh
+        run: python scripts/comment_guidance_checks.py structure --repo .
       - name: Shell syntax under Git Bash
         shell: bash
-        run: for f in install.sh release.sh ci.sh plugins/engineering/hooks/session-start.sh; do bash -n "$f"; done
+        run: for f in install.sh release.sh ci.sh plugins/engineering/hooks/session-start.sh plugins/engineering/evals/behaviour-comment-cleanup/fixture.sh plugins/engineering/evals/comment-guidance-review-only/fixture.sh plugins/engineering/evals/comment-guidance-implementation/fixture.sh plugins/engineering/evals/comment-guidance-plan/fixture.sh plugins/engineering/evals/comment-guidance-change-review/fixture.sh plugins/engineering/evals/comment-guidance-mechanical/fixture.sh plugins/engineering/evals/comment-guidance-repair/fixture.sh plugins/engineering/evals/comment-guidance-doc-plan/fixture.sh; do bash -n "$f"; done

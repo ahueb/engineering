@@ -299,6 +299,7 @@ Coupling, failure domains, critical dependencies, retries/timeouts, limits/quota
 
 ### D10 Maintainability, testability, and technical sustainability
 Modularity, testability, reviewability, upgrade path, reproducibility, technical debt, operability of future change.
+Consider whether critical interface contracts, invariants, and current constraints are accurately documented and discoverable for future change; do not substitute comment coverage or documentation volume for demonstrated maintainability or runtime evidence.
 
 ### D11 Ownership, staffing, governance, and long-term support
 Bus factor, accountable owners, staffing depth, training, handover, risk authority, lifecycle/retirement ownership.

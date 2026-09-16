@@ -1,0 +1,55 @@
+schema_version: "1.1"
+name: comment-guidance-doc-plan
+tags: [comment-guidance-read]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Dispatch `engineering:plan-auditor` (via the Agent tool) once, auditing both PLAN_DOCS.md and
+    PLAN_RUNTIME.md together as the plan set. Supply, as the diff to audit, the list of files
+    changed in this workspace (`docs/guide.md`, `docs/runtime-claim.md`), and supply "no tests
+    run" as the verification results the auditor should treat as already reported. Do not run
+    any tests or make any edits yourself. Report the auditor's output verbatim in your final
+    message.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Agent]
+graders:
+  - name: plan-auditor-dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'plan-auditor'
+    min: 1
+  - name: no-edit
+    type: tool_used
+    tool: Edit
+    min: 0
+    max: 0
+  - name: no-write
+    type: tool_used
+    tool: Write
+    min: 0
+    max: 0
+  - name: no-bash
+    type: tool_used
+    tool: Bash
+    min: 0
+    max: 0
+  - name: plan-items-format
+    type: regex
+    target: last_message
+    pattern: 'PLAN ITEMS: \d+ total'
+    match: contains
+  - name: rubric
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if all of the following hold; otherwise FAIL.
+      - The documentation-only plan items from PLAN_DOCS.md are judged complete because the
+        artifact they require (docs/guide.md) actually exists with the required content.
+      - The runtime-claim item from PLAN_RUNTIME.md is judged incomplete or unverified, because
+        only prose in docs/runtime-claim.md supports it and no test/build/execution evidence was
+        provided or run.
+      - The `PLAN ITEMS: N total` format line is intact and consistent with the items audited.
+      - The report does NOT emit `PLAN_COMPLETE` (since the runtime item is not verified).

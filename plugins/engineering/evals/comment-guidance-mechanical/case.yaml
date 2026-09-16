@@ -1,0 +1,60 @@
+schema_version: "1.1"
+name: comment-guidance-mechanical
+tags: [comment-guidance-write]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Dispatch `engineering:mechanical-worker` (via the Agent tool) to rename the term "buffer" to
+    "queue" in prose comments and docstrings only, in src/py/messages.py and src/web/lint.js.
+    Explicit protected exception: directive payloads (lint/type/build/bundler directive text) and
+    code identifiers must NOT change, even if they contain the word "buffer". Instruct the worker
+    to return the occurrences it deliberately left unchanged and why, and report that back in
+    your final message.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Agent, Edit, Write]
+graders:
+  - name: mechanical-worker-dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'mechanical-worker'
+    min: 1
+  - name: directive-intact
+    type: regex
+    target:
+      source: file
+      path: src/web/lint.js
+    match: contains
+    pattern: '// eslint-disable-next-line no-buffer-constructor'
+  - name: identifier-unrenamed
+    type: regex
+    target:
+      source: file
+      path: src/py/messages.py
+    match: not_contains
+    pattern: 'ring_queue'
+  - name: prose-renamed
+    type: llm
+    focus:
+      source: file
+      path: src/py/messages.py
+    criteria: |
+      PASS only if all of the following hold; otherwise FAIL.
+      - Ordinary prose comment and docstring occurrences of the word "buffer" have become
+        "queue" (adjusted for grammar/case as appropriate).
+      - The code identifier `ring_buffer` is unchanged (not renamed to `ring_queue` or similar).
+      - The string literal `"buffer overflow"` is unchanged.
+      - Any sentence that describes an unrelated, semantically different hardware buffer register
+        (not the renamed prose concept) is left unchanged, since renaming it would change its
+        meaning rather than merely its terminology.
+  - name: exceptions-reported
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if the final message reports the occurrences it deliberately left unchanged
+      (at minimum: the eslint directive payload, the `ring_buffer` identifier, and the
+      `"buffer overflow"` string literal or the semantically different hardware-buffer sentence)
+      and explains why each was excluded from the rename. FAIL if it claims a uniform, unqualified
+      rename with no exceptions, or omits this reporting entirely.

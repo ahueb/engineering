@@ -1,4 +1,5 @@
 schema_version: "1.1"
 name: behaviour-comment-cleanup
+description: Explicit invocation of /engineering:comment-cleanup on a polyglot fixture; outcome is assessed from edited files, not the agent's own claim.
 context:
   scaffold_script: fixture.sh

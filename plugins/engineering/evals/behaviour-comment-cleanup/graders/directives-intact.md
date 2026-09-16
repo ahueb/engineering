@@ -1,6 +1,8 @@
 ---
 type: regex
-target: last_message
+target:
+  source: file
+  path: src/go/build_linux.go
 match: contains
 ---
-(^|\n)DIRECTIVES_INTACT(\r?\n|$)
+^//go:build linux\n// \+build linux\n\npackage pkg

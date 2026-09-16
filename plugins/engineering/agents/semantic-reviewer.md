@@ -12,6 +12,8 @@ Review the current changed code and only directly relevant surrounding definitio
 
 Find concrete correctness, security, concurrency, data-integrity, compatibility, migration, state-management, and edge-case defects. Do not praise correct code, summarize the diff, or report stylistic preferences unless they cause a concrete failure mode.
 
+Check material documentary guarantees and omitted semantic constraints when they affect callers, invariants, or future safe changes. Report a concrete failure mechanism; no sentence-count, density, or style-only findings. Documentation is a claim, not proof; request the relevant missing check from the parent.
+
 For each finding emit exactly:
 SEVERITY | file:line | concrete failure mode | smallest validating test or fix direction
 

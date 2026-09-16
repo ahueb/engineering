@@ -63,6 +63,10 @@ SHELL_FILES=(
   "$PLUGIN/hooks/readonly-guard.sh" "$HERE/scripts/ci/install-claude.sh" "$HERE/.githooks/pre-push"
   "$HERE/ci/shims/claude-official-fail" "$HERE/ci/shims/claude-official-mutate" "$HERE/ci/shims/claude-release-ok" "$HERE/ci/shims/gh-fake"
   "$PLUGIN/evals/change-eval/plan-execution/run.sh" "$PLUGIN/evals/fixture-service.sh"
+  "$PLUGIN/evals/behaviour-comment-cleanup/fixture.sh" "$PLUGIN/evals/comment-guidance-review-only/fixture.sh"
+  "$PLUGIN/evals/comment-guidance-implementation/fixture.sh" "$PLUGIN/evals/comment-guidance-plan/fixture.sh"
+  "$PLUGIN/evals/comment-guidance-change-review/fixture.sh" "$PLUGIN/evals/comment-guidance-mechanical/fixture.sh"
+  "$PLUGIN/evals/comment-guidance-repair/fixture.sh" "$PLUGIN/evals/comment-guidance-doc-plan/fixture.sh"
 )
 BASH_FILES=()
 for f in "${SHELL_FILES[@]}"; do
@@ -112,6 +116,26 @@ else
   bad "unit tests"
 fi
 rm -f "$UT_TMP"
+rm -rf "$HERE/scripts/__pycache__" "$HERE/scripts/tests/__pycache__"
+
+step "comment-guidance checks"
+(cd "$HERE" && python3 -W error -m py_compile scripts/comment_guidance_checks.py plugins/engineering/evals/comment-guidance-support/build_fixture.py) && ok "py_compile" || bad "py_compile"
+UT_TMP="$(mktemp)"
+if (cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_comment_guidance_checks >"$UT_TMP" 2>&1); then
+  ok "unit tests"
+else
+  grep -E '^(FAIL|ERROR):|Error:' "$UT_TMP" | head -20 | sed 's/^/   /' >&2
+  bad "unit tests"
+fi
+rm -f "$UT_TMP"
+STRUCT_TMP="$(mktemp)"
+if (cd "$HERE" && python3 scripts/comment_guidance_checks.py structure --repo "$HERE" >"$STRUCT_TMP" 2>&1); then
+  ok "structure check"
+else
+  sed 's/^/   /' "$STRUCT_TMP" >&2
+  bad "structure check"
+fi
+rm -f "$STRUCT_TMP"
 rm -rf "$HERE/scripts/__pycache__" "$HERE/scripts/tests/__pycache__"
 
 step "frontmatter, policy, and cross-references"

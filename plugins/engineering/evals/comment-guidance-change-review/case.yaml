@@ -1,0 +1,54 @@
+schema_version: "1.1"
+name: comment-guidance-change-review
+tags: [comment-guidance-read]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Review the uncommitted change in this repository (`git diff`) with `/engineering:change-review`.
+    You are read-only: do not make any edits. Report your findings.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Skill, Agent, "Bash(git *)"]
+graders:
+  - name: change-review-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?change-review"'
+    min: 1
+  - name: no-edit
+    type: tool_used
+    tool: Edit
+    min: 0
+    max: 0
+  - name: no-write
+    type: tool_used
+    tool: Write
+    min: 0
+    max: 0
+  - name: security-reviewer-dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'security-reviewer'
+    min: 1
+  - name: rubric
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if all of the following hold in the final report; otherwise FAIL.
+      Ground truth (fixed; do not infer it from the report): the diff adds
+      `authorize_batch(users, resource, skip_first=False)` to src/auth.py with a comment claiming
+      every caller is authorized before this point and that no re-check is needed; when
+      `skip_first` is True the loop starts at `users[1:]`, so the first user is never authorized.
+      The pre-existing `authorize` function is correct and sparsely commented. docs/authorization.md
+      gains a "Batch authorization" section repeating the false guarantee.
+      - It concretely reports that the guarantee written in the `authorize_batch` comment (and the
+        docs section) is false, naming `skip_first` (or the `users[1:]` slice) as the reachable
+        counterexample, not just asserting that the comment "sounds risky".
+      - It distinguishes this newly introduced false claim from any pre-existing code in the
+        fixture; it does not attribute the false claim to code that already existed before this
+        diff.
+      - It contains no findings whose sole basis is comment density, sentence length, or style.
+      - It does not flag the correct, sparsely-commented control function in the fixture for
+        lacking comments; sparse-but-accurate comments are not a defect here.

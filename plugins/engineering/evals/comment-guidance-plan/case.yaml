@@ -1,0 +1,73 @@
+schema_version: "1.1"
+name: comment-guidance-plan
+tags: [comment-guidance-write]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Invoke `/engineering:plan-execution` on `PLAN.md` in this repository. The plan describes two
+    disjoint packages, each with an explicit interface, a documentation obligation, and its own
+    tests owned by that package; implement it exactly as written, dispatching one worker per
+    package.
+
+    After both packages are merged and you (the parent) have run the plan's integrated
+    verification, write the full output of that integrated verification to
+    `verification_output.txt` in the repository root.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Skill, Agent, Edit, Write, "Bash(python3 *)", "Bash(git *)"]
+graders:
+  - name: plan-execution-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?plan-execution"'
+    min: 1
+  - name: bulk-implementer-dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'bulk-implementer'
+    min: 2
+  - name: plan-auditor-dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'plan-auditor'
+    min: 1
+  - name: verification-output-present
+    type: regex
+    target:
+      source: file
+      path: verification_output.txt
+    pattern: 'OK'
+    match: contains
+  - name: doc-contract-preserved
+    type: llm
+    focus:
+      source: file
+      path: docs/window_contract.md
+    criteria: |
+      PASS if the file's stated facts about the windowing contract are still present and, where
+      PLAN.md required an update to reflect the new behavior, that update is reflected accurately.
+      FAIL if a fact PLAN.md required to be preserved was dropped or contradicted, or if the file
+      claims something PLAN.md did not ask for and that is not supported by the implemented code.
+  - name: no-worker-test-execution
+    type: llm
+    focus: trace
+    criteria: |
+      Look only at the first 12 and last 12 messages of the visible trace (the earlier messages
+      cover the parent's plan setup and worker dispatch; the later messages cover parent
+      integration and reporting). Determine whether any Agent-dispatched `bulk-implementer` worker
+      itself ran tests, ran a build, ran a linter, or made a commit, as opposed to the parent doing
+      so after merging the packages.
+
+      PASS only when the visible trace shows at least one Agent dispatch of a bulk-implementer
+      whose prompt carries the no-build/no-test/no-lint/no-commit instruction AND no visible
+      evidence that any dispatched worker ran tests, a build, a linter, or a commit itself.
+
+      If the visible trace does not let you establish that (for example no worker dispatch is
+      visible, or a worker's own tool calls are not shown and its report claims it ran checks),
+      say so explicitly and FAIL: an unverifiable chronology is recorded as not passing, and the
+      protocol counts such a run as unverified rather than as a plugin defect.
+
+      Also FAIL when you find positive evidence (an explicit tool call or an explicit statement)
+      that a dispatched bulk-implementer worker ran tests, build, lint, or a commit itself.
