@@ -4,6 +4,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-09-16
+
 ### Changed
 
 - The global policy gains a "Comments and docstrings" section and drops the "concise comments only where hard to understand" sentence.
@@ -268,7 +270,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.9.1...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/ahueb/engineering/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/ahueb/engineering/compare/v2.7.2...v2.8.0
