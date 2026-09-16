@@ -1,0 +1,3 @@
+# Keep LF in every checkout: scripts/comment_guidance_checks.py hashes tracked
+# files byte-for-byte, and Windows runners default to core.autocrlf=true.
+* text=auto eol=lf

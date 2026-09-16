@@ -77,6 +77,15 @@ def rd(path):
         return f.read()
 
 
+def rmtree_force(path):
+    """shutil.rmtree that also removes read-only entries: git writes .git/objects/** read-only,
+    which makes a plain rmtree fail on Windows with PermissionError."""
+    def _onerror(func, target, _exc):
+        os.chmod(target, 0o700)
+        func(target)
+    shutil.rmtree(path, onerror=_onerror)
+
+
 def wr(path, text):
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(text)
@@ -562,7 +571,7 @@ class ArtifactMutationTests(TempDirCase):
 
     def test_git_dir_deleted_fails(self):
         workspace = self.build()
-        shutil.rmtree(workspace / ".git")
+        rmtree_force(workspace / ".git")
         rc, report = self.check(workspace)
         self.assertEqual(rc, 1)
         self.assertTrue(any(c["id"] == "git_metadata_changed" and c["status"] == "FAIL" for c in report["checks"]))
