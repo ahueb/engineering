@@ -1,0 +1,56 @@
+schema_version: "1.1"
+name: comment-guidance-review-only
+tags: [comment-guidance-read]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Review this repository's comments and docstrings for accuracy against what the code actually
+    does. Do not make any edits. Report concrete findings: which comments or docstrings are
+    stale, misleading, or unsupported by the code, and which parts of the code are already
+    accurately documented. Where you cannot determine whether something is accurate (for
+    example because it refers to information you cannot access), say so explicitly rather than
+    guessing. Do not propose or make any code change; only report findings and, if useful,
+    suggested wording.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Skill]
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?comment-cleanup"'
+    min: 1
+  - name: no-edit
+    type: tool_used
+    tool: Edit
+    min: 0
+    max: 0
+  - name: no-write
+    type: tool_used
+    tool: Write
+    min: 0
+    max: 0
+  - name: no-bash
+    type: tool_used
+    tool: Bash
+    min: 0
+    max: 0
+  - name: rubric
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if all of the following hold in the final message; otherwise FAIL.
+      - It names, concretely, the stale comment in src/py/contracts.py that claims the function
+        "returns None" when empty (the code actually returns an empty list).
+      - It names, concretely, the unsupported "thread-safe" claim on a helper that has no lock or
+        other synchronization.
+      - It distinguishes between the comment referencing an inaccessible private intranet URL
+        (reported as unknown/unverifiable, not asserted to be stale or wrong) and the comment
+        referencing an uncommitted docs/plans file (reported as a different kind of gap, e.g.
+        not part of the committed repository).
+      - It reports uncertainty explicitly where it exists, rather than asserting confidence it
+        cannot support.
+      - It does not propose or claim to have made any code change.
+      - It contains no findings whose sole basis is comment density or sentence count/length.

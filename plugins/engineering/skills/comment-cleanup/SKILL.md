@@ -1,6 +1,6 @@
 ---
 name: comment-cleanup
-description: Audit and rewrite every code comment in a repository so each one orients an unfamiliar reader and nothing else. Use when the user asks to clean up, review, normalize, or de-clutter comments, or when comments reference dates, phases, plans, spec files, tickets, authors, or change history instead of describing the code they annotate.
+description: Audit or improve code comments and docstrings within a requested scope, preserving accurate contracts, rationale, directives, and documentation consumers. Use for explicit comment or docstring review, cleanup, normalization, or documentation-drift requests. Review-only requests do not edit. Not for automatically cleaning comments during unrelated implementation or refactoring.
 argument-hint: "[path or scope, default whole repository]"
 context: fork
 agent: general-purpose
@@ -10,15 +10,16 @@ background: false
 disallowed-tools: Agent, Skill, Artifact
 ---
 
-# Comment cleanup
+# Comment and docstring cleanup
 
-Every surviving comment must tell a reader with no repository context exactly what they are looking at, in the fewest words that do so.
+Read [comment-guidance](references/comment-guidance.md) before auditing or editing. For the evidence behind these rules, read [source-basis](references/source-basis.md) only when rationale or revalidation is requested.
 
-1. Enumerate every comment in $ARGUMENTS (default: the whole repository), all languages, including docstrings, block headers, and file banners. Skip generated, vendored, and license text.
-2. Protect machine-read comments; never delete or reword them: lint and type suppressions (`noqa`, `type: ignore`, `eslint-disable`, `pylint:`, `nolint`, `@ts-ignore`, `@ts-expect-error`), build and codegen directives (`//go:build`, `//go:generate`, `//go:embed`, `#pragma`, `// +build`, `#[cfg]`-adjacent doc attrs, `@generated`, `DO NOT EDIT`), tooling markers (`prettier-ignore`, `fmt: off/on`, `istanbul ignore`, `coverage:`, `sourceMappingURL`, bundler magic comments such as `webpackChunkName`), test directives (doctests, `# doctest:`, `t.Parallel` hints, snapshot markers), API documentation consumed by generators (Javadoc, JSDoc, rustdoc, Sphinx, OpenAPI annotations), shebangs and encoding lines, and any repository-specific magic comment found by grepping the build, lint, and CI configuration before editing. Reword the prose part of a documentation block only when the tags and their arguments stay byte-identical.
-3. Flag comments that carry non-orienting content: dates, implementation phases or steps, plan or spec file names, ticket numbers, author names, TODO/FIXME without an owner and action, change history ("moved from", "added in", "temporary"), and commentary about the conversation or agent that wrote the code. Treat `git log` as the home for that content.
-4. Flag comments that restate the code, are stale against the code beside them, or run past two sentences where one would orient.
-5. For each flagged comment: delete it if the code is already self-explanatory; otherwise rewrite it to state purpose, invariant, or non-obvious reason in one concise sentence. Never move a comment's content into prose elsewhere.
-6. Keep comments that explain why, warn about a constraint, or name a contract the code alone cannot show. Match the repository's existing comment style and each language's docstring conventions.
-7. Change comments only. Do not touch code, whitespace outside comments, or user-facing strings. After editing run the repository's formatter, lint, type checker, and its standard test command; a comment change that alters any of their results is reverted, because that comment was a directive.
-8. Report counts of comments deleted and rewritten, with file references, and list any comment left unresolved because its meaning could not be recovered from the code.
+1. Establish mode and scope from the request. Review/audit-only means no edits. An explicit cleanup invocation with no narrower scope covers tracked first-party source in the repository; include other files only when the request warrants it. Record excluded, unsupported, generated, vendored, and protected files. Do not infer whole-repository scope from an ordinary coding task.
+2. Inspect the working tree and the applicable language, build, lint, test, and documentation configuration. Preserve user changes. Find comments/docstrings and their consumers using language-aware inspection where available; searches are discovery aids, not proof of exhaustive parsing.
+3. Identify protected directives, structured tags and arguments, legal notices, shebangs, encoding lines, executable examples, generated content, and runtime/tool consumers. Preserve their bytes and attachment/scope unless their change is explicitly authorized. Do not edit a consumer-sensitive block when its behavior cannot be established safely.
+4. For each material comment claim, distinguish current behavior, intended contract, rationale, and unresolved uncertainty. Check relevant code, callers, tests, schemas, and available authoritative references. Do not replace a contract with a description of a suspected bug.
+5. Retain useful contracts, units, invariants, rationale, compatibility conditions, and durable references. Delete redundant narration or transient work history only when no required information is lost. Rewrite verified stale or ambiguous prose to the shortest sufficient form; use multiple sentences or structured docstrings when necessary. Preserve required documentation conventions.
+6. Put information at the appropriate scope. In a comment-only cleanup, do not create or edit unrelated design documents; propose a relocation instead. When relocation is explicitly in scope, verify the durable destination before removing the local explanation and keep a useful local summary or pointer. Never replace an essential contract with an inaccessible link.
+7. In audit-only mode, report supported findings and stop without editing. In edit mode, change only approved comment/docstring spans. Do not change executable code, unrelated whitespace, unrelated user-facing strings, configuration, or other user work. Do not let formatters broaden the diff.
+8. Compare against the pre-edit state and run the narrow relevant checks, including documentation consumers when affected. Prefer formatter check mode. Establish whether failures are newly caused, pre-existing, flaky, or environmental; a changed result does not by itself prove a directive changed. Undo only this task's unsafe hunks, preserving the user's work, or defer the edit with its reason.
+9. Report scope, changed paths, comments retained/deleted/rewritten/deferred, material contract conflicts, verification commands and results, and unverified consumers. Counts are inventory, not success metrics. Do not claim complete coverage for skipped languages or files.

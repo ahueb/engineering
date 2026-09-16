@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Inject the operating policy only when the user already has it installed, either
-# as the rules file $CFG/rules/engineering-policy.md (install.sh >= 2.8.0) or as
-# the legacy $CFG/CLAUDE.md copy (older install.sh, or --policy-target claude-md).
-# This hook is the fallback for marketplace-only installs and for sessions
+# Inject the plugin-bundled operating policy as a fallback, used only when neither
+# recognized installed copy exists: not the rules file $CFG/rules/engineering-policy.md
+# (install.sh >= 2.8.0) and not the legacy $CFG/CLAUDE.md copy (older install.sh, or
+# --policy-target claude-md). This hook covers marketplace-only installs and sessions
 # started before a migration completes.
+# When an installed copy does exist but is stale, this hook prints a one-line refresh
+# notice instead of injecting anything.
 # The check is first-line only: a policy copied under a different heading is
 # injected again, and a user file that merely contains the heading elsewhere is
 # not treated as the policy. An installed copy that is out of date yields a

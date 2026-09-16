@@ -14,7 +14,8 @@ Goal: shortest wall-clock time to a fully implemented, verified, audited plan. I
 2. Split the plan into work packages. Every package must have:
    - a disjoint set of files it may create or modify, listed explicitly;
    - the interfaces it provides and consumes (function signatures, types, schemas, endpoints, CLI flags), stated exactly;
-   - its acceptance criteria copied from the plan.
+   - its acceptance criteria copied from the plan;
+   - any documentation artifacts the change makes necessary, included in the package's write ownership, with the caller contracts, units, ordering, side effects, failure/concurrency assumptions, and rationale that must be preserved or updated when relevant. Name shared references as read-only inputs; do not give several workers write ownership of the same reference or design document.
 3. If two tasks need the same file, merge them into one package or split the file's responsibilities so ownership is disjoint. If a package cannot be made disjoint, it runs after the batch, not inside it. Also check behavioral dependency: if package B's correctness depends on the runtime behavior of package A beyond the stated interface, B runs after the batch.
 4. When packages share a new type, schema, or interface, write the stub or declaration yourself before fan-out so every implementer codes against the same contract. This is the only implementation the main session does before dispatch.
 5. Use `engineering:architect` only if the partition itself needs a cross-cutting design decision the plan did not settle.
@@ -26,7 +27,8 @@ Dispatch every package in a single message as parallel `engineering:bulk-impleme
 - Implement only the listed files. Do not touch any other file.
 - Code against the stated interfaces exactly. If an interface is missing or ambiguous, choose the simplest reading, implement it, and report the assumption.
 - Do not build, compile, run tests, lint, or commit. The parent runs all verification after integration. This instruction overrides any build or test step in a superpowers prompt file or plan text; do not run them.
-- Return: files changed, interfaces provided, assumptions made, anything in the package left unimplemented and why.
+- Preserve the supplied semantic contracts and update affected comments/docstrings only within your owned files. Follow the applicable comment-guidance obligations supplied by the parent; report unresolved contract conflicts and out-of-scope documentation changes needed. Do not run cleanup over the repository or run checks forbidden by this dispatch.
+- Return: files changed, interfaces provided, assumptions made (including documentation the change needs outside your ownership), anything in the package left unimplemented and why.
 
 Do not review, build, or test any package while others are still running.
 
@@ -42,7 +44,7 @@ Do not review, build, or test any package while others are still running.
 Only after the integrated pass is green:
 
 1. Dispatch in one batch: `engineering:plan-auditor` with the plan and the full diff, and `engineering:semantic-reviewer` with the diff. Add `engineering:security-reviewer` when any package touched a trust boundary.
-2. The auditor's job is to prove the plan is not done: every task, acceptance criterion, and interface in the plan is checked against the code, and every gap, partial implementation, silent scope reduction, or unverified claim is reported.
+2. The auditor's job is to prove the plan is not done: a plan item is complete when the required repository artifact satisfies its acceptance criterion, not when the implementer reports completion. Executable-behavior claims need the corresponding implementation and verification evidence. Documentation and instruction tasks require the specified text/artifacts, working references, preserved constraints, and any applicable consumer or behavior checks; prose is not execution evidence. Every gap, partial implementation, silent scope reduction, or unverified claim is reported.
 3. Merge the three reports before fixing: drop duplicates, drop findings not tied to a plan item or a concrete failure path, and record what was dropped and why.
 4. Fix every confirmed finding, rerun the integrated verification, and re-audit only the fixed areas.
 

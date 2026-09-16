@@ -1,0 +1,64 @@
+schema_version: "1.1"
+name: comment-guidance-implementation
+tags: [comment-guidance-write]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Invoke `/engineering:implementation-loop` to add support for `end_ns=None` as an open upper
+    bound in `select_window` in `src/py/contracts.py`. When `end_ns` is `None`, every event at or
+    after `start_ns` should be included, with no upper bound. Preserve all existing behavior:
+    `start_ns` remains inclusive, an explicit `end_ns` remains exclusive, input order is
+    preserved, a new list is returned, the input is never mutated, equal explicit endpoints still
+    yield an empty list, and reversed explicit endpoints (`start_ns > end_ns`) still raise
+    `ValueError`.
+
+    Add focused tests for the new `end_ns=None` behavior in `tests/test_contracts.py` without
+    removing or weakening the existing tests. Then run `python3 -m unittest tests.test_contracts`
+    and write its full output (stdout and stderr) to `test_output.txt` in the repository root.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Skill, Edit, Write, "Bash(python3 *)"]
+graders:
+  - name: implementation-loop-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?implementation-loop"'
+    min: 1
+  - name: no-cleanup-invocation
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?comment-cleanup"'
+    min: 0
+    max: 0
+  - name: tests-pass
+    type: regex
+    target:
+      source: file
+      path: test_output.txt
+    flags: m
+    pattern: '^OK\b'
+    match: contains
+  - name: unittest-run
+    type: tool_used
+    tool: Bash
+    input_match: 'python3 -m unittest'
+    min: 1
+  - name: rubric
+    type: llm
+    focus:
+      source: file
+      path: src/py/contracts.py
+    criteria: |
+      PASS only if all of the following hold; otherwise FAIL.
+      - The docstring/comments for `select_window` now document that `end_ns=None` means an open
+        upper bound (every matching event at or after `start_ns` with no upper limit).
+      - All seven original facts are still stated and correct: start inclusive; explicit end
+        exclusive; input order preserved; a new list is returned; the input is never mutated;
+        equal explicit endpoints yield an empty list; reversed explicit endpoints raise
+        `ValueError`.
+      - Comments elsewhere in the file that are unrelated to this change still have the same
+        meaning as before (they may be reworded only if the underlying fact they state is
+        unchanged).
+      Sentence count and exact wording are not criteria.

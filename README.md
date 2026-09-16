@@ -12,7 +12,7 @@ Everything except settings ships as the `engineering` plugin; the policy also sh
 - **Decide go or no-go before a release.** `/engineering:production-readiness-review assess this branch for a 5% canary` audits twelve non-compensable gates, tries to falsify every apparent pass, and returns READY, CONDITIONALLY READY, or NOT READY with evidence strength per gate.
 - **Review a pull request without noise.** `/engineering:change-review` reports concrete defects with location, failure mechanism, and fix direction, and dispatches `security-reviewer` when the diff touches auth, secrets, or external input.
 - **Check one fact that may have changed.** `/engineering:docs-check "does Next.js 16 still support the pages router?"` answers from version-matched official docs with citations, on Sonnet, without editing anything.
-- **Make comments orient a stranger.** `/engineering:comment-cleanup` scans every comment in the repo, strips dates, phase and plan references, and history, and rewrites what remains into one concise sentence about the code it annotates.
+- **Make comments orient a stranger.** `/engineering:comment-cleanup` audits or, in a bounded scope (explicit invocation or a named path), rewrites comments and docstrings, preserving their semantic content and never touching the code itself.
 - **Hand work to the next session.** `/engineering:checkpoint` writes what is done, what failed and why, what was verified, and the next safe step.
 - **Escalate only when it matters.** `/engineering:deep-audit` runs a read-only adversarial audit on Fable at extra-high effort, reserved for consequential or hard-to-reverse changes.
 
@@ -160,8 +160,10 @@ Locally, CI still has three tiers: `./ci.sh --quick` runs static checks and unit
 
 Beyond the 20 trigger-quality cases above, two outcome-graded behaviour suites exercise skill *output*, not just whether it fires. Both use `claude plugin eval`; see `plugins/engineering/evals/README.md` for the full invocations.
 
+Two independent kinds of checking apply to the comment-guidance cases, and neither substitutes for the other: `claude plugin eval`'s regex/tool/llm graders read the transcript (final message, tool calls) and cannot see whether a preserved comment survived byte-for-byte or whether an edit stayed inside a comment/docstring span. `scripts/comment_guidance_checks.py artifacts` inspects the retained scaffold workspace after the run against the frozen `fixtures.json`/`manifest.json` data (allowed-write regions, immutable paths, protected directives, structured regions) and always reports semantic facts as `REQUIRES_REVIEW` rather than judging them; it is a bounded fixture validator for what changed on disk (Python via tokenize/AST, Go and JavaScript via a line scanner; other syntaxes fail closed), run with `--keep-temp` to retain the workspace.
+
 - **Readiness behaviour** (`behaviour-prr-1`..`-7`): seven `production-readiness-review` scenarios graded on the report's machine-checkable `VERDICT:`/`GATE G<n>:` lines and an `llm` rubric, run with grants that exclude `Edit`/`Write`. Measured (7 cases × 3 runs, sonnet, explicit slash invocation, `--allow-tools Read Grep Glob "Bash(python3 *)"`, cost 9.84 USD): the `VERDICT`/`GATE` regex graders passed on every run for scenarios 1, 2, 3, 5, 6, 7; the `llm` rubric passed 20 of 21 runs (one FAIL on scenario 5). Scenario 4 (a 1% internal canary behind a kill switch) failed on all 3 runs — the skill returned `VERDICT: NOT READY` where the scenario expects `CONDITIONALLY READY`; this is an open finding about the readiness rubric's bounded-canary rule (see risk register R15), not a grader bug.
-- **Comment-cleanup behaviour** (`behaviour-comment-cleanup`): asserts protected directive comments survive `comment-cleanup` byte-identical. Measured (3 runs, sonnet, `Skill` granted because the skill is forked, cost 0.58 USD): 3 of 3 runs passed every grader. An earlier batch without the `Skill` grant passed 2 of 3, the miss being the missing grant.
+- **Comment-cleanup behaviour** (`behaviour-comment-cleanup`): asserts protected directive comments survive `comment-cleanup` byte-identical. Measured under the previous final-message graders on 2026-09-12 (3 runs, sonnet, `Skill` granted because the skill is forked, cost 0.58 USD): 3 of 3 runs passed every grader. An earlier batch without the `Skill` grant passed 2 of 3, the miss being the missing grant. That 3/3 predates the semantic-preservation rewrite and is not evidence that attachment or code is preserved; the strengthened suite (`comment-guidance-write`, `comment-guidance-read`, 8 cases) adds an external, retained-workspace artifact checker (`scripts/comment_guidance_checks.py`) that a report-only grader cannot substitute for. Results: `NOT_RUN`.
 
 ## Requirements
 
@@ -183,7 +185,7 @@ Beyond the 20 trigger-quality cases above, two outcome-graded behaviour suites e
 | Kind | Names |
 |---|---|
 | Agents | `engineering:scout` (haiku), `engineering:test-triage` (sonnet, low, no Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, no Bash, has Playwright MCP), `engineering:auditor` (fable, xhigh, Bash guarded by a plugin hook allowlist) |
-| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review`, `comment-cleanup` (forked, sonnet, medium, edits comments only) |
+| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review`, `comment-cleanup` (forked, sonnet, medium; audit or bounded cleanup of comments and docstrings, edits comment/docstring spans only) |
 | Research skills (forked, no shell) | `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 | User-only escalation | `/engineering:deep-audit` (forks to `engineering:auditor`, fable, xhigh) |
 
@@ -234,13 +236,13 @@ The policy maps superpowers' subagent roles onto engineering agents (implementer
 plugins/engineering/
   .claude-plugin/plugin.json      plugin manifest and version
   agents/                         eleven agent definitions
-  skills/                         twelve SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests
-  evals/                          claude plugin eval cases for skill trigger quality
+  skills/                         twelve SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests; comment-cleanup bundles references/ (comment-guidance.md canonical reference, source-basis.md)
+  evals/                          claude plugin eval cases for skill trigger quality; comment-guidance-support/ holds the fixture builder and data shared by the comment-guidance cases
   hooks/                          SessionStart hook and its script
   context/CLAUDE.md               the operating policy
 settings.recommended.json         settings merged by install.sh
 install.sh                        installer
-scripts/                          settings-merge and safe-write/backup/restore helpers used by install.sh
+scripts/                          settings-merge and safe-write/backup/restore helpers used by install.sh, plus comment_guidance_checks.py and its tests/test_comment_guidance_checks.py
 ci/                                fixtures and shims used by ci.sh's scratch-install scenarios
 release.sh                        version bump, ci, signed tag, local refresh
 ci.sh                             local CI gate (also run by the pre-push hook)
@@ -248,6 +250,7 @@ ci.sh                             local CI gate (also run by the pre-push hook)
 SECURITY.md                       reporting path and verification steps
 .allowed_signers                  SSH key that signs release tags
 docs/risk-register.md             known residual risks and their owners
+docs/change-eval/comment-guidance-2026-09.md   evaluation protocol for the comment-guidance change, results NOT_RUN
 CHANGELOG.md                      release notes per version
 ```
 

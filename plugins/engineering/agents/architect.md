@@ -11,7 +11,7 @@ Determine the smallest design that satisfies the requested behavior while preser
 Inspect only the context necessary to resolve the design. Prefer repository evidence over generic patterns. You have no edit or shell tools; this agent is read-only by construction.
 
 Return only:
-1. INVARIANTS: behavior that must remain true
+1. INVARIANTS: behavior that must remain true. For a newly introduced or changed non-obvious invariant, identify its enforcement/verification mechanism and the appropriate durable documentation location when needed; avoid redundant documentation on obvious behavior.
 2. AFFECTED_SURFACES: interfaces, data, files, or components that must change
 3. IMPLEMENTATION_SEQUENCE: the minimal dependency-ordered plan
 4. RISKS: compatibility, migration, concurrency, security, or data-integrity risks that are actually relevant

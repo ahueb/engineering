@@ -1,0 +1,52 @@
+schema_version: "1.1"
+name: comment-guidance-repair
+tags: [comment-guidance-write]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Dispatch `engineering:hard-repair` with the following, exactly:
+    - Failing command: `python3 -m unittest tests.test_contracts`
+    - Captured output: the contents of `failed_check.txt` in this workspace.
+    - Changed files so far: none.
+    - Disproven hypotheses so far: none.
+    Instruct it to make the test pass without weakening the test (do not change the test's
+    assertions to accept the current, incorrect behavior), to fix the underlying code defect,
+    and to run the failing command again and write its output verbatim to `repair_output.txt`.
+  model: claude-sonnet-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Agent, Edit, Write, "Bash(python3 *)"]
+graders:
+  - name: hard-repair-dispatched
+    type: tool_used
+    tool: Agent
+    input_match: 'hard-repair'
+    min: 1
+  - name: repair-output-ok
+    type: regex
+    target:
+      source: file
+      path: repair_output.txt
+    flags: m
+    pattern: '\nOK\b'
+    match: contains
+  - name: test-not-weakened
+    type: regex
+    target:
+      source: file
+      path: tests/test_contracts.py
+    match: contains
+    pattern: 'self\.assertEqual\(select_window\(events, 10, 30\), \[\(10, "a"\), \(20, "b"\)\]\)'
+  - name: rubric
+    type: llm
+    focus:
+      source: file
+      path: src/py/contracts.py
+    criteria: |
+      PASS only if all of the following hold; otherwise FAIL.
+      - The docstring for `select_window` still states that the end bound is exclusive.
+      - The implementation now actually treats the end bound as exclusive (a strict `<`
+        comparison against the end bound, not `<=`), i.e. the code was fixed to match the
+        docstring rather than the docstring being rewritten to describe the previous buggy
+        (inclusive-end) behavior.

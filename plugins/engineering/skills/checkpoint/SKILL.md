@@ -14,7 +14,7 @@ Include:
 - in-progress and not-started work;
 - approaches attempted that failed and the evidence for failure;
 - verification already run, including exact commands and outcomes;
-- known defects, open questions, external dependencies, and risk;
+- known defects, open questions, external dependencies, and risk, including unresolved documentation-contract conflicts, evidence needed to resolve them, protected edits deferred, and relevant consumer checks not run; give the next agent accessible artifact paths and identify uncommitted or private references rather than presenting them as durable repository evidence;
 - the smallest next actions to continue safely.
 
 Prefer facts derivable from the repository and tool output. Do not copy transient speculation into the checkpoint as fact. Mark unresolved assumptions explicitly.

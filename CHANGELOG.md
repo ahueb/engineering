@@ -4,6 +4,31 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- The global policy gains a "Comments and docstrings" section and drops the "concise comments only where hard to understand" sentence.
+- `comment-cleanup` is rewritten to preserve the semantic content of existing comments and docstrings, adds an audit-only mode, and removes the sentence-count quota, history-stripping behavior, and formatter-scope broadening.
+- Documentation obligations are integrated into `implementation-loop`, `verification-loop`, `plan-execution`, `change-review`, `checkpoint`, and `production-readiness-review`, and into eight agents.
+- `plan-auditor`'s completion rule is now artifact-aware.
+
+### Added
+
+- The canonical comment-guidance reference and its source basis under `plugins/engineering/skills/comment-cleanup/references/`.
+- `scripts/comment_guidance_checks.py`, a standard-library structure/artifacts checker, with unit tests in `scripts/tests/test_comment_guidance_checks.py`.
+- `plugins/engineering/evals/comment-guidance-support/`: fixture builder, fixture data, and manifest shared by the new comment-guidance eval cases.
+- Seven new `claude plugin eval` cases (`comment-guidance-review-only`, `comment-guidance-implementation`, `comment-guidance-plan`, `comment-guidance-change-review`, `comment-guidance-mechanical`, `comment-guidance-repair`, `comment-guidance-doc-plan`) and a strengthened `behaviour-comment-cleanup` case with file-content graders.
+- `docs/change-eval/comment-guidance-2026-09.md`, an evaluation protocol with results recorded as `NOT_RUN`.
+- CI integration of the new checker, its unit tests, and the structure check on Linux, macOS, and Windows.
+
+### Fixed
+
+- `session-start.sh`'s opening comment described the policy-injection fallback backwards.
+- `production-readiness-review/SKILL.md` said `browser-tester` has Bash.
+
+### Notes
+
+- This changelog contains a second `## [Unreleased]` heading below `## [2.9.1] - 2026-09-12`, left for the maintainer to resolve at release time.
+
 ## [2.9.1] - 2026-09-12
 
 ## [Unreleased]

@@ -51,3 +51,79 @@ claude plugin eval . --case behaviour-comment-cleanup --scaffold --trust-plugin 
 These two invocations are separate on purpose: `--case 'prr-*'` (the trigger-quality suite
 above) must never be widened to `behaviour-*` — the `behaviour-*` cases are outcome-graded,
 cost far more per run, and need write grants the trigger suite does not.
+
+## Comment-guidance suite
+
+Eight native cases (`behaviour-comment-cleanup` plus `comment-guidance-review-only`,
+`comment-guidance-implementation`, `comment-guidance-plan`, `comment-guidance-change-review`,
+`comment-guidance-mechanical`, `comment-guidance-repair`, `comment-guidance-doc-plan`) exercise
+comment/docstring guidance end to end: explicit cleanup, natural-language review, implementation,
+plan-execution, change-review, mechanical rename, hard-repair, and plan-auditor. Each is tagged
+`comment-guidance-write` or `comment-guidance-read`; `behaviour-comment-cleanup` carries both
+`behaviour`/`behaviour-cleanup` and `comment-guidance-write`. Run reads and writes as separate
+invocations with separate budgets:
+
+```bash
+: "${COMMENT_WRITE_BUDGET_USD:?Set an authorized budget for this invocation}"
+: "${COMMENT_SUBJECT_MODEL:?Set the tested parent model}"
+: "${COMMENT_JUDGE_MODEL:?Set the tested judge model}"
+
+claude plugin eval plugins/engineering \
+  --tag comment-guidance-write --scaffold --trust-plugin \
+  --ablation none --runs 3 --threshold 1.0 \
+  --model "$COMMENT_SUBJECT_MODEL" --judge-model "$COMMENT_JUDGE_MODEL" \
+  --allow-tools Read Grep Glob Skill Agent Edit Write \
+    "Bash(python3 *)" "Bash(git *)" \
+  --keep-temp --no-publish --max-cost-usd "$COMMENT_WRITE_BUDGET_USD"
+```
+
+```bash
+: "${COMMENT_READ_BUDGET_USD:?Set a separate authorized budget}"
+claude plugin eval plugins/engineering \
+  --tag comment-guidance-read --scaffold --trust-plugin \
+  --ablation none --runs 3 --threshold 1.0 \
+  --model "$COMMENT_SUBJECT_MODEL" --judge-model "$COMMENT_JUDGE_MODEL" \
+  --allow-tools Read Grep Glob Skill Agent \
+  --keep-temp --no-publish --max-cost-usd "$COMMENT_READ_BUDGET_USD"
+```
+
+The read cases' `no-edit`/`no-write`/`no-bash` graders document intent rather than measure
+refusal: with the read-arm grant above the harness removes those tools from the session, so
+read-mode scope is harness-enforced. Their value is as a tripwire if the grant is ever widened.
+
+Prerequisites: Claude Code >= 2.1.273, verified locally for `--keep-temp` support; on Linux the
+`Bash` grants above additionally require bubblewrap and socat to be installed for the eval
+sandbox to run bash tools at all. The budget variables above are authorized-budget inputs you
+must set explicitly; they are not recommended dollar amounts.
+
+`--keep-temp` retains each run's scaffold workspace instead of deleting it. Retaining the
+workspace path is not itself a passing result: for every actual retained workspace, run
+
+```bash
+python3 scripts/comment_guidance_checks.py artifacts \
+  --case "$CASE_ID" \
+  --fixtures plugins/engineering/evals/comment-guidance-support/fixtures.json \
+  --manifest plugins/engineering/evals/comment-guidance-support/manifest.json \
+  --candidate "$RETAINED_WORKSPACE" \
+  --report "$TRUSTED_REPORT_PATH"
+```
+
+from the repository root, against each retained workspace, before treating that trial as
+verified. The report's `artifact_status` covers only the deterministic checks this helper
+implements; `semantic_status` is always `REQUIRES_REVIEW` and is never a substitute for reading
+the `llm`-graded findings.
+
+Trust boundary: `--trust-plugin` authorizes the inspected plugin/scaffold code in this
+repository, not an arbitrary untrusted repository. Run this suite in a disposable config with no
+unrelated secrets, no production credentials, and no side-effecting real integrations; a
+read-only or bounded-write prompt is not itself a security sandbox.
+
+Incomplete-run handling: a cost-limit abort, a denied required tool, a missing subagent trace, or
+a retained workspace that cannot be located is an **unverified** trial, not a passing or failing
+one — do not count it toward a pass rate and do not silently drop it from the reported
+denominator.
+
+`directives-intact`-style and `rubric`-style graders in these cases grade the *contents of
+scaffolded and edited files after the run* (via `focus`/`target: { source: file, path: ... }`),
+not the agent's final message; a final-message grader here is retained only for honest self-
+reporting of scope and exceptions, not as evidence of artifact correctness.
