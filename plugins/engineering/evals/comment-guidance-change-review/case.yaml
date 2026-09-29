@@ -7,7 +7,7 @@ execution:
   prompt: |
     Review the uncommitted change in this repository (`git diff`) with `/engineering:change-review`.
     You are read-only: do not make any edits. Report your findings.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill, Agent, "Bash(git *)"]

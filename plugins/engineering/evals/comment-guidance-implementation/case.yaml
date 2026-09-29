@@ -16,7 +16,7 @@ execution:
     Add focused tests for the new `end_ns=None` behavior in `tests/test_contracts.py` without
     removing or weakening the existing tests. Then run `python3 -m unittest tests.test_contracts`
     and write its full output (stdout and stderr) to `test_output.txt` in the repository root.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill, Edit, Write, "Bash(python3 *)"]

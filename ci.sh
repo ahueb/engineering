@@ -12,7 +12,7 @@
 #                       This is what .githooks/pre-push, release.sh, and the Actions
 #                       linux/macos jobs run
 #   ./ci.sh --full     adds the two network scenarios (default official-plugin install,
-#                       rules-file load via `claude -p --model haiku`); fails (exit 1)
+#                       rules-file load via `claude -p --model sonnet --effort low`); fails (exit 1)
 #                       rather than skipping a scenario it cannot run (no credentials at
 #                       $HOME/.claude/.credentials.json, no network) unless CI_ALLOW_SKIP=1.
 #                       Never runs in Actions
@@ -1224,12 +1224,12 @@ assert "claude-plugins-official" not in d.get("extraKnownMarketplaces", {})
 
 # ---- S19: shims (claude-old, claude-fail-install, claude-old-plugin) --------------------------
 s19() {
-  step "S19a: claude-old (< 2.1.267) exits before any write"
+  step "S19a: claude-old (< 2.1.284) exits before any write"
   local cfg bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-old" claude)"
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes --no-official 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -ne 0 ] && ok "S19a: rejected old CLI (rc=$RC)" || bad "S19a: old CLI accepted"
   [ ! -e "$cfg/settings.json" ] && [ ! -e "$cfg/CLAUDE.md" ] && [ ! -e "$cfg/rules" ] && ok "S19a: nothing written" || bad "S19a: something was written"
-  case "$OUT" in *"2.1.267"*) ok "S19a: message names required version" ;; *) bad "S19a: message missing required version"; esac
+  case "$OUT" in *"2.1.284"*) ok "S19a: message names required version" ;; *) bad "S19a: message missing required version"; esac
   rm -rf "$cfg" "$bindir"
 
   step "S19b: claude-fail-install fails plugin install, exit 1, no installer writes"
@@ -1842,7 +1842,7 @@ assert "claude-plugins-official" in d.get("extraKnownMarketplaces", {})
 
 # ---- S21 (--full): rules-file load via claude -p ------------------------------------------------
 s21() {
-  step "S21 (--full): rules-file load via claude -p --model haiku"
+  step "S21 (--full): rules-file load via claude -p --model sonnet --effort low"
   local creds="$HOME/.claude/.credentials.json"
   if [ ! -f "$creds" ]; then
     if [ "${CI_ALLOW_SKIP:-0}" = "1" ]; then echo "   skip: no credentials at $creds"; FULL_RAN="$FULL_RAN S21(skipped)"; return; fi
@@ -1861,7 +1861,7 @@ s21() {
   local sentinel="CI_SENTINEL_$$_${RANDOM:-0}"
   printf '# ci sentinel rule\nWhenever you respond, include this exact literal token somewhere in your reply: %s\n' "$sentinel" > "$cfg/rules/ci-sentinel.md" || bad "S21: setup failed"
   local out
-  if out="$(CLAUDE_CONFIG_DIR="$cfg" claude -p --model haiku "reply with a short greeting" 2>&1)"; then
+  if out="$(CLAUDE_CONFIG_DIR="$cfg" claude -p --model sonnet --effort low "reply with a short greeting" 2>&1)"; then
     case "$out" in
       *"$sentinel"*) ok "S21: sentinel from rules file present in reply" ;;
       *) bad "S21: sentinel not found in claude -p output" ;;

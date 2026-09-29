@@ -12,7 +12,7 @@ execution:
     example because it refers to information you cannot access), say so explicitly rather than
     guessing. Do not propose or make any code change; only report findings and, if useful,
     suggested wording.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill]

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shim for ci.sh scenario 19a: reports a `claude` CLI too old to satisfy
-# install.sh's >= 2.1.267 precondition. Every other invocation execs the real
+# install.sh's >= 2.1.284 precondition. Every other invocation execs the real
 # `claude` found on PATH (skipping this shim itself), so if the precondition
 # check is somehow bypassed the rest of the flow still behaves realistically.
 set -euo pipefail

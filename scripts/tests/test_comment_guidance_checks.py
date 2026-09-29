@@ -806,13 +806,13 @@ class SemanticFactsTests(TempDirCase):
 
 VALID_AGENT_FRONTMATTER = {
     "architect": "tools: Read, Grep, Glob\nmodel: opus\neffort: medium",
-    "auditor": "tools: Read, Grep, Glob, Bash\nmodel: fable\neffort: xhigh",
+    "auditor": "tools: Read, Grep, Glob, Bash\nmodel: opus\neffort: xhigh",
     "browser-tester": "tools: Read, Grep, Glob, mcp__plugin_playwright_playwright, mcp__playwright\nmodel: sonnet\neffort: medium",
     "bulk-implementer": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: sonnet\neffort: medium",
     "hard-repair": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: opus\neffort: high",
     "mechanical-worker": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: sonnet\neffort: low",
     "plan-auditor": "tools: Read, Grep, Glob\nmodel: opus\neffort: high",
-    "scout": "tools: Read, Grep, Glob\nmodel: haiku",
+    "scout": "tools: Read, Grep, Glob\nmodel: sonnet\neffort: low",
     "security-reviewer": "tools: Read, Grep, Glob\nmodel: opus\neffort: medium",
     "semantic-reviewer": "tools: Read, Grep, Glob\nmodel: opus\neffort: medium",
     "test-triage": "tools: Read, Grep, Glob\nmodel: sonnet\neffort: low",
@@ -890,7 +890,7 @@ def build_baseline_structure_repo(root):
         if case_id == "B01":
             # Mirrors the real six-file layout: tags live in prompt.md frontmatter.
             wr(case_dir / "prompt.md",
-                "---\nmodel: claude-sonnet-5\ntags: [{}]\n---\nDo the cleanup.\n".format(tags)
+                "---\nmodel: claude-sonnet-5-5\ntags: [{}]\n---\nDo the cleanup.\n".format(tags)
             )
             (case_dir / "graders").mkdir(exist_ok=True)
             wr(case_dir / "graders" / "rubric.md", "---\ntype: llm\n---\nRubric.\n")

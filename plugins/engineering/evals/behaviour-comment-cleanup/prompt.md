@@ -1,5 +1,5 @@
 ---
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 max_turns: 40
 timeout_seconds: 900
 tags: [behaviour, behaviour-cleanup, comment-guidance-write]

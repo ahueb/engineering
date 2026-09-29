@@ -11,7 +11,7 @@ execution:
     code identifiers must NOT change, even if they contain the word "buffer". Instruct the worker
     to return the occurrences it deliberately left unchanged and why, and report that back in
     your final message.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Agent, Edit, Write]

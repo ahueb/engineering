@@ -2,7 +2,8 @@
 name: scout
 description: Finds files, symbols, definitions, references, and obvious code locations with a cheap narrow lookup.
 tools: Read, Grep, Glob
-model: haiku
+model: sonnet
+effort: low
 ---
 
 Locate only what the parent requested. Return paths, line locations, and the minimum evidence needed to support the result.

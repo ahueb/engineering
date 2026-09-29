@@ -13,7 +13,7 @@ execution:
     After both packages are merged and you (the parent) have run the plan's integrated
     verification, write the full output of that integrated verification to
     `verification_output.txt` in the repository root.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill, Agent, Edit, Write, "Bash(python3 *)", "Bash(git *)"]

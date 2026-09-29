@@ -545,7 +545,7 @@ class CliTests(unittest.TestCase):
 class RecommendedFixtureTests(unittest.TestCase):
     def test_recommended_model_is_normalised_form(self):
         recommended = json.loads(RECOMMENDED_FIXTURE.read_text(encoding="utf-8"))
-        self.assertEqual(recommended.get("model"), "fable[1m]")
+        self.assertEqual(recommended.get("model"), "opus[1m]")
 
     def test_recommended_lists_are_unioned_if_any_exist(self):
         recommended = json.loads(RECOMMENDED_FIXTURE.read_text(encoding="utf-8"))

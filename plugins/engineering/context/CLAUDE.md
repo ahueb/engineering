@@ -68,7 +68,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
 | `browser-tester` | one named user journey must be exercised in a real browser against a running app; returns pass/fail with snapshot, console, and network evidence, never edits | read-only + Playwright MCP, no Bash |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
-| `deep-audit` (user-invoked slash command) | Fable at xhigh effort, adversarial audit with no edit tools | Bash guarded by a plugin hook allowlist (`engineering:auditor`), no edit |
+| `deep-audit` (user-invoked slash command) | Opus at xhigh effort, adversarial audit with no edit tools | Bash guarded by a plugin hook allowlist (`engineering:auditor`), no edit |
 | `docs-check` (skill) | Sonnet, one version-dependent fact confirmed against official docs | no shell |
 | `literature-review` (skill) | Opus, evidence-driven research synthesis for a consequential decision | no shell |
 

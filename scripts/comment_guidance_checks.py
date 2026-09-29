@@ -56,10 +56,11 @@ AGENT_NAMES = {
     "test-triage",
 }
 
-# Frozen frontmatter fields, copied verbatim from the baseline blobs at HEAD e158b1e6.
+# Frozen frontmatter fields, copied verbatim from the baseline blobs at HEAD e158b1e6, except
+# auditor (fable -> opus) and scout (haiku -> sonnet at low effort), moved to Opus 5.5 and Sonnet 5.5.
 AGENT_FROZEN_FIELDS = {
     "architect": {"tools": "Read, Grep, Glob", "model": "opus", "effort": "medium"},
-    "auditor": {"tools": "Read, Grep, Glob, Bash", "model": "fable", "effort": "xhigh"},
+    "auditor": {"tools": "Read, Grep, Glob, Bash", "model": "opus", "effort": "xhigh"},
     "browser-tester": {
         "tools": "Read, Grep, Glob, mcp__plugin_playwright_playwright, mcp__playwright",
         "model": "sonnet",
@@ -69,7 +70,7 @@ AGENT_FROZEN_FIELDS = {
     "hard-repair": {"tools": "Read, Grep, Glob, Bash, Edit, Write", "model": "opus", "effort": "high"},
     "mechanical-worker": {"tools": "Read, Grep, Glob, Bash, Edit, Write", "model": "sonnet", "effort": "low"},
     "plan-auditor": {"tools": "Read, Grep, Glob", "model": "opus", "effort": "high"},
-    "scout": {"tools": "Read, Grep, Glob", "model": "haiku", "effort": None},
+    "scout": {"tools": "Read, Grep, Glob", "model": "sonnet", "effort": "low"},
     "security-reviewer": {"tools": "Read, Grep, Glob", "model": "opus", "effort": "medium"},
     "semantic-reviewer": {"tools": "Read, Grep, Glob", "model": "opus", "effort": "medium"},
     "test-triage": {"tools": "Read, Grep, Glob", "model": "sonnet", "effort": "low"},

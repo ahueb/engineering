@@ -395,8 +395,8 @@ fi
 command -v claude >/dev/null 2>&1 || { echo "claude CLI not found on PATH" >&2; exit 1; }
 CLAUDE_VERSION_RAW="$(claude --version 2>/dev/null || true)"
 CLAUDE_VERSION="$(printf '%s\n' "$CLAUDE_VERSION_RAW" | sed -n 's/^[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n1)"
-if [ -z "$CLAUDE_VERSION" ] || ! version_ge "$CLAUDE_VERSION" "2.1.267"; then
-  echo "claude CLI ${CLAUDE_VERSION:-version could not be determined} found; this installer requires >= 2.1.267" >&2
+if [ -z "$CLAUDE_VERSION" ] || ! version_ge "$CLAUDE_VERSION" "2.1.284"; then
+  echo "claude CLI ${CLAUDE_VERSION:-version could not be determined} found; this installer requires >= 2.1.284" >&2
   exit 1
 fi
 

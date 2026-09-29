@@ -13,7 +13,7 @@ execution:
     Instruct it to make the test pass without weakening the test (do not change the test's
     assertions to accept the current, incorrect behavior), to fix the underlying code defect,
     and to run the failing command again and write its output verbatim to `repair_output.txt`.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Agent, Edit, Write, "Bash(python3 *)"]

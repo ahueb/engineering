@@ -4,6 +4,14 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- The recommended session model is `opus[1m]` (Opus 5.5) at `xhigh` effort, replacing `fable[1m]` at `low`; the per-model effort entries move from `claude-fable-5-1` (`low`) and `claude-sonnet-5` (`medium`) to `claude-opus-5-5` (`xhigh`) and `claude-sonnet-5-5` (`medium`).
+- `auditor` (and so `/engineering:deep-audit`) runs on `opus` instead of `fable`, still at `xhigh`.
+- `scout` runs on `sonnet` at `low` effort instead of `haiku`.
+- Every `claude plugin eval` case pinned to `claude-sonnet-5` is pinned to `claude-sonnet-5-5`, and `ci.sh --full`'s rules-file load scenario (S21) calls `claude -p --model sonnet --effort low` instead of `--model haiku`.
+- `install.sh` requires Claude Code 2.1.284 or later (was 2.1.267), the first version whose `opus` and `sonnet` aliases resolve to Opus 5.5 and Sonnet 5.5; CI's pinned Claude Code moves from 2.1.269 to 2.1.284 so its scratch installs still pass that check.
+
 ## [2.10.0] - 2026-09-16
 
 ### Changed

@@ -11,7 +11,7 @@ execution:
     run" as the verification results the auditor should treat as already reported. Do not run
     any tests or make any edits yourself. Report the auditor's output verbatim in your final
     message.
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 40
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Agent]

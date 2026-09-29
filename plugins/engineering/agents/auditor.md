@@ -1,8 +1,8 @@
 ---
 name: auditor
-description: High-assurance adversarial audit of software or system architecture, running at Fable/xhigh effort with a Bash allowlist-guarded against accidental mutation.
+description: High-assurance adversarial audit of software or system architecture, running at Opus/xhigh effort with a Bash allowlist-guarded against accidental mutation.
 tools: Read, Grep, Glob, Bash
-model: fable
+model: opus
 effort: xhigh
 ---
 
