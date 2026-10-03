@@ -38,6 +38,20 @@ graders:
       path: tests/test_contracts.py
     match: contains
     pattern: 'self\.assertEqual\(select_window\(events, 10, 30\), \[\(10, "a"\), \(20, "b"\)\]\)'
+  - name: end-exclusive-code
+    type: regex
+    target:
+      source: file
+      path: src/py/contracts.py
+    match: contains
+    pattern: '<\s*end_ns\b'
+  - name: no-inclusive-end
+    type: regex
+    target:
+      source: file
+      path: src/py/contracts.py
+    match: not_contains
+    pattern: '<=\s*end_ns\b'
   - name: rubric
     type: llm
     focus:
@@ -48,14 +62,3 @@ graders:
       - The file's documentation of `select_window` still states that the end bound (`end_ns`) is
         exclusive. That documentation is the module docstring ("Contract for select_window: ..."),
         plus a function docstring if one was added.
-  - name: rubric-2
-    type: llm
-    focus:
-      source: file
-      path: src/py/contracts.py
-    criteria: |
-      PASS only if the following holds; otherwise FAIL.
-      - The implementation now actually treats the end bound as exclusive (a strict `<`
-        comparison against the end bound, not `<=`), i.e. the code was fixed to match the
-        docstring rather than the docstring being rewritten to describe the previous buggy
-        (inclusive-end) behavior.

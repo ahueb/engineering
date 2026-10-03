@@ -35,6 +35,20 @@ graders:
       path: src/py/messages.py
     match: not_contains
     pattern: 'ring_queue'
+  - name: identifier-kept
+    type: regex
+    target:
+      source: file
+      path: src/py/messages.py
+    match: contains
+    pattern: '(^|\n)ring_buffer = \[\]'
+  - name: literal-kept
+    type: regex
+    target:
+      source: file
+      path: src/py/messages.py
+    match: contains
+    pattern: 'return "buffer overflow"'
   - name: prose-renamed
     type: llm
     focus:
@@ -50,34 +64,6 @@ graders:
       PASS only if the following holds; otherwise FAIL.
       - Ordinary prose comment and docstring occurrences of the word "buffer" have become
         "queue" (adjusted for grammar/case as appropriate).
-  - name: prose-renamed-2
-    type: llm
-    focus:
-      source: file
-      path: src/py/messages.py
-    criteria: |
-      Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
-      register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
-      must stay as the datasheet writes it.") is one sentence about a different concept. Its
-      hardware wording ("UART hardware buffer register", "the chip's buffer") must stay unchanged;
-      its clause "our message buffer" names the renamed concept and may read "our message buffer"
-      or "our message queue". It is the only prose exception to the rename.
-      PASS only if the following holds; otherwise FAIL.
-      - The code identifier `ring_buffer` is unchanged (not renamed to `ring_queue` or similar).
-  - name: prose-renamed-3
-    type: llm
-    focus:
-      source: file
-      path: src/py/messages.py
-    criteria: |
-      Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
-      register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
-      must stay as the datasheet writes it.") is one sentence about a different concept. Its
-      hardware wording ("UART hardware buffer register", "the chip's buffer") must stay unchanged;
-      its clause "our message buffer" names the renamed concept and may read "our message buffer"
-      or "our message queue". It is the only prose exception to the rename.
-      PASS only if the following holds; otherwise FAIL.
-      - The string literal `"buffer overflow"` is unchanged.
   - name: hardware-sentence-unchanged
     type: regex
     target:
