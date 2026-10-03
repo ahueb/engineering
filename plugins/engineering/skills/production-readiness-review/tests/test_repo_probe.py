@@ -471,7 +471,8 @@ class FilterDriverTests(unittest.TestCase):
             _git(root, "-c", "protocol.file.allow=always", "submodule", "-q", "add", str(sub), "sub")
             _git(root, "commit", "-q", "-m", "add submodule")
             (root / "sub" / "f.txt").write_text("b\n", encoding="utf-8")
-            _git(root / "sub", "commit", "-q", "-am", "move the submodule to another commit")
+            _git(root / "sub", "-c", "user.email=test@example.invalid", "-c", "user.name=Probe Test",
+                 "commit", "-q", "-am", "move the submodule to another commit")
             _git(root / "sub", "config", "filter.y.clean", _touch_cmd(marker))
             _stat_dirty(root / "sub" / "f.txt")
             report = run_probe(root)

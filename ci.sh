@@ -106,7 +106,14 @@ python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$HERE/settings.recom
 
 step "probe"
 python3 -W error -m py_compile "$PRR/scripts/repo_probe.py" && ok "py_compile" || bad "py_compile"
-python3 -X dev -m unittest "$PRR/tests/test_repo_probe.py" >/dev/null 2>&1 && ok "unit tests" || bad "unit tests"
+UT_TMP="$(mktemp)"
+if python3 -X dev -m unittest "$PRR/tests/test_repo_probe.py" >"$UT_TMP" 2>&1; then
+  ok "unit tests"
+else
+  grep -E '^(FAIL|ERROR):|Error:' "$UT_TMP" | head -20 | sed 's/^/   /' >&2
+  bad "unit tests"
+fi
+rm -f "$UT_TMP"
 rm -rf "$PRR/tests/__pycache__" "$PRR/scripts/__pycache__"
 
 step "scripts unit tests (merge_settings, safe_write, eval_recheck)"
