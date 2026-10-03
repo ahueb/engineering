@@ -178,7 +178,10 @@ and a case passes only when every one passes. Splitting does not make the judge 
 rating), and split votes 4 of 9 FAIL on three identical `comment-guidance-repair` files under a
 criterion that named a function docstring the file lacks (see `RESULTS.md`). The
 `behaviour-prr-1` bullet is now the regex graders `gate-lines` and `gate-evidence`, and the repair
-bullet is reworded; `behaviour-prr-6`'s `rubric-5` is unchanged. Splitting can also drop an exception one
+bullet is reworded. Wording matters as much: a `behaviour-prr-6` `rubric-5` that named the HA and
+multi-region claims and also excluded E3 ratings on gate FAILs made the judge fail all three reports
+in one run, none of which rated the claim above E1; replayed as final messages, the same reports
+passed under the current, shorter criterion. Splitting can also drop an exception one
 bullet made to another: `comment-guidance-mechanical`'s hardware-sentence bullet is now the regex
 `hardware-sentence-unchanged`, and its `prose-renamed` grader states that sentence as the rename's
 one exception. Write criteria the judge can decide from the focus alone (state any before-state or plan
