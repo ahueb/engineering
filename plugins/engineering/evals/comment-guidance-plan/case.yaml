@@ -33,6 +33,16 @@ graders:
     tool: Agent
     input_match: 'plan-auditor'
     min: 1
+  - name: bulk-implementer-instructed
+    type: tool_used
+    tool: Agent
+    input_match: '(?:"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer"[\s\S]*[Dd]o not (?:build|compile|run tests)|[Dd]o not (?:build|compile|run tests)[\s\S]*"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer")'
+    min: 2
+  - name: no-worker-test-command
+    type: regex
+    target: trace
+    match: not_contains
+    pattern: '"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?(?:unittest|pytest|node --test|npm (?:run )?test|py_compile|eslint|git commit)[^\n]*"parent_tool_use_id":"toolu_'
   - name: verification-output-present
     type: regex
     target:
@@ -57,24 +67,3 @@ graders:
       or contradicted, or if the file asserts a behavioral guarantee that is neither one of these
       facts nor a direct consequence of them (for example thread-safety, sorting, deduplication,
       or performance). Wording, structure, and examples consistent with the facts are not criteria.
-  - name: no-worker-test-execution
-    type: llm
-    focus: trace
-    criteria: |
-      Look only at the first 12 and last 12 messages of the visible trace (the earlier messages
-      cover the parent's plan setup and worker dispatch; the later messages cover parent
-      integration and reporting). Determine whether any Agent-dispatched `bulk-implementer` worker
-      itself ran tests, ran a build, ran a linter, or made a commit, as opposed to the parent doing
-      so after merging the packages.
-
-      PASS only when the visible trace shows at least one Agent dispatch of a bulk-implementer
-      whose prompt carries the no-build/no-test/no-lint/no-commit instruction AND no visible
-      evidence that any dispatched worker ran tests, a build, a linter, or a commit itself.
-
-      If the visible trace does not let you establish that (for example no worker dispatch is
-      visible, or a worker's own tool calls are not shown and its report claims it ran checks),
-      say so explicitly and FAIL: an unverifiable chronology is recorded as not passing, and the
-      protocol counts such a run as unverified rather than as a plugin defect.
-
-      Also FAIL when you find positive evidence (an explicit tool call or an explicit statement)
-      that a dispatched bulk-implementer worker ran tests, build, lint, or a commit itself.
