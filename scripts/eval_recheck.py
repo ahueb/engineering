@@ -25,7 +25,7 @@ import tempfile
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 
-PROMPT = """You are re-checking an eval judge's {harness} verdict. Apply the criterion below to the agent \
+PROMPT = """You are re-checking an eval judge's verdict. Apply the criterion below to the agent \
 output. For each bullet in the criterion write one line `<n>. PASS|FAIL - <reason quoting the \
 output>`; if the criterion has no bullets, write one such line. Finish with exactly one line \
 `OVERALL: PASS` or `OVERALL: FAIL`. Be strict and literal; do not add requirements.

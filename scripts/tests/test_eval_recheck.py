@@ -192,7 +192,9 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("behaviour-prr-6 run 0 rubric: harness PASS PASS PASS; recheck FAIL -> NEEDS REVIEW", out)
         self.assertIn("1 of 1 need review", out)
-        self.assertIn("re-checking an eval judge's PASS verdict", run.call_args.kwargs["input"])
+        # The prompt does not reveal the verdict being rechecked, so it cannot anchor the judge.
+        self.assertIn("re-checking an eval judge's verdict.", run.call_args.kwargs["input"])
+        self.assertNotIn("PASS verdict", run.call_args.kwargs["input"])
 
     def test_grader_glob_matching_nothing_selects_zero(self):
         with mock.patch.object(er.subprocess, "run") as run:
