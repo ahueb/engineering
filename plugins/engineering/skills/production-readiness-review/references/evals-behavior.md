@@ -51,9 +51,11 @@ Expectations:
 - Records the precise exposure boundary and rollback/stop trigger.
 - Requires explicit ownership and reassessment conditions for material residual risk.
 
-## 5. Review an AI-enabled service for production readiness for GA to all customers. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
+## 5. Review an AI-enabled service for production readiness for GA to all customers. Auth, alerting, a pinned image, and a drilled restore are in place, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
 
 **Expected:** The audit activates the AI/ML domain overlay and treats missing AI-specific evidence as material rather than declaring the system ready from generic web-service controls alone.
+
+The fixture adds to the shared service customer-token auth at the public gateway, paging alerts with an on-call runbook, an image pinned by digest, and a dated restore drill; its AI feature (`src/summarize.js`, `docs/ai-notes.md`) has none of the AI controls the prompt lists. Every date is relative to the day the fixture is built.
 
 Expectations:
 - Applies G12 domain obligations and AI/ML overlay checks.
