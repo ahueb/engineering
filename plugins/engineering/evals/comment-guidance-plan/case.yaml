@@ -41,7 +41,7 @@ graders:
   - name: bulk-implementer-instructed
     type: tool_used
     tool: Agent
-    input_match: '(?:"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer"[\s\S]*[Dd]o not (?:build|compile|run tests)|[Dd]o not (?:build|compile|run tests)[\s\S]*"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer")'
+    input_match: '(?:"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer"[\s\S]*(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)|(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)[\s\S]*"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer")'
     min: 2
   - name: no-worker-test-command
     type: regex
