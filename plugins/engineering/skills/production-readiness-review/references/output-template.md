@@ -119,7 +119,7 @@ Explicitly include:
 
 ## Actions required before READY
 
-Order by decision impact, not convenience. For each:
+Order by decision impact, not convenience. Under CONDITIONALLY READY, nothing but the pre-launch checks may be required before the bounded exposure starts: put every other action under the wider exposure it gates (for example GA). If an action must happen before the bounded exposure starts and can be evidenced before deployment, its gate is UNKNOWN for that exposure and the verdict is NOT READY. For each action:
 
 1. **Action** - concrete change or evidence to produce.
    - Closes: gate/finding ID.
