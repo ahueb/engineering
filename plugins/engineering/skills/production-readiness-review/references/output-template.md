@@ -142,7 +142,7 @@ Under CONDITIONALLY READY, list every pre-launch check in this table, with one "
 | Check | Why it can't be evidenced before deployment | Owner | Acceptance evidence |
 |---|---|---|---|
 
-These are not pre-launch checks, because they can be evidenced before deployment: access rights and RBAC, on-call rosters and paging tests, image attestation and registry digests, staging drills, and configuration in the repository. Evidence them now, or rate their gate UNKNOWN.
+These are not pre-launch checks, because they can be evidenced before deployment: group membership and access rights in the access system, RBAC committed in the repository, on-call rosters and paging tests, image attestation and registry digests, staging drills, and configuration in the repository. Evidence them now; if this exposure needs one that is not evidenced, rate its gate UNKNOWN, and if it does not, accept the gap with a control.
 
 For READY/CONDITIONALLY READY, also record each accepted residual with:
 - risk;
