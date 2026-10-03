@@ -128,10 +128,21 @@ Order by decision impact, not convenience. For each:
 
 ## Gap disposition, residual risk, and bounded release conditions
 
-For every verdict, including NOT READY, give each material gap one disposition for the stated exposure:
+For every verdict, including NOT READY, give each material gap its own row and one disposition for the stated exposure. A summary line such as "all gaps block" does not replace the rows.
+
+| Gap | Disposition | Gate | Reason |
+|---|---|---|---|
+
 - **Blocks:** must close before the exposure it names; name the gate and the exposure. Under CONDITIONALLY READY, Blocks name only a wider exposure, such as GA.
-- **Pre-launch check** (CONDITIONALLY READY only): production state that exists after deployment but before any canary traffic and cannot be evidenced earlier; name the owner and the acceptance evidence. Evidence that needs live canary traffic is a stop criterion, not a pre-launch check. If any check fails, the verdict is NOT READY. A check whose owner is unknown cannot support CONDITIONALLY READY.
+- **Pre-launch check** (CONDITIONALLY READY only): production state that exists after deployment but before any canary traffic and cannot be evidenced earlier. Evidence that needs live canary traffic is a stop criterion, not a pre-launch check. If any check fails, the verdict is NOT READY. A check whose owner is unknown cannot support CONDITIONALLY READY.
 - **Acceptable with control:** could ship within this exposure once the blockers close, given the named compensating control, stop trigger, and owner.
+
+Under CONDITIONALLY READY, list every pre-launch check in this table, with one "none" row if there are none:
+
+| Check | Why it can't be evidenced before deployment | Owner | Acceptance evidence |
+|---|---|---|---|
+
+These are not pre-launch checks, because they can be evidenced before deployment: access rights and RBAC, on-call rosters and paging tests, image attestation and registry digests, staging drills, and configuration in the repository. Evidence them now, or rate their gate UNKNOWN.
 
 For READY/CONDITIONALLY READY, also record each accepted residual with:
 - risk;
