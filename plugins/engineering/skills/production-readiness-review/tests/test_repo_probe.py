@@ -414,6 +414,31 @@ class FilterDriverTests(unittest.TestCase):
             _git(root, "config", "--worktree", "filter.x.clean", _touch_cmd(marker))
             self.assert_blocked(root, root / "f.txt", marker)
 
+    def test_worktree_config_is_read_whatever_an_include_says(self) -> None:
+        # git takes extensions.worktreeConfig from .git/config alone, so an included file that sets
+        # it to false must not stop the probe from reading config.worktree.
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "core.repositoryformatversion", "1")
+            _git(root, "config", "extensions.worktreeConfig", "true")
+            _git(root, "config", "--worktree", "filter.x.clean", _touch_cmd(marker))
+            (root / ".git" / "extra.cfg").write_text("[extensions]\n\tworktreeConfig = false\n", encoding="utf-8")
+            _git(root, "config", "include.path", "extra.cfg")
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
+    def test_linked_worktree_config_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, linked, marker = Path(td) / "r", Path(td) / "w", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "core.repositoryformatversion", "1")
+            _git(root, "config", "extensions.worktreeConfig", "true")
+            _git(root, "worktree", "add", "-q", str(linked))
+            _git(linked, "config", "--worktree", "filter.x.clean", _touch_cmd(marker))
+            report = self.assert_blocked(linked, linked / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
     def test_submodule_filter_is_not_run(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             sub, root, marker = Path(td) / "sub", Path(td) / "r", Path(td) / "marker"

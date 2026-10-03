@@ -127,25 +127,27 @@ def repo_filter_drivers(root: Path) -> tuple[list[str] | None, str | None]:
     """Names of the filter drivers the repository's own config defines (local and worktree
     scope, following includes), or (None, reason) when they cannot all be neutralised with
     `-c`: git splits `-c name=value` at the first `=`, so a driver named `a=b` would survive."""
-    # Worktree config exists only with extensions.worktreeConfig; without it `--worktree` reads
-    # the local file again, and fails outright once a linked worktree exists.
-    code, out, err = safe_run(
-        ["git", *GIT_HARDENING, "config", "--local", "--includes", "--bool", "--get", "extensions.worktreeConfig"],
-        root,
-    )
-    if code not in (0, 1):
-        return None, "git config extensions.worktreeConfig failed: {}".format(err or code)
-    scopes = ["--local", "--worktree"] if out == "true" else ["--local"]
+    # git reads this worktree's config.worktree only with extensions.worktreeConfig, which it takes
+    # from .git/config alone, and `git config --worktree` fails once a linked worktree exists
+    # without that extension. So read the file directly whenever it exists: blanking drivers that
+    # git would ignore is harmless.
+    code, worktree_config, err = safe_run(["git", *GIT_HARDENING, "rev-parse", "--git-path", "config.worktree"], root)
+    if code != 0 or not worktree_config:
+        return None, "git rev-parse --git-path config.worktree failed: {}".format(err or code)
+    sources = [["--local"]]
+    worktree_path = Path(worktree_config) if os.path.isabs(worktree_config) else root / worktree_config
+    if worktree_path.is_file():
+        sources.append(["--file", str(worktree_path)])
     names: set[str] = set()
-    for scope in scopes:
+    for source in sources:
         code, out, err = safe_run(
-            ["git", *GIT_HARDENING, "config", scope, "--includes", "--name-only", "--get-regexp", r"^filter\."],
+            ["git", *GIT_HARDENING, "config", *source, "--includes", "--name-only", "--get-regexp", r"^filter\."],
             root,
         )
         if code == 1 and not out:
-            continue  # no filter keys in this scope
+            continue  # no filter keys in this file
         if code != 0:
-            return None, "git config {} failed: {}".format(scope, err or code)
+            return None, "git config {} failed: {}".format(" ".join(source), err or code)
         for key in out.splitlines():
             match = FILTER_KEY_RE.match(key)
             if not match or "=" in match.group(1):
