@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -85,6 +86,8 @@ class RepoProbeTests(unittest.TestCase):
             clean = run_probe(root)
             self.assertTrue(clean["git"]["is_repo"])
             self.assertFalse(clean["git"]["dirty"])
+            self.assertEqual("collected", clean["git"]["status"])
+            self.assertIsNone(clean["git"]["status_skip_reason"])
             self.assertEqual(40, len(clean["git"]["head"]))
 
             (root / "README.md").write_text("changed\n", encoding="utf-8")
@@ -319,6 +322,158 @@ class RepoProbeTests(unittest.TestCase):
             report = run_probe(repo)
             self.assertIn("manifests", report["signals"])
             self.assertEqual(["package.json"], report["signals"]["manifests"])
+
+
+def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=str(cwd), check=True, capture_output=True, text=True)
+
+
+HARDENED_STATUS = ["git", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "status", "--porcelain"]
+NO_LOCKS_ENV = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+
+
+def _make_repo(root: Path, attributes: str = "f.txt filter=x\n") -> None:
+    root.mkdir(parents=True)
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "test@example.invalid")
+    _git(root, "config", "user.name", "Probe Test")
+    (root / ".gitattributes").write_text(attributes, encoding="utf-8")
+    (root / "f.txt").write_text("a\n", encoding="utf-8")
+    _git(root, "add", ".")
+    # The driver is defined only after this commit, so committing never runs it.
+    _git(root, "commit", "-q", "-m", "init")
+
+
+def _stat_dirty(path: Path) -> None:
+    """Change the content (never back to the committed "a") but not the size, and move the
+    mtime, so git must hash the file to compare it."""
+    path.write_text("c\n" if path.read_text(encoding="utf-8") == "b\n" else "b\n", encoding="utf-8")
+    t = path.stat().st_mtime + 5
+    os.utime(path, (t, t))
+
+
+def _touch_cmd(marker: Path) -> str:
+    return "touch {}; cat".format(shlex.quote(str(marker)))
+
+
+@unittest.skipUnless(os.name == "posix" and shutil.which("git"), "filter-driver probes need git and a POSIX shell")
+class FilterDriverTests(unittest.TestCase):
+    """Each test first proves the vector fires under plain hardened `git status` (the control),
+    then proves the probe does not run it."""
+
+    def assert_blocked(self, root: Path, dirty_file: Path, marker: Path) -> dict:
+        _stat_dirty(dirty_file)
+        subprocess.run(HARDENED_STATUS, cwd=str(root), env=NO_LOCKS_ENV, capture_output=True)
+        self.assertTrue(marker.exists(), "control: the vector did not fire under plain git status")
+        marker.unlink()
+        _stat_dirty(dirty_file)
+        report = run_probe(root)
+        self.assertFalse(marker.exists(), "the probe ran a repository-defined filter")
+        return report
+
+    def test_clean_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "filter.x.clean", _touch_cmd(marker))
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+            self.assertTrue(report["git"]["dirty"])
+
+    def test_process_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "filter.x.process", "sh -c 'touch {}; exit 1'".format(shlex.quote(str(marker))))
+            self.assert_blocked(root, root / "f.txt", marker)
+
+    def test_required_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "filter.x.clean", _touch_cmd(marker))
+            _git(root, "config", "filter.x.required", "true")
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
+    def test_include_path_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            (root / ".git" / "extra.cfg").write_text(
+                '[filter "x"]\n\tclean = "{}"\n'.format(_touch_cmd(marker)), encoding="utf-8")
+            _git(root, "config", "include.path", "extra.cfg")
+            self.assert_blocked(root, root / "f.txt", marker)
+
+    def test_worktree_scope_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "core.repositoryformatversion", "1")
+            _git(root, "config", "extensions.worktreeConfig", "true")
+            _git(root, "config", "--worktree", "filter.x.clean", _touch_cmd(marker))
+            self.assert_blocked(root, root / "f.txt", marker)
+
+    def test_submodule_filter_is_not_run(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            sub, root, marker = Path(td) / "sub", Path(td) / "r", Path(td) / "marker"
+            _make_repo(sub, "f.txt filter=y\n")
+            _make_repo(root, "g.txt -text\n")
+            _git(root, "-c", "protocol.file.allow=always", "submodule", "-q", "add", str(sub), "sub")
+            _git(root, "commit", "-q", "-m", "add submodule")
+            _git(root / "sub", "config", "filter.y.clean", _touch_cmd(marker))
+            self.assert_blocked(root, root / "sub" / "f.txt", marker)
+
+    def test_racily_clean_entry_does_not_run_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "config", "filter.x.clean", _touch_cmd(marker))
+            # Rewrite the index, then change the file at the same size: whether git sees the entry
+            # as stat-dirty or as racily clean, it must hash the file.
+            subprocess.run(["git", "-c", "filter.x.clean=cat", "update-index", "--really-refresh"],
+                           cwd=str(root), capture_output=True)
+            (root / "f.txt").write_text("b\n", encoding="utf-8")
+            subprocess.run(HARDENED_STATUS, cwd=str(root), env=NO_LOCKS_ENV, capture_output=True)
+            self.assertTrue(marker.exists(), "control: the racy entry did not trigger the filter")
+            marker.unlink()
+            subprocess.run(["git", "-c", "filter.x.clean=cat", "update-index", "--really-refresh"],
+                           cwd=str(root), capture_output=True)
+            (root / "f.txt").write_text("a\n", encoding="utf-8")
+            run_probe(root)
+            self.assertFalse(marker.exists(), "the probe ran a repository-defined filter")
+
+    def test_driver_name_with_dots_and_capitals_is_neutralised(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root, "f.txt filter=My.Driver\n")
+            _git(root, "config", "filter.My.Driver.clean", _touch_cmd(marker))
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
+    def test_unneutralisable_driver_name_skips_status(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root, "f.txt filter=a=b\n")
+            with open(root / ".git" / "config", "a", encoding="utf-8") as f:
+                f.write('[filter "a=b"]\n\tclean = "{}"\n'.format(_touch_cmd(marker)))
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            git = report["git"]
+            self.assertEqual("not collected", git["status"])
+            self.assertIn("a=b", git["status_skip_reason"])
+            self.assertIsNone(git["dirty"])
+            self.assertIsNone(git["status_entry_count"])
+            self.assertIsNone(git["status_code_counts"])
+
+    def test_failed_status_is_reported_not_collected(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "r"
+            _make_repo(root, "g.txt -text\n")
+            (root / ".git" / "index").write_bytes(b"not an index")
+            report = run_probe(root)
+            self.assertEqual("not collected", report["git"]["status"])
+            self.assertIn("git status failed", report["git"]["status_skip_reason"])
+            self.assertIsNone(report["git"]["dirty"])
 
 
 if __name__ == "__main__":

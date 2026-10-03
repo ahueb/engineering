@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = "2.2"
 DEFAULT_MAX_FILES = 50000
 MAX_TEXT_BYTES = 1_000_000
 MAX_PATHS_PER_SIGNAL = 25
@@ -115,10 +115,34 @@ def safe_run(args: list[str], cwd: Path, timeout: float = 5.0) -> tuple[int, str
         return 127, "", str(exc)
 
 
-# Neutralises the fsmonitor and hook execution points. It does not stop every config-driven
-# command: `git status` below can still run a filter driver that the repository's own config
-# defines and its attributes select (SECURITY.md; risk register R20).
+# Neutralises the fsmonitor and hook execution points for every git call. `git status` can
+# also run a filter driver that the repository's own config defines and its attributes select,
+# so git_info blanks every repository-scope driver first (repo_filter_drivers) and skips
+# submodules (SECURITY.md; risk register R20).
 GIT_HARDENING = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
+FILTER_KEY_RE = re.compile(r"^filter\.(.+)\.[^.]+$")
+
+
+def repo_filter_drivers(root: Path) -> tuple[list[str] | None, str | None]:
+    """Names of the filter drivers the repository's own config defines (local and worktree
+    scope, following includes), or (None, reason) when they cannot all be neutralised with
+    `-c`: git splits `-c name=value` at the first `=`, so a driver named `a=b` would survive."""
+    names: set[str] = set()
+    for scope in ("--local", "--worktree"):
+        code, out, err = safe_run(
+            ["git", *GIT_HARDENING, "config", scope, "--includes", "--name-only", "--get-regexp", r"^filter\."],
+            root,
+        )
+        if code == 1 and not out:
+            continue  # no filter keys in this scope
+        if code != 0:
+            return None, "git config {} failed: {}".format(scope, err or code)
+        for key in out.splitlines():
+            match = FILTER_KEY_RE.match(key)
+            if not match or "=" in match.group(1):
+                return None, "repository filter driver {!r} cannot be neutralised".format(key)
+            names.add(match.group(1))
+    return sorted(names), None
 
 
 def git_info(start: Path) -> tuple[Path, dict]:
@@ -134,15 +158,32 @@ def git_info(start: Path) -> tuple[Path, dict]:
     root = Path(out).resolve()
     _, head, _ = safe_run(["git", *GIT_HARDENING, "rev-parse", "HEAD"], root)
     _, branch, _ = safe_run(["git", *GIT_HARDENING, "branch", "--show-current"], root)
-    status_code, status, _ = safe_run(["git", *GIT_HARDENING, "status", "--porcelain=v1", "--untracked-files=normal"], root)
 
-    counts: collections.Counter[str] = collections.Counter()
-    dirty = False
-    if status_code == 0:
+    drivers, skip_reason = repo_filter_drivers(root)
+    status = None
+    if drivers is not None:
+        neutralise: list[str] = []
+        for name in drivers:
+            for key, value in (("clean", ""), ("smudge", ""), ("process", ""), ("required", "false")):
+                neutralise += ["-c", "filter.{}.{}={}".format(name, key, value)]
+        status_code, out, err = safe_run(
+            ["git", *GIT_HARDENING, *neutralise, "status", "--porcelain=v1", "--untracked-files=normal",
+             "--ignore-submodules=all"],
+            root,
+        )
+        if status_code == 0:
+            status = out
+        else:
+            skip_reason = "git status failed: {}".format(err or status_code)
+
+    counts: collections.Counter[str] | None = None
+    dirty = None
+    if status is not None:
+        counts = collections.Counter()
+        dirty = False
         for line in status.splitlines():
             if len(line) >= 2:
-                code2 = line[:2]
-                counts[code2] += 1
+                counts[line[:2]] += 1
                 dirty = True
 
     return root, {
@@ -151,9 +192,11 @@ def git_info(start: Path) -> tuple[Path, dict]:
         "toplevel": str(root),
         "head": head or None,
         "branch": branch or None,
+        "status": "collected" if status is not None else "not collected",
+        "status_skip_reason": skip_reason if status is None else None,
         "dirty": dirty,
-        "status_entry_count": sum(counts.values()),
-        "status_code_counts": dict(sorted(counts.items())),
+        "status_entry_count": sum(counts.values()) if counts is not None else None,
+        "status_code_counts": dict(sorted(counts.items())) if counts is not None else None,
     }
 
 
