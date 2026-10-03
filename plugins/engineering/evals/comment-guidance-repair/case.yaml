@@ -18,6 +18,11 @@ execution:
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Agent, Edit, Write, "Bash(python3 *)"]
 graders:
+  - name: tests-ran
+    type: regex
+    target: trace
+    match: contains
+    pattern: '"type":"tool_result"[^\n]*Ran \d+ tests? in [0-9.]+s[^\n]*"parent_tool_use_id":null'
   - name: hard-repair-dispatched
     type: tool_used
     tool: Agent

@@ -173,9 +173,9 @@ A `regex` grader with `target: trace` sees the whole trace as compact JSON, one 
 a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's carry `null`.
 `comment-guidance-plan` uses that: `bulk-implementer-instructed` requires at least two
 `bulk-implementer` dispatches to carry the no-build/no-test instruction, and `no-worker-test-command`
-fails the case if a subagent's own Bash call, run or denied, contains `unittest`, `pytest`,
-`node --test`, `npm test`, `py_compile`, `eslint`, or `git commit`. Other forms (a test file run
-directly, another linter) pass it, and no measured worker has made a Bash call yet, so it has not
+fails the case if a subagent's own Bash call, run or denied, invokes `-m unittest`, `-m pytest`,
+`-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`, or `git commit` (reading a file
+such as `pytest.ini` does not count). Other forms (a test file run directly, another linter) pass it, and no measured worker has made a Bash call yet, so it has not
 been exercised on a real violation.
 
 Prerequisites: Claude Code >= 2.1.273, verified locally for `--keep-temp` support; on Linux the

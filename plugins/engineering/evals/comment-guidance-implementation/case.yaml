@@ -21,6 +21,11 @@ execution:
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill, Edit, Write, "Bash(python3 *)"]
 graders:
+  - name: tests-ran
+    type: regex
+    target: trace
+    match: contains
+    pattern: '"type":"tool_result"[^\n]*Ran \d+ tests? in [0-9.]+s[^\n]*"parent_tool_use_id":null'
   - name: implementation-loop-fired
     type: tool_used
     tool: Skill
