@@ -32,11 +32,11 @@ Before collecting evidence, establish as much of the following as the available 
 If the user does not specify an exposure, use the current working tree as the **source candidate under review**, but do not invent a deployable artifact or production operating envelope; record those as unknown and judge only what the available evidence supports.
 
 ## Collect deterministic repository signals
-When Python 3 is available, run the bundled read-only probe before deep inspection:
+When Python 3 is available, run the bundled read-only probe before deep inspection, as its own Bash call, exactly as written:
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/scripts/repo_probe.py" "${CLAUDE_PROJECT_DIR}"
 ```
-If unavailable, continue without it; the probe is a discovery aid, not readiness evidence by itself. Read the files it identifies, corroborate important claims, and then inspect whatever each rubric gate's "Look for" list names that the probe did not surface.
+Do not chain other commands onto it: it already reports the git HEAD, branch, and working-tree status using hardened git settings. Run any further `git` command as a separate call from the repository root, without `-C`. If the probe is unavailable or its call is denied, continue without it; the probe is a discovery aid, not readiness evidence by itself. Read the files it identifies, corroborate important claims, and then inspect whatever each rubric gate's "Look for" list names that the probe did not surface.
 
 For large repositories, dispatch read-only evidence collection in one batch and keep gate synthesis and the final verdict with the primary auditor:
 - `engineering:scout`: locate test, CI, deployment, migration, operations, observability, and security files the probe did not surface, returning paths only.
