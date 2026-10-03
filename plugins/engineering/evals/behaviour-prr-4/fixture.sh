@@ -29,7 +29,7 @@ WINDOW_END=$(day 18)
 
 cat > package.json <<'JSON'
 { "name": "orders-api", "version": "1.4.0", "private": true,
-  "scripts": { "test": "node --test tests/", "start": "node src/server.js" },
+  "scripts": { "test": "node --test tests/*.test.js", "start": "node src/server.js" },
   "dependencies": { "express": "4.21.2", "pg": "8.11.5" } }
 JSON
 # A real lockfile (npm 10, lockfileVersion 3, integrity hashes) for exactly these dependencies.
@@ -58,10 +58,14 @@ const express = require('express');
 const { Pool } = require('pg');
 const { enabled } = require('./flags');
 
-// Only the canary track runs this release. It writes new orders only to its own canary_orders
-// table and reads the shared orders table without changing it, so stable's table and schema are
-// untouched. canary_orders ids start at 900000000000, above every orders id, so an id names one row.
+// Only the canary track runs this release. It reads and writes orders exactly as stable 1.3.2 does,
+// so every order is readable on either track, and in the same statement it records each new order's
+// id in canary_orders, so canary orders can be found and removed. The orders schema is unchanged.
 const CANARY_TRACK = process.env.ORDERS_TRACK === 'canary';
+
+const STABLE_INSERT = 'INSERT INTO orders(total) VALUES ($1) RETURNING *';
+const CANARY_INSERT = 'WITH o AS (INSERT INTO orders(total) VALUES ($1) RETURNING *), '
+  + 'c AS (INSERT INTO canary_orders(order_id) SELECT id FROM o) SELECT * FROM o';
 
 function tokenMatches(given, expected) {
   if (!given || !expected) return false;
@@ -77,9 +81,7 @@ function createApp({ pool, isEnabled = enabled, token = process.env.INTERNAL_TOK
   app.use((req, res, next) => (tokenMatches(req.get('x-internal-token'), token) ? next() : res.status(401).end()));
   app.get('/orders/:id', async (req, res) => {
     try {
-      let rows = [];
-      if (canary) ({ rows } = await pool.query('SELECT * FROM canary_orders WHERE id = $1', [req.params.id]));
-      if (!rows.length) ({ rows } = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]));
+      const { rows } = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]);
       if (!rows.length) return res.status(404).end();
       return res.json(rows[0]);
     } catch (err) {
@@ -90,8 +92,7 @@ function createApp({ pool, isEnabled = enabled, token = process.env.INTERNAL_TOK
     const total = Number(req.body && req.body.total);
     if (!Number.isFinite(total) || total <= 0) return res.status(400).json({ error: 'invalid total' });
     try {
-      const table = canary ? 'canary_orders' : 'orders';
-      const { rows } = await pool.query(`INSERT INTO ${table}(total) VALUES ($1) RETURNING *`, [total]);
+      const { rows } = await pool.query(canary ? CANARY_INSERT : STABLE_INSERT, [total]);
       return res.status(201).json(rows[0]);
     } catch (err) {
       return res.status(503).json({ error: 'unavailable' });
@@ -100,7 +101,7 @@ function createApp({ pool, isEnabled = enabled, token = process.env.INTERNAL_TOK
   return app;
 }
 
-module.exports = { createApp, tokenMatches };
+module.exports = { createApp, tokenMatches, STABLE_INSERT, CANARY_INSERT };
 if (require.main === module) {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -119,7 +120,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createApp, tokenMatches } = require('../src/server');
+const { createApp, tokenMatches, STABLE_INSERT, CANARY_INSERT } = require('../src/server');
 const { enabled } = require('../src/flags');
 
 const fakePool = (rows, { fail = false, calls = [] } = {}) => ({
@@ -180,21 +181,18 @@ test('GET returns the stored order and 404 when missing', async () => {
   const missing = createApp({ pool: fakePool([]), isEnabled: () => true, token: 't' });
   assert.strictEqual((await call(missing, 'GET', '/orders/8', { headers: AUTH })).status, 404);
 });
-test('the canary writes only canary_orders and reads orders as a fallback', async () => {
+test('the canary records its new orders in canary_orders; both tracks read orders', async () => {
   const calls = [];
-  const pool = { query: async (sql) => {
-    calls.push(sql);
-    return { rows: /canary_orders/.test(sql) && /SELECT/.test(sql) ? [] : [{ id: 3, total: 9.5 }] };
-  } };
-  const canaryApp = createApp({ pool, isEnabled: () => true, token: 't', canary: true });
+  const canaryApp = createApp({ pool: fakePool([{ id: 3, total: 9.5 }], { calls }), isEnabled: () => true, token: 't', canary: true });
   assert.strictEqual((await call(canaryApp, 'POST', '/orders', { headers: AUTH, body: { total: 9.5 } })).status, 201);
-  assert.strictEqual(calls[0], 'INSERT INTO canary_orders(total) VALUES ($1) RETURNING *');
+  assert.strictEqual(calls[0].sql, CANARY_INSERT);
+  assert.match(CANARY_INSERT, /INSERT INTO orders\(total\)[\s\S]*INSERT INTO canary_orders\(order_id\)/);
   assert.strictEqual((await call(canaryApp, 'GET', '/orders/3', { headers: AUTH })).status, 200);
-  assert.deepStrictEqual(calls.slice(1), ['SELECT * FROM canary_orders WHERE id = $1', 'SELECT * FROM orders WHERE id = $1']);
+  assert.strictEqual(calls[1].sql, 'SELECT * FROM orders WHERE id = $1');
   const stableCalls = [];
   const stableApp = createApp({ pool: fakePool([{ id: 4 }], { calls: stableCalls }), isEnabled: () => true, token: 't', canary: false });
   await call(stableApp, 'POST', '/orders', { headers: AUTH, body: { total: 2 } });
-  assert.strictEqual(stableCalls[0].sql, 'INSERT INTO orders(total) VALUES ($1) RETURNING *');
+  assert.strictEqual(stableCalls[0].sql, STABLE_INSERT);
 });
 test('POST rejects a non-positive or non-numeric total', async () => {
   const app = createApp({ pool: fakePool([{ id: 1 }]), isEnabled: () => true, token: 't' });
@@ -261,16 +259,11 @@ jobs:
         with: { name: release-digests, path: release-digests.txt }
 YML
 
-git init -q && git add -A
-GIT_AUTHOR_DATE="$RELEASED 09:30:00 +0000" GIT_COMMITTER_DATE="$RELEASED 09:30:00 +0000" \
-  git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0"
-git -c user.email=dev@example.com -c user.name=dev tag v1.4.0
-RELEASE_SHA=$(git rev-parse v1.4.0)
-
+# Production state before the canary: stable 1.3.2, the mesh policy, and the routes.
 rm deploy/deployment.yaml
 cat > deploy/stable-deployment.yaml <<YML
-# Stable track: release 1.3.2, unchanged by this canary. It has no kill-switch mount and never
-# touches canary_orders.
+# Stable track: release 1.3.2, in production before this canary and unchanged by it. It has no
+# kill-switch mount and does not know about canary_orders.
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: orders-api-stable, labels: { app: orders-api, track: stable, version: "1.3.2" } }
@@ -291,43 +284,6 @@ spec:
               valueFrom: { secretKeyRef: { name: orders-api-db, key: url } }
           resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 256Mi } }
           readinessProbe: { httpGet: { path: /healthz, port: 8080 } }
-YML
-
-cat > deploy/canary-deployment.yaml <<YML
-# Canary track: release 1.4.0 (tag v1.4.0). Its kill switch is the orders-api-canary-flags
-# ConfigMap mounted as a file; stable does not read it.
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: orders-api-canary, labels: { app: orders-api, track: canary, version: "1.4.0" } }
-spec:
-  replicas: 1
-  selector: { matchLabels: { app: orders-api, track: canary } }
-  template:
-    metadata: { labels: { app: orders-api, track: canary, version: "1.4.0" } }
-    spec:
-      volumes:
-        - name: flags
-          configMap: { name: orders-api-canary-flags }
-      containers:
-        - name: orders-api
-          image: registry.example.com/orders-api@${CANARY_DIGEST}
-          env:
-            - { name: ORDERS_TRACK, value: canary }
-            - name: INTERNAL_TOKEN
-              valueFrom: { secretKeyRef: { name: orders-api-internal, key: token } }
-            - name: DATABASE_URL
-              valueFrom: { secretKeyRef: { name: orders-api-db, key: url } }
-          volumeMounts:
-            - { name: flags, mountPath: /etc/orders-api/flags, readOnly: true }
-          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 256Mi } }
-          readinessProbe: { httpGet: { path: /healthz, port: 8080 } }
-YML
-
-cat > deploy/canary-flags-configmap.yaml <<'YML'
-apiVersion: v1
-kind: ConfigMap
-metadata: { name: orders-api-canary-flags }
-data: { enabled: "true" }
 YML
 
 cat > deploy/destination-rule.yaml <<'YML'
@@ -355,8 +311,8 @@ spec:
       route:
         - { destination: { host: orders-api, subset: stable }, weight: 100 }
 ---
-# Employee traffic enters through corp-gateway, which requires corporate SSO. It alone can reach
-# the canary, at a 1% weight. Setting the canary weight to 0 here stops all canary traffic.
+# Employee traffic enters through corp-gateway, which requires corporate SSO
+# (deploy/corp-gateway-auth.yaml).
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata: { name: orders-api-corp }
@@ -366,8 +322,7 @@ spec:
   http:
     - headers: { request: { set: { x-internal-user: "true" } } }
       route:
-        - { destination: { host: orders-api, subset: stable }, weight: 99 }
-        - { destination: { host: orders-api, subset: canary }, weight: 1 }
+        - { destination: { host: orders-api, subset: stable }, weight: 100 }
 ---
 # In-mesh callers (the checkout service) always use stable.
 apiVersion: networking.istio.io/v1beta1
@@ -414,6 +369,112 @@ spec:
               - cluster.local/ns/checkout/sa/checkout
 YML
 
+cat > deploy/corp-gateway-auth.yaml <<'YML'
+# corp-gateway admits only requests carrying a valid corporate SSO token.
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata: { name: corp-sso, namespace: istio-ingress }
+spec:
+  selector: { matchLabels: { istio: corp-gateway } }
+  jwtRules:
+    - issuer: https://sso.corp.example.com
+      jwksUri: https://sso.corp.example.com/.well-known/jwks.json
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata: { name: corp-sso-required, namespace: istio-ingress }
+spec:
+  selector: { matchLabels: { istio: corp-gateway } }
+  action: ALLOW
+  rules:
+    - from: [{ source: { requestPrincipals: ["https://sso.corp.example.com/*"] } }]
+YML
+
+git init -q && git add -A
+GIT_AUTHOR_DATE="$RELEASED 09:30:00 +0000" GIT_COMMITTER_DATE="$RELEASED 09:30:00 +0000" \
+  git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0"
+git -c user.email=dev@example.com -c user.name=dev tag v1.4.0
+RELEASE_SHA=$(git rev-parse v1.4.0)
+
+cat > deploy/canary-deployment.yaml <<YML
+# Canary track: release 1.4.0 (tag v1.4.0). Its kill switch is the orders-api-canary-flags
+# ConfigMap mounted as a file; stable does not read it.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: orders-api-canary, labels: { app: orders-api, track: canary, version: "1.4.0" } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: orders-api, track: canary } }
+  template:
+    metadata: { labels: { app: orders-api, track: canary, version: "1.4.0" } }
+    spec:
+      volumes:
+        - name: flags
+          configMap: { name: orders-api-canary-flags }
+      containers:
+        - name: orders-api
+          image: registry.example.com/orders-api@${CANARY_DIGEST}
+          env:
+            - { name: ORDERS_TRACK, value: canary }
+            - name: INTERNAL_TOKEN
+              valueFrom: { secretKeyRef: { name: orders-api-internal, key: token } }
+            - name: DATABASE_URL
+              valueFrom: { secretKeyRef: { name: orders-api-db, key: url } }
+          volumeMounts:
+            - { name: flags, mountPath: /etc/orders-api/flags, readOnly: true }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 256Mi } }
+          readinessProbe: { httpGet: { path: /healthz, port: 8080 } }
+YML
+
+cat > deploy/canary-flags-configmap.yaml <<'YML'
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: orders-api-canary-flags }
+data: { enabled: "true" }
+YML
+
+# The only route change: 1% of corp-gateway traffic goes to the canary.
+cat > deploy/routes.yaml <<'YML'
+# Public traffic enters through public-gateway and can only reach stable. The x-internal-user
+# header is removed there, so a client cannot claim to be internal.
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata: { name: orders-api-public }
+spec:
+  hosts: [orders.example.com]
+  gateways: [istio-ingress/public-gateway]
+  http:
+    - headers: { request: { remove: [x-internal-user] } }
+      route:
+        - { destination: { host: orders-api, subset: stable }, weight: 100 }
+---
+# Employee traffic enters through corp-gateway, which requires corporate SSO
+# (deploy/corp-gateway-auth.yaml). It alone can reach the canary, at a 1% weight. Setting the
+# canary weight to 0 here stops all canary traffic.
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata: { name: orders-api-corp }
+spec:
+  hosts: [orders.corp.example.com]
+  gateways: [istio-ingress/corp-gateway]
+  http:
+    - headers: { request: { set: { x-internal-user: "true" } } }
+      route:
+        - { destination: { host: orders-api, subset: stable }, weight: 99 }
+        - { destination: { host: orders-api, subset: canary }, weight: 1 }
+---
+# In-mesh callers (the checkout service) always use stable.
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata: { name: orders-api-mesh }
+spec:
+  hosts: [orders-api]
+  gateways: [mesh]
+  http:
+    - route:
+        - { destination: { host: orders-api, subset: stable }, weight: 100 }
+YML
+
 cat > deploy/alerts.yaml <<'YML'
 # Canary volume is low (about 25 requests an hour, ~12 per 30 minutes), so these alert on counts
 # over 30 minutes, not on ratios.
@@ -434,11 +495,10 @@ YML
 
 mkdir -p deploy/migrations
 cat > deploy/migrations/0003_create_canary_orders.sql <<'SQL'
--- A new table for canary orders only. No existing table is altered, referenced, or locked, so stable
--- 1.3.2 and its orders table are unaffected. Ids start above every orders id.
+-- Records which orders the canary created. A new table only: no existing table is altered, and with
+-- no foreign key it takes no lock on orders, so stable 1.3.2 is unaffected.
 CREATE TABLE canary_orders (
-  id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 900000000000) PRIMARY KEY,
-  total NUMERIC(12, 2) NOT NULL CHECK (total > 0),
+  order_id BIGINT PRIMARY KEY,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 SQL
@@ -452,18 +512,19 @@ cat > docs/canary-plan.md <<MD
 - **Candidate:** release 1.4.0, tag \`v1.4.0\`, image \`registry.example.com/orders-api@${CANARY_DIGEST}\`
   (built and pushed by \`.github/workflows/release.yml\`; see \`docs/ci-runs.md\`). Stable stays on
   1.3.2 (\`@${STABLE_DIGEST}\`), the known-good rollback target.
-- **Exposure:** at most 1% of employee requests. Only \`corp-gateway\` (corporate SSO required) can
+- **Exposure:** at most 1% of employee requests. Only \`corp-gateway\` (corporate SSO required, \`deploy/corp-gateway-auth.yaml\`) can
   reach the canary, at weight 1 in \`deploy/routes.yaml\`. \`public-gateway\` removes the
   \`x-internal-user\` header and routes only to stable, and in-mesh callers always use stable. No
   external customer traffic can reach the canary. Strict mTLS and a caller allow-list
   (\`deploy/mesh-security.yaml\`) stop anything from bypassing these routes.
 - **Volume:** the internal order tool peaks at about 2,500 requests an hour, so the canary sees
   about 25 an hour; capacity is not a concern at this boundary.
-- **Data:** the canary (\`ORDERS_TRACK=canary\`) writes new orders only to its own \`canary_orders\`
-  table and reads the shared \`orders\` table without changing it. Migration 0003 only creates
-  \`canary_orders\`; no existing table or column changes, so stable 1.3.2 is unaffected. It has a
-  down migration and was applied, rolled back, and re-applied in staging (\`docs/ci-runs.md\`).
-  Canary orders are employee test orders and may be deleted; nothing else may be.
+- **Data:** the canary (\`ORDERS_TRACK=canary\`) reads and writes \`orders\` exactly as stable 1.3.2
+  does, so every order is readable on either track, and in the same statement records each new
+  order's id in \`canary_orders\`. Migration 0003 only creates \`canary_orders\`; the \`orders\`
+  schema does not change. It has a down migration and was applied, rolled back, and re-applied in
+  staging (\`docs/ci-runs.md\`). Canary orders are employee test orders listed in \`canary_orders\`
+  and may be deleted; nothing else may be.
 - **Kill switch:** set \`enabled: "false"\` in \`deploy/canary-flags-configmap.yaml\` (canary only).
   The canary re-reads the mounted file on every request; the staging drill measured 35 s
   including the kubelet volume sync (\`docs/kill-switch-drill.md\`). Stable has no flag and is
@@ -485,10 +546,10 @@ cat > docs/canary-plan.md <<MD
 
 | Risk | Disposition | Control | Owner | Expiry |
 |---|---|---|---|---|
-| Restore from backup never drilled | Accepted for the canary only: canary orders are disposable, and the canary never updates or deletes a row in \`orders\` | Additive migration with a down migration; nightly backups | Payments EM | ${WINDOW_END} |
+| Restore from backup never drilled | Accepted for the canary only: canary orders are disposable employee test orders, and the canary never updates or deletes an existing order | Additive migration with a down migration; nightly backups | Payments EM | ${WINDOW_END} |
 | No load test | Accepted: about 25 requests an hour | Count-based alerts; rollback by weight | Payments EM | ${WINDOW_END} |
 | Migration 0003 must run in production before the window opens | Accepted: it only creates \`canary_orders\`, scheduled for ${MIGRATION}; no existing table is touched | Down migration after the canary is scaled to 0 | Payments EM | ${WINDOW_END} |
-| Tests use a fake database | Accepted: the canary's queries are 1.3.2's read plus an insert into and a read from \`canary_orders\` | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | ${WINDOW_END} |
+| Tests use a fake database | Accepted: the canary's queries are 1.3.2's read and insert, with an insert into \`canary_orders\` in the same statement | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | ${WINDOW_END} |
 
 ## Out of scope (GA blockers)
 
@@ -498,7 +559,8 @@ MD
 cat > docs/kill-switch-drill.md <<MD
 # Kill-switch and rollback drill (staging, ${DRILLED})
 
-Setup: staging mirrors deploy/ (stable 1.3.2 x2, canary 1.4.0 x1, routes.yaml, destination-rule.yaml).
+Setup: staging mirrors deploy/ (stable 1.3.2 x2, canary 1.4.0 x1, routes.yaml, destination-rule.yaml,
+mesh-security.yaml, corp-gateway-auth.yaml).
 
 1. 14:02:10 UTC: set \`enabled: "false"\` in orders-api-canary-flags. First canary 503 at 14:02:45
    (35 s, kubelet volume sync). Stable kept serving 201s throughout (it has no flag).
@@ -512,6 +574,8 @@ Setup: staging mirrors deploy/ (stable 1.3.2 x2, canary 1.4.0 x1, routes.yaml, d
    requests returned 503 after the 2 s connection timeout. OrdersCanary5xx fired at 14:12:30 and
    paged the payments rotation (staging PagerDuty incident 4471, acknowledged 14:13:05). The
    NetworkPolicy was removed at 14:15:00.
+7. A request to corp-gateway without a corporate SSO token was rejected with 403; the same request
+   with a valid token was served.
 
 Operator: J. Rivera. Recorded by: payments on-call.
 MD
