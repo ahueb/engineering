@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 PROBE = SKILL_ROOT / "scripts" / "repo_probe.py"
@@ -518,6 +519,82 @@ class FilterDriverTests(unittest.TestCase):
             self.assertIsNone(git["dirty"])
             self.assertIsNone(git["status_entry_count"])
             self.assertIsNone(git["status_code_counts"])
+
+    def test_conditional_include_resolved_like_git_status(self) -> None:
+        # A hasconfig: condition in .git/config can match a remote URL that only config.worktree
+        # defines; git status sees both files, so the probe must resolve it the same way.
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root, "f.txt filter=evil\n")
+            _git(root, "config", "core.repositoryformatversion", "1")
+            _git(root, "config", "extensions.worktreeConfig", "true")
+            (root / ".git" / "drv.cfg").write_text(
+                '[filter "evil"]\n\tclean = "{}"\n'.format(_touch_cmd(marker)), encoding="utf-8")
+            with open(root / ".git" / "config", "a", encoding="utf-8") as f:
+                f.write('[includeIf "hasconfig:remote.*.url:https://example.invalid/*"]\n\tpath = drv.cfg\n')
+            _git(root, "config", "--worktree", "remote.r.url", "https://example.invalid/r")
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
+    def test_driver_name_with_a_line_separator_character_is_neutralised(self) -> None:
+        # Python's str.splitlines() also breaks on \x1c; git prints the name on one line.
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root, "f.txt filter=p.q\x1cfilter.r\n")
+            with open(root / ".git" / "config", "a", encoding="utf-8") as f:
+                f.write('[filter "p.q\x1cfilter.r"]\n\tclean = "{}"\n'.format(_touch_cmd(marker)))
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
+    def test_partial_clone_lazy_fetch_is_not_run(self) -> None:
+        # A missing object in a partial clone makes git status fetch it through the promisor
+        # remote, whose transport the repository configures (here remote.<name>.uploadpack).
+        with tempfile.TemporaryDirectory() as td:
+            root, marker = Path(td) / "r", Path(td) / "marker"
+            _make_repo(root, "g.txt -text\n")
+            _git(root, "config", "core.repositoryformatversion", "1")
+            _git(root, "config", "extensions.partialClone", "origin")
+            _git(root, "config", "remote.origin.url", ".")
+            _git(root, "config", "remote.origin.promisor", "true")
+            _git(root, "config", "remote.origin.uploadpack", "touch {}; git-upload-pack".format(shlex.quote(str(marker))))
+            tree = _git(root, "rev-parse", "HEAD^{tree}").stdout.strip()
+            (root / ".git" / "objects" / tree[:2] / tree[2:]).unlink()
+            subprocess.run(HARDENED_STATUS, cwd=str(root), env=NO_LOCKS_ENV, capture_output=True)
+            self.assertTrue(marker.exists(), "control: the lazy fetch did not run")
+            marker.unlink()
+            report = run_probe(root)
+            self.assertFalse(marker.exists(), "the probe let git status fetch through the repository's remote")
+            self.assertEqual("not collected", report["git"]["status"])
+            self.assertIn("partial clone", report["git"]["status_skip_reason"])
+
+    def test_unstaged_change_on_the_first_status_line_keeps_its_code(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "r"
+            _make_repo(root, "g.txt -text\n")
+            (root / "f.txt").write_text("changed\n", encoding="utf-8")
+            report = run_probe(root)
+            self.assertEqual({" M": 1}, report["git"]["status_code_counts"])
+
+    def test_unborn_head_is_reported_as_none(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "r"
+            root.mkdir()
+            _git(root, "init", "-q")
+            report = run_probe(root)
+            self.assertIsNone(report["git"]["head"])
+
+    def test_user_level_filter_driver_still_applies(self) -> None:
+        # Drivers from the user's own global config (for example git-lfs) are trusted and stay
+        # in effect, so status keeps comparing cleaned content.
+        with tempfile.TemporaryDirectory() as td:
+            root, global_config = Path(td) / "r", Path(td) / "gitconfig"
+            _make_repo(root, "f.txt filter=g\n")
+            global_config.write_text('[filter "g"]\n\tclean = sed s/b/a/\n', encoding="utf-8")
+            (root / "f.txt").write_text("b\n", encoding="utf-8")
+            with mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(global_config)}):
+                report = run_probe(root)
+            self.assertEqual("collected", report["git"]["status"])
+            self.assertFalse(report["git"]["dirty"])
 
     def test_failed_status_is_reported_not_collected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
