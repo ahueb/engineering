@@ -208,13 +208,23 @@ jobs:
         with: { node-version: 20 }
       - run: npm ci
       - run: npm test
+      - uses: docker/login-action@v3
+        with: { registry: registry.example.com, username: ${{ secrets.REGISTRY_USER }}, password: ${{ secrets.REGISTRY_TOKEN }} }
       - id: build
         run: |
           docker build -t registry.example.com/orders-api:${GITHUB_REF_NAME} .
           docker push registry.example.com/orders-api:${GITHUB_REF_NAME}
           echo "digest=$(docker inspect --format '{{index .RepoDigests 0}}' registry.example.com/orders-api:${GITHUB_REF_NAME})" >> "$GITHUB_OUTPUT"
-      - run: echo "${GITHUB_REF_NAME} ${{ steps.build.outputs.digest }} ${GITHUB_SHA}" >> release-digests.txt
+      - uses: actions/attest-build-provenance@v1
+        with: { subject-name: registry.example.com/orders-api, subject-digest: "${{ steps.build.outputs.digest }}", push-to-registry: true }
+      - run: echo "${GITHUB_REF_NAME} ${{ steps.build.outputs.digest }} ${GITHUB_SHA}" > release-digests.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: release-digests, path: release-digests.txt }
 YML
+
+git init -q && git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0"
+git -c user.email=dev@example.com -c user.name=dev tag v1.4.0
+RELEASE_SHA=$(git rev-parse v1.4.0)
 
 rm deploy/deployment.yaml
 cat > deploy/stable-deployment.yaml <<YML
@@ -383,6 +393,9 @@ YML
 
 mkdir -p deploy/migrations
 cat > deploy/migrations/0003_add_internal_flag.sql <<'SQL'
+-- Metadata-only on PostgreSQL 11+ (constant default), so no table rewrite; the lock timeout makes
+-- it give up instead of queueing behind long transactions and stalling stable traffic.
+SET lock_timeout = '2s';
 ALTER TABLE orders ADD COLUMN internal BOOLEAN NOT NULL DEFAULT false;
 SQL
 cat > deploy/migrations/0003_add_internal_flag.down.sql <<'SQL'
@@ -429,6 +442,7 @@ cat > docs/canary-plan.md <<MD
 |---|---|---|---|---|
 | Restore from backup never drilled | Accepted for the canary only: canary rows are disposable and the canary never updates or deletes rows | Additive migration with a down migration; nightly backups | Payments EM | 2026-10-20 |
 | No load test | Accepted: about 25 requests an hour | Count-based alerts; rollback by weight | Payments EM | 2026-10-20 |
+| Migration 0003 runs on the shared orders table that stable uses | Accepted: additive, metadata-only on PostgreSQL 16, \`lock_timeout\` 2 s; applied in production 2026-10-05 02:00 UTC (lowest traffic) before any canary traffic. Stable 1.3.2 reads rows with \`SELECT *\`, so its responses gain \`internal: false\`; checkout ignores unknown fields (its contract test \`orders_response_extra_fields\`) | Down migration; abort before apply if the lock is not acquired | Payments EM | 2026-10-20 |
 | Tests use a fake database | Accepted: the canary's DB calls are the same two queries as 1.3.2 plus the internal flag | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | 2026-10-20 |
 
 ## Out of scope (GA blockers)
@@ -449,6 +463,8 @@ Setup: staging mirrors deploy/ (stable 1.3.2 x2, canary 1.4.0 x1, routes.yaml, d
 4. A request to public-gateway with `x-internal-user: true` was served by stable (header removed).
 5. 50 requests from the checkout service (in mesh) all went to stable; a request from a pod
    without a sidecar was refused (strict mTLS, deploy/mesh-security.yaml).
+6. 14:10:00: forced 3 canary 500s with a staging fault flag. OrdersCanary5xx fired at 14:12:30 and
+   paged the payments rotation (staging PagerDuty incident 4471, acknowledged 14:13:05).
 
 Operator: J. Rivera. Recorded by: payments on-call.
 MD
@@ -456,8 +472,9 @@ MD
 cat > docs/ci-runs.md <<MD
 # Release evidence for v1.4.0
 
-- Release workflow run 412 on tag v1.4.0: \`npm ci\`, \`npm test\` (8 tests passed), image built and
-  pushed; recorded digest \`${CANARY_DIGEST}\`.
+- Release workflow run 412 on tag v1.4.0 (commit \`${RELEASE_SHA}\`): \`npm ci\`, \`npm test\`
+  (8 tests passed), image built and pushed, build provenance attested; the uploaded
+  \`release-digests\` artifact records digest \`${CANARY_DIGEST}\` for that commit.
 - Staging deploy 2026-09-29: migration 0003 applied, then rolled back with the down migration and
   re-applied; canary smoke test (create and read an order) passed against the staging database.
 MD
@@ -487,5 +504,4 @@ Order service for the checkout flow. Owner: payments team. Alerts: canary alerts
 `deploy/alerts.yaml`; GA alerting is not yet designed. Canary: see `docs/canary-plan.md`.
 MD
 
-git init -q && git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0: bounded 1% internal canary"
-git -c user.email=dev@example.com -c user.name=dev tag v1.4.0
+git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "deploy: canary 1.4.0 at 1%, pinned to the digest from release run 412"
