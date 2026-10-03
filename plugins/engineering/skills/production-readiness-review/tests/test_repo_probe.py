@@ -596,6 +596,54 @@ class FilterDriverTests(unittest.TestCase):
             self.assertEqual("collected", report["git"]["status"])
             self.assertFalse(report["git"]["dirty"])
 
+    def test_bare_promisor_key_skips_status(self) -> None:
+        # git reads a bare `promisor` line (no value) as true.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "r"
+            _make_repo(root, "g.txt -text\n")
+            with open(root / ".git" / "config", "a", encoding="utf-8") as f:
+                f.write('[remote "origin"]\n\turl = .\n\tpromisor\n')
+            report = run_probe(root)
+            self.assertEqual("not collected", report["git"]["status"])
+            self.assertIn("partial clone", report["git"]["status_skip_reason"])
+
+    def test_assume_unchanged_entry_is_not_reported_clean(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "r"
+            _make_repo(root, "g.txt -text\n")
+            _git(root, "update-index", "--assume-unchanged", "f.txt")
+            (root / "f.txt").write_text("changed\n", encoding="utf-8")
+            report = run_probe(root)
+            self.assertEqual("not collected", report["git"]["status"])
+            self.assertIn("assume-unchanged", report["git"]["status_skip_reason"])
+            self.assertIsNone(report["git"]["dirty"])
+
+    def test_replace_ref_does_not_hide_changes(self) -> None:
+        # A refs/replace entry for HEAD would make status compare against another commit's tree.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "r"
+            _make_repo(root, "g.txt -text\n")
+            head = _git(root, "rev-parse", "HEAD").stdout.strip()
+            (root / "f.txt").write_text("changed\n", encoding="utf-8")
+            _git(root, "add", "f.txt")
+            tree = _git(root, "write-tree").stdout.strip()
+            fake = _git(root, "commit-tree", tree, "-m", "replacement").stdout.strip()
+            _git(root, "replace", head, fake)
+            report = run_probe(root)
+            self.assertEqual(head, report["git"]["head"])
+            self.assertTrue(report["git"]["dirty"])
+
+    def test_work_tree_elsewhere_is_not_reported(self) -> None:
+        # core.worktree can point git at another directory; its status says nothing about the scan root.
+        with tempfile.TemporaryDirectory() as td:
+            root, other = Path(td) / "r", Path(td) / "other"
+            _make_repo(root, "g.txt -text\n")
+            _make_repo(other, "g.txt -text\n")
+            (root / "f.txt").write_text("changed\n", encoding="utf-8")
+            _git(root, "config", "core.worktree", str(other))
+            report = run_probe(root)
+            self.assertNotEqual("collected", report["git"].get("status"))
+
     def test_failed_status_is_reported_not_collected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "r"
@@ -603,7 +651,7 @@ class FilterDriverTests(unittest.TestCase):
             (root / ".git" / "index").write_bytes(b"not an index")
             report = run_probe(root)
             self.assertEqual("not collected", report["git"]["status"])
-            self.assertIn("git status failed", report["git"]["status_skip_reason"])
+            self.assertRegex(report["git"]["status_skip_reason"], r"git (ls-files|status) failed")
             self.assertIsNone(report["git"]["dirty"])
 
 
