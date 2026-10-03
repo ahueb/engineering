@@ -72,6 +72,8 @@ Use the following non-compensable decision rules:
 - **CONDITIONALLY READY**: no hard gate is actually failed for the **strictly bounded** exposure; remaining gaps are noncritical within that boundary and have explicit compensating controls, stop criteria, owners, and expiry/reassessment conditions where appropriate. Never use this as a softer label for a failed hard gate.
 - **NOT READY**: any applicable hard gate fails, or a material unknown prevents a defensible readiness claim for the proposed exposure.
 
+Before choosing CONDITIONALLY READY, resolve every applicable gate rated UNKNOWN for the bounded exposure: if the missing evidence is not needed for that exposure, rate the gate PASS (or N/A) for it at the evidence level you have and record the gap as a residual risk with its control, owner, and reassessment trigger; otherwise the unknown is material and the verdict is NOT READY. A CONDITIONALLY READY report never carries a `GATE Gn: UNKNOWN` line.
+
 A condition never converts a failed applicable hard gate: if any applicable hard gate is FAIL, the verdict is NOT READY regardless of bounding. A legal, safety, regulatory, privacy, or other mandatory requirement cannot be waived by a score; a formal exception is relevant only when policy permits it and the evidence identifies the authorized risk owner, scope, compensating controls, and expiry/review point. If the evidence would support a narrower exposure than requested, state that explicitly (for example, "not ready for GA; evidence may support a 1% internal canary subject to ...") rather than weakening the GA standard.
 
 ## Produce the report
