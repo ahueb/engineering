@@ -162,6 +162,9 @@ content inline), prefer a regex grader for anything mechanical, and re-check eve
 against the evidence before recording it. `comment-guidance-plan`'s
 `no-worker-test-execution` judges a `trace` focus, so when the worker dispatch falls outside the
 visible messages it returns FAIL, which its own rubric defines as unverified, not a plugin defect.
+`python3 scripts/eval_recheck.py <results-dir>/aggregate-result.json` replays every failed `llm`
+grader with a judge that must give a reason per criterion and lists disagreements as "NEEDS
+REVIEW"; it calls `claude -p` once per failure and never changes a recorded score.
 
 Prerequisites: Claude Code >= 2.1.273, verified locally for `--keep-temp` support; on Linux the
 `Bash` grants above additionally require bubblewrap and socat to be installed for the eval
