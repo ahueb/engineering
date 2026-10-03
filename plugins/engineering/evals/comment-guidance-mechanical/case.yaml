@@ -43,9 +43,10 @@ graders:
     criteria: |
       Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
       register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
-      must stay as the datasheet writes it.") is one sentence about a different concept, and it
-      must stay unchanged in full, including "our message buffer"; it is the only prose exception
-      to the rename.
+      must stay as the datasheet writes it.") is one sentence about a different concept. Its
+      hardware wording ("UART hardware buffer register", "the chip's buffer") must stay unchanged;
+      its clause "our message buffer" names the renamed concept and may read "our message buffer"
+      or "our message queue". It is the only prose exception to the rename.
       PASS only if the following holds; otherwise FAIL.
       - Ordinary prose comment and docstring occurrences of the word "buffer" have become
         "queue" (adjusted for grammar/case as appropriate).
@@ -57,9 +58,10 @@ graders:
     criteria: |
       Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
       register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
-      must stay as the datasheet writes it.") is one sentence about a different concept, and it
-      must stay unchanged in full, including "our message buffer"; it is the only prose exception
-      to the rename.
+      must stay as the datasheet writes it.") is one sentence about a different concept. Its
+      hardware wording ("UART hardware buffer register", "the chip's buffer") must stay unchanged;
+      its clause "our message buffer" names the renamed concept and may read "our message buffer"
+      or "our message queue". It is the only prose exception to the rename.
       PASS only if the following holds; otherwise FAIL.
       - The code identifier `ring_buffer` is unchanged (not renamed to `ring_queue` or similar).
   - name: prose-renamed-3
@@ -70,9 +72,10 @@ graders:
     criteria: |
       Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
       register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
-      must stay as the datasheet writes it.") is one sentence about a different concept, and it
-      must stay unchanged in full, including "our message buffer"; it is the only prose exception
-      to the rename.
+      must stay as the datasheet writes it.") is one sentence about a different concept. Its
+      hardware wording ("UART hardware buffer register", "the chip's buffer") must stay unchanged;
+      its clause "our message buffer" names the renamed concept and may read "our message buffer"
+      or "our message queue". It is the only prose exception to the rename.
       PASS only if the following holds; otherwise FAIL.
       - The string literal `"buffer overflow"` is unchanged.
   - name: hardware-sentence-unchanged
@@ -81,7 +84,7 @@ graders:
       source: file
       path: src/py/messages.py
     match: contains
-    pattern: '    # The UART hardware buffer register is 16 bytes wide; this is the chip''s buffer, not our\n    # message buffer, so its name must stay as the datasheet writes it\.'
+    pattern: '    # The UART hardware buffer register is 16 bytes wide; this is the chip''s buffer, not our\n    # message (buffer|queue), so its name must stay as the datasheet writes it\.'
   - name: exceptions-reported
     type: llm
     focus: last_message

@@ -340,7 +340,7 @@
           "path": "src/web/lint.js"
         },
         {
-          "fact": "The sentence about the UART hardware buffer register names a different concept; renaming it to queue would change its meaning, so it must be left unchanged and reported as an exception.",
+          "fact": "The sentence about the UART hardware buffer register names a different concept: its hardware wording (\"UART hardware buffer register\", \"the chip's buffer\") must stay unchanged and the sentence must be reported as an exception; its clause \"our message buffer\" names the renamed concept and may become \"our message queue\".",
           "id": "F-BUFFER-HARDWARE",
           "path": "src/py/messages.py"
         }
