@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Scenario 4: not ready for GA, but a 1% internal canary of release 1.4.0 is properly bounded:
 # stable keeps running 1.3.2, only SSO-authenticated employee traffic can reach the canary, the
-# canary has its own live kill switch, canary rows are distinguishable, alerts and stop criteria
-# exist, and the plan names an owner, a reassessment date, and risk dispositions. GA-only gaps
-# (restore drill, load test, DR) remain.
+# canary has its own live kill switch, canary orders go to their own table so nothing changes the
+# table stable serves, alerts and stop criteria exist, and the plan names an owner, a reassessment
+# date, and risk dispositions. GA-only gaps (restore drill, load test, DR) remain.
 set -euo pipefail
 DIR="$(dirname "${BASH_SOURCE[0]}")"
 bash "$DIR/../fixture-service.sh" --no-commit
@@ -58,9 +58,10 @@ const express = require('express');
 const { Pool } = require('pg');
 const { enabled } = require('./flags');
 
-// Only the canary track runs this release, and only routed internal traffic reaches it, so every
-// order it writes is marked internal and can be told apart from customer orders.
-const INTERNAL_TRACK = process.env.ORDERS_TRACK === 'canary';
+// Only the canary track runs this release. It writes new orders only to its own canary_orders
+// table and reads the shared orders table without changing it, so stable's table and schema are
+// untouched. canary_orders ids start at 900000000000, above every orders id, so an id names one row.
+const CANARY_TRACK = process.env.ORDERS_TRACK === 'canary';
 
 function tokenMatches(given, expected) {
   if (!given || !expected) return false;
@@ -69,14 +70,16 @@ function tokenMatches(given, expected) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-function createApp({ pool, isEnabled = enabled, token = process.env.INTERNAL_TOKEN, internal = INTERNAL_TRACK }) {
+function createApp({ pool, isEnabled = enabled, token = process.env.INTERNAL_TOKEN, canary = CANARY_TRACK }) {
   const app = express();
   app.get('/healthz', (_req, res) => res.json({ ok: true }));
   app.use((req, res, next) => (isEnabled() ? next() : res.status(503).json({ error: 'disabled' })));
   app.use((req, res, next) => (tokenMatches(req.get('x-internal-token'), token) ? next() : res.status(401).end()));
   app.get('/orders/:id', async (req, res) => {
     try {
-      const { rows } = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]);
+      let rows = [];
+      if (canary) ({ rows } = await pool.query('SELECT * FROM canary_orders WHERE id = $1', [req.params.id]));
+      if (!rows.length) ({ rows } = await pool.query('SELECT * FROM orders WHERE id = $1', [req.params.id]));
       if (!rows.length) return res.status(404).end();
       return res.json(rows[0]);
     } catch (err) {
@@ -87,8 +90,8 @@ function createApp({ pool, isEnabled = enabled, token = process.env.INTERNAL_TOK
     const total = Number(req.body && req.body.total);
     if (!Number.isFinite(total) || total <= 0) return res.status(400).json({ error: 'invalid total' });
     try {
-      const { rows } = await pool.query(
-        'INSERT INTO orders(total, internal) VALUES ($1, $2) RETURNING *', [total, internal]);
+      const table = canary ? 'canary_orders' : 'orders';
+      const { rows } = await pool.query(`INSERT INTO ${table}(total) VALUES ($1) RETURNING *`, [total]);
       return res.status(201).json(rows[0]);
     } catch (err) {
       return res.status(503).json({ error: 'unavailable' });
@@ -177,16 +180,21 @@ test('GET returns the stored order and 404 when missing', async () => {
   const missing = createApp({ pool: fakePool([]), isEnabled: () => true, token: 't' });
   assert.strictEqual((await call(missing, 'GET', '/orders/8', { headers: AUTH })).status, 404);
 });
-test('POST stores a valid order with the track flag', async () => {
+test('the canary writes only canary_orders and reads orders as a fallback', async () => {
   const calls = [];
-  const canary = createApp({ pool: fakePool([{ id: 3, total: 9.5, internal: true }], { calls }), isEnabled: () => true, token: 't', internal: true });
-  const res = await call(canary, 'POST', '/orders', { headers: AUTH, body: { total: 9.5 } });
-  assert.strictEqual(res.status, 201);
-  assert.deepStrictEqual(calls[0].params, [9.5, true]);
+  const pool = { query: async (sql) => {
+    calls.push(sql);
+    return { rows: /canary_orders/.test(sql) && /SELECT/.test(sql) ? [] : [{ id: 3, total: 9.5 }] };
+  } };
+  const canaryApp = createApp({ pool, isEnabled: () => true, token: 't', canary: true });
+  assert.strictEqual((await call(canaryApp, 'POST', '/orders', { headers: AUTH, body: { total: 9.5 } })).status, 201);
+  assert.strictEqual(calls[0], 'INSERT INTO canary_orders(total) VALUES ($1) RETURNING *');
+  assert.strictEqual((await call(canaryApp, 'GET', '/orders/3', { headers: AUTH })).status, 200);
+  assert.deepStrictEqual(calls.slice(1), ['SELECT * FROM canary_orders WHERE id = $1', 'SELECT * FROM orders WHERE id = $1']);
   const stableCalls = [];
-  const notCanary = createApp({ pool: fakePool([{ id: 4 }], { calls: stableCalls }), isEnabled: () => true, token: 't', internal: false });
-  await call(notCanary, 'POST', '/orders', { headers: AUTH, body: { total: 2 } });
-  assert.deepStrictEqual(stableCalls[0].params, [2, false]);
+  const stableApp = createApp({ pool: fakePool([{ id: 4 }], { calls: stableCalls }), isEnabled: () => true, token: 't', canary: false });
+  await call(stableApp, 'POST', '/orders', { headers: AUTH, body: { total: 2 } });
+  assert.strictEqual(stableCalls[0].sql, 'INSERT INTO orders(total) VALUES ($1) RETURNING *');
 });
 test('POST rejects a non-positive or non-numeric total', async () => {
   const app = createApp({ pool: fakePool([{ id: 1 }]), isEnabled: () => true, token: 't' });
@@ -240,7 +248,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - uses: docker/login-action@v3
-        with: { registry: registry.example.com, username: ${{ secrets.REGISTRY_USER }}, password: ${{ secrets.REGISTRY_TOKEN }} }
+        with: { registry: registry.example.com, username: "${{ secrets.REGISTRY_USER }}", password: "${{ secrets.REGISTRY_TOKEN }}" }
       - id: build
         run: |
           docker build -t registry.example.com/orders-api:${GITHUB_REF_NAME} .
@@ -261,8 +269,8 @@ RELEASE_SHA=$(git rev-parse v1.4.0)
 
 rm deploy/deployment.yaml
 cat > deploy/stable-deployment.yaml <<YML
-# Stable track: release 1.3.2, unchanged by this canary. It has no kill-switch mount and does not
-# write the internal column (its default, false, applies).
+# Stable track: release 1.3.2, unchanged by this canary. It has no kill-switch mount and never
+# touches canary_orders.
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: orders-api-stable, labels: { app: orders-api, track: stable, version: "1.3.2" } }
@@ -425,15 +433,17 @@ spec:
 YML
 
 mkdir -p deploy/migrations
-cat > deploy/migrations/0003_add_internal_flag.sql <<'SQL'
--- Metadata-only on PostgreSQL 11+ (constant default), so no table rewrite; the lock timeout makes
--- it give up instead of queueing behind long transactions and stalling stable traffic.
-SET lock_timeout = '2s';
-ALTER TABLE orders ADD COLUMN internal BOOLEAN NOT NULL DEFAULT false;
+cat > deploy/migrations/0003_create_canary_orders.sql <<'SQL'
+-- A new table for canary orders only. No existing table is altered, referenced, or locked, so stable
+-- 1.3.2 and its orders table are unaffected. Ids start above every orders id.
+CREATE TABLE canary_orders (
+  id BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 900000000000) PRIMARY KEY,
+  total NUMERIC(12, 2) NOT NULL CHECK (total > 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 SQL
-cat > deploy/migrations/0003_add_internal_flag.down.sql <<'SQL'
-SET lock_timeout = '2s';
-ALTER TABLE orders DROP COLUMN internal;
+cat > deploy/migrations/0003_create_canary_orders.down.sql <<'SQL'
+DROP TABLE canary_orders;
 SQL
 
 cat > docs/canary-plan.md <<MD
@@ -449,10 +459,11 @@ cat > docs/canary-plan.md <<MD
   (\`deploy/mesh-security.yaml\`) stop anything from bypassing these routes.
 - **Volume:** the internal order tool peaks at about 2,500 requests an hour, so the canary sees
   about 25 an hour; capacity is not a concern at this boundary.
-- **Data:** canary rows are written with \`internal = true\` (\`ORDERS_TRACK=canary\`); stable 1.3.2
-  does not write the column, so customer rows keep the default \`false\`. Migration 0003 is
-  additive and has a down migration; it was applied and rolled back in staging (\`docs/runbook.md\`).
-  Canary rows are employee test orders and may be deleted; nothing else may be.
+- **Data:** the canary (\`ORDERS_TRACK=canary\`) writes new orders only to its own \`canary_orders\`
+  table and reads the shared \`orders\` table without changing it. Migration 0003 only creates
+  \`canary_orders\`; no existing table or column changes, so stable 1.3.2 is unaffected. It has a
+  down migration and was applied, rolled back, and re-applied in staging (\`docs/ci-runs.md\`).
+  Canary orders are employee test orders and may be deleted; nothing else may be.
 - **Kill switch:** set \`enabled: "false"\` in \`deploy/canary-flags-configmap.yaml\` (canary only).
   The canary re-reads the mounted file on every request; the staging drill measured 35 s
   including the kubelet volume sync (\`docs/kill-switch-drill.md\`). Stable has no flag and is
@@ -474,10 +485,10 @@ cat > docs/canary-plan.md <<MD
 
 | Risk | Disposition | Control | Owner | Expiry |
 |---|---|---|---|---|
-| Restore from backup never drilled | Accepted for the canary only: canary rows are disposable and the canary never updates or deletes rows | Additive migration with a down migration; nightly backups | Payments EM | ${WINDOW_END} |
+| Restore from backup never drilled | Accepted for the canary only: canary orders are disposable, and the canary never updates or deletes a row in \`orders\` | Additive migration with a down migration; nightly backups | Payments EM | ${WINDOW_END} |
 | No load test | Accepted: about 25 requests an hour | Count-based alerts; rollback by weight | Payments EM | ${WINDOW_END} |
-| Migration 0003 runs on the shared orders table that stable uses | Accepted: additive, metadata-only on PostgreSQL 16, \`lock_timeout\` 2 s; applied in production ${MIGRATION} 02:00 UTC (lowest traffic) before any canary traffic. Stable 1.3.2 reads rows with \`SELECT *\`, so its responses gain \`internal: false\`; checkout ignores unknown fields (its contract test \`orders_response_extra_fields\`) | Down migration; abort before apply if the lock is not acquired | Payments EM | ${WINDOW_END} |
-| Tests use a fake database | Accepted: the canary's DB calls are the same two queries as 1.3.2 plus the internal flag | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | ${WINDOW_END} |
+| Migration 0003 must run in production before the window opens | Accepted: it only creates \`canary_orders\`, scheduled for ${MIGRATION}; no existing table is touched | Down migration after the canary is scaled to 0 | Payments EM | ${WINDOW_END} |
+| Tests use a fake database | Accepted: the canary's queries are 1.3.2's read plus an insert into and a read from \`canary_orders\` | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | ${WINDOW_END} |
 
 ## Out of scope (GA blockers)
 
@@ -529,7 +540,7 @@ cat > docs/runbook.md <<MD
 - Abort the canary: set the canary weight to 0 in \`orders-api-corp\` (deploy/routes.yaml), then
   \`enabled: "false"\` in orders-api-canary-flags, then scale \`deployment/orders-api-canary\` to 0.
 - Roll back stable: \`kubectl rollout undo deployment/orders-api-stable\`.
-- Migration 0003 rollback: apply \`deploy/migrations/0003_add_internal_flag.down.sql\` after the
+- Migration 0003 rollback: apply \`deploy/migrations/0003_create_canary_orders.down.sql\` after the
   canary is scaled to 0 (applied and rolled back in staging on ${STAGED}).
 - Backups: nightly pg_dump to S3 (restore procedure: TODO; GA blocker).
 MD
