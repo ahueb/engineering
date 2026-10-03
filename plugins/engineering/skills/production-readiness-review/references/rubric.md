@@ -312,7 +312,7 @@ Hazards, regulatory constraints, scientific/numerical validity, accessibility, a
 
 ## Conditions
 
-Record for each condition attached to a CONDITIONALLY READY verdict: exact exposure boundary; compensating control; stop/rollback trigger; accountable owner; expiry or reassessment event.
+Record for each condition attached to a CONDITIONALLY READY verdict: exact exposure boundary; compensating control; stop/rollback trigger; accountable owner; expiry or reassessment event. Record each pre-launch check (production state that cannot be evidenced before deployment) with its accountable owner and acceptance evidence.
 See SKILL.md for the verdict, confidence, and condition-conversion decision rules.
 
 ## Final challenge

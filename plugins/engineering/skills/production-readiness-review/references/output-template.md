@@ -129,8 +129,8 @@ Order by decision impact, not convenience. For each:
 ## Gap disposition, residual risk, and bounded release conditions
 
 For every verdict, including NOT READY, give each material gap one disposition for the stated exposure:
-- **Blocks:** must close before this exposure; name the gate. A CONDITIONALLY READY report lists Blocks only for a wider exposure, such as GA.
-- **Pre-launch check** (CONDITIONALLY READY only): production state that cannot be evidenced before deployment; name the owner and the acceptance evidence. If any check fails, the verdict is NOT READY.
+- **Blocks:** must close before the exposure it names; name the gate and the exposure. Under CONDITIONALLY READY, Blocks name only a wider exposure, such as GA.
+- **Pre-launch check** (CONDITIONALLY READY only): production state that cannot be evidenced before deployment; name the owner and the acceptance evidence. If any check fails, the verdict is NOT READY. A check whose owner is unknown cannot support CONDITIONALLY READY.
 - **Acceptable with control:** could ship within this exposure once the blockers close, given the named compensating control, stop trigger, and owner.
 
 For READY/CONDITIONALLY READY, also record each accepted residual with:

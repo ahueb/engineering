@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Scenario 4: not ready for GA, but a 1% internal canary of release 1.4.0 is properly bounded:
 # stable keeps running 1.3.2, only SSO-authenticated employee traffic can reach the canary, the
-# canary has its own live kill switch, canary orders go to their own table so nothing changes the
-# table stable serves, alerts and stop criteria exist, and the plan names an owner, a reassessment
+# canary has its own live kill switch, the orders schema does not change (the canary records its
+# orders' ids in its own table), alerts and stop criteria exist, and the plan names an owner, a reassessment
 # date, and risk dispositions. GA-only gaps (restore drill, load test, DR) remain.
 set -euo pipefail
 DIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -22,7 +22,8 @@ PCI_REVIEW=$(day -60)
 RELEASED=$(day -5)
 STAGED=$(day -4)
 DRILLED=$(day -3)
-DEPLOY_COMMITTED=$(day -2)
+CANARY_COMMITTED=$(day -5)
+DOCS_COMMITTED=$(day -2)
 MIGRATION=$(day 3)
 WINDOW_START=$(day 4)
 WINDOW_END=$(day 18)
@@ -433,7 +434,7 @@ metadata: { name: orders-api-canary-flags }
 data: { enabled: "true" }
 YML
 
-# The only route change: 1% of corp-gateway traffic goes to the canary.
+# The only route change: the canary destination, at weight 0 until the window opens.
 cat > deploy/routes.yaml <<'YML'
 # Public traffic enters through public-gateway and can only reach stable. The x-internal-user
 # header is removed there, so a client cannot claim to be internal.
@@ -449,8 +450,9 @@ spec:
         - { destination: { host: orders-api, subset: stable }, weight: 100 }
 ---
 # Employee traffic enters through corp-gateway, which requires corporate SSO
-# (deploy/corp-gateway-auth.yaml). It alone can reach the canary, at a 1% weight. Setting the
-# canary weight to 0 here stops all canary traffic.
+# (deploy/corp-gateway-auth.yaml). It alone can reach the canary. The canary weight is committed
+# at 0; at window start, after migration 0003 is applied in production, on-call sets it to 1 (1% of
+# employee requests). Setting it back to 0 stops all canary traffic.
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata: { name: orders-api-corp }
@@ -460,8 +462,8 @@ spec:
   http:
     - headers: { request: { set: { x-internal-user: "true" } } }
       route:
-        - { destination: { host: orders-api, subset: stable }, weight: 99 }
-        - { destination: { host: orders-api, subset: canary }, weight: 1 }
+        - { destination: { host: orders-api, subset: stable }, weight: 100 }
+        - { destination: { host: orders-api, subset: canary }, weight: 0 }
 ---
 # In-mesh callers (the checkout service) always use stable.
 apiVersion: networking.istio.io/v1beta1
@@ -506,6 +508,10 @@ cat > deploy/migrations/0003_create_canary_orders.down.sql <<'SQL'
 DROP TABLE canary_orders;
 SQL
 
+git add -A
+GIT_AUTHOR_DATE="$CANARY_COMMITTED 16:00:00 +0000" GIT_COMMITTER_DATE="$CANARY_COMMITTED 16:00:00 +0000" \
+  git -c user.email=dev@example.com -c user.name=dev commit -qm "deploy: canary 1.4.0 at weight 0, pinned to the digest from release run 412"
+
 cat > docs/canary-plan.md <<MD
 # Canary plan: orders-api 1.4.0
 
@@ -513,7 +519,8 @@ cat > docs/canary-plan.md <<MD
   (built and pushed by \`.github/workflows/release.yml\`; see \`docs/ci-runs.md\`). Stable stays on
   1.3.2 (\`@${STABLE_DIGEST}\`), the known-good rollback target.
 - **Exposure:** at most 1% of employee requests. Only \`corp-gateway\` (corporate SSO required, \`deploy/corp-gateway-auth.yaml\`) can
-  reach the canary, at weight 1 in \`deploy/routes.yaml\`. \`public-gateway\` removes the
+  reach the canary: its weight in \`deploy/routes.yaml\` is committed at 0 and set to 1 at window
+  start, after migration 0003 is applied in production. \`public-gateway\` removes the
   \`x-internal-user\` header and routes only to stable, and in-mesh callers always use stable. No
   external customer traffic can reach the canary. Strict mTLS and a caller allow-list
   (\`deploy/mesh-security.yaml\`) stop anything from bypassing these routes.
@@ -616,5 +623,5 @@ Order service for the checkout flow. Owner: payments team. Alerts: canary alerts
 MD
 
 git add -A
-GIT_AUTHOR_DATE="$DEPLOY_COMMITTED 16:00:00 +0000" GIT_COMMITTER_DATE="$DEPLOY_COMMITTED 16:00:00 +0000" \
-  git -c user.email=dev@example.com -c user.name=dev commit -qm "deploy: canary 1.4.0 at 1%, pinned to the digest from release run 412"
+GIT_AUTHOR_DATE="$DOCS_COMMITTED 16:00:00 +0000" GIT_COMMITTER_DATE="$DOCS_COMMITTED 16:00:00 +0000" \
+  git -c user.email=dev@example.com -c user.name=dev commit -qm "docs: canary plan and staging evidence for 1.4.0"
