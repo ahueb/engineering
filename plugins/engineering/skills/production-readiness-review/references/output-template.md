@@ -126,9 +126,13 @@ Order by decision impact, not convenience. For each:
    - Acceptance evidence: what a reviewer must see to mark it resolved.
    - Owner: use known owner, otherwise `unassigned` (do not invent one).
 
-## Residual risk and bounded release conditions
+## Gap disposition, residual risk, and bounded release conditions
 
-For READY/CONDITIONALLY READY, record each material residual with:
+For every verdict, including NOT READY, give each material gap one disposition for the stated exposure:
+- **Blocks:** must close before this exposure; name the gate.
+- **Acceptable with control:** could ship within this exposure once the blockers close, given the named compensating control, stop trigger, and owner.
+
+For READY/CONDITIONALLY READY, also record each accepted residual with:
 - risk;
 - exposure boundary;
 - compensating control;
