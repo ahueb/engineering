@@ -5,4 +5,4 @@ timeout_seconds: 900
 tags: [behaviour, behaviour-readiness]
 allowed_tools: [Read, Grep, Glob]
 ---
-/engineering:production-readiness-review Review an AI-enabled service for production readiness. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
+/engineering:production-readiness-review Review an AI-enabled service for production readiness for GA to all customers. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.

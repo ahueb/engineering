@@ -49,7 +49,7 @@ Expectations:
 - Records the precise exposure boundary and rollback/stop trigger.
 - Requires explicit ownership and reassessment conditions for material residual risk.
 
-## 5. Review an AI-enabled service for production readiness. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
+## 5. Review an AI-enabled service for production readiness for GA to all customers. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
 
 **Expected:** The audit activates the AI/ML domain overlay and treats missing AI-specific evidence as material rather than declaring the system ready from generic web-service controls alone.
 
