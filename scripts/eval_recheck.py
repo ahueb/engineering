@@ -15,10 +15,12 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 
@@ -86,18 +88,26 @@ def parse_overall(text):
 
 
 def run_judge(prompt, model, claude):
-    """Send the prompt on stdin to `claude -p` with no tools; return its stdout."""
-    proc = subprocess.run(
-        [claude, "-p", "--model", model, "--tools", "", "--setting-sources", "project",
-         "--strict-mcp-config", "--no-session-persistence"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=600,
-        check=False,
-    )
-    return proc.stdout
+    """Send the prompt on stdin to `claude -p` with no tools; return its stdout.
+
+    Runs in a new private temporary directory, so no repository's project settings reach the
+    judge. When the call prints nothing, returns its exit status and stderr instead.
+    """
+    with tempfile.TemporaryDirectory(prefix="eval_recheck-") as cwd:
+        proc = subprocess.run(
+            [claude, "-p", "--model", model, "--tools", "", "--setting-sources", "project",
+             "--strict-mcp-config", "--no-session-persistence"],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=600,
+            check=False,
+            cwd=cwd,
+        )
+    if proc.stdout.strip():
+        return proc.stdout
+    return "judge printed nothing; exit {}: {}".format(proc.returncode, (proc.stderr or "").strip())
 
 
 def votes_text(votes):
@@ -112,6 +122,9 @@ def main(argv=None):
     parser.add_argument("--claude", default="claude", help="claude executable")
     parser.add_argument("--dry-run", action="store_true", help="list failed llm graders only")
     args = parser.parse_args(argv)
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="backslashreplace")  # a cp1252 console must not abort the run mid-way
     try:
         with open(args.aggregate, encoding="utf-8") as f:
             aggregate = json.load(f)
@@ -125,10 +138,15 @@ def main(argv=None):
             print("- {case} run {run} {grader}: harness {votes}".format(**dict(r, votes=votes_text(r["votes"]))))
         return 0
     claude = shutil.which(args.claude) or args.claude
+    if os.path.dirname(claude):
+        claude = os.path.abspath(claude)  # the judge runs in another directory
     disagreements = 0
     for r in records:
-        reply = run_judge(PROMPT.format(**r), args.model, claude)
-        verdict = parse_overall(reply)
+        try:
+            reply = run_judge(PROMPT.format(**r), args.model, claude)
+            verdict = parse_overall(reply)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            reply, verdict = "judge call failed: {}".format(exc), "ERROR"
         flag = " -> NEEDS REVIEW" if verdict != "FAIL" else ""
         disagreements += bool(flag)
         print("\n## {case} run {run} {grader}: harness {votes}; recheck {verdict}{flag}".format(

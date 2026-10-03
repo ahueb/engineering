@@ -20,11 +20,12 @@ Every run is a model call on your account (about 9 USD for the full suite at one
 
 ## Output-behavior (outcome-graded) cases
 
-Seven output-behavior scenarios for the audit itself (green CI is not readiness, backup
-documentation is not restore evidence, proxy-metric theater, bounded canary, AI overlay,
-multi-region falsification, CRA-scope product without a vulnerability reporting path) are
+Eight output-behavior scenarios for the audit itself (green CI is not readiness, backup
+documentation is not restore evidence, proxy-metric theater, a properly bounded canary that
+should be CONDITIONALLY READY, AI overlay, multi-region falsification, CRA-scope product without a
+vulnerability reporting path, and a canary proposal whose kill switch is never wired in) are
 described in `../skills/production-readiness-review/references/evals-behavior.md` and
-implemented as `behaviour-prr-1` … `behaviour-prr-7`. Each scaffolds its own repository (via
+implemented as `behaviour-prr-1` … `behaviour-prr-8`. Each scaffolds its own repository (via
 `fixture-service.sh` plus scenario-specific artefacts) and is graded on the report's
 machine-checkable `VERDICT:`/`GATE G<n>:` lines, a `repo-evidence` regex that requires the report
 to cite one of the paths that scenario's own `fixture.sh` creates, and an `llm` rubric judged one
@@ -147,7 +148,7 @@ reports, and two `behaviour-prr-6` reports), and PASS on a `behaviour-prr-4` rep
 one bullet 3/3 judged alone, a report whose whole rubric had drawn FAIL FAIL FAIL in the eval
 run. These diagnostic cases (2026-10-03) fed the recorded evidence through a file `focus`, not
 `last_message`. Each `llm` rubric is therefore split into one grader per bullet (`rubric`,
-`rubric-2`, ..., or `prose-renamed`, `prose-renamed-2`, ...), each with the shared ground truth,
+`rubric-2`, ...), each with the shared ground truth,
 and a case passes only when every one passes. Splitting does not make the judge reliable: on
 2026-10-03 it still failed single-bullet graders whose criterion the evidence satisfies (two
 `behaviour-prr-1` reports with all 12 gates rated, one `behaviour-prr-6` report with no E3/E4
@@ -156,15 +157,26 @@ criterion that named a function docstring the file lacks (see `RESULTS.md`). The
 `behaviour-prr-1` bullet is now the regex graders `gate-lines` and `gate-evidence`, and the repair
 bullet is reworded; `behaviour-prr-6`'s `rubric-5` is unchanged. Splitting can also drop an exception one
 bullet made to another: `comment-guidance-mechanical`'s hardware-sentence bullet is now the regex
-`hardware-sentence-unchanged`, and its other bullets state that sentence as the rename's one
-exception. Write criteria the judge can decide from the focus alone (state any before-state or plan
+`hardware-sentence-unchanged`, and its `prose-renamed` grader states that sentence as the rename's
+one exception. Write criteria the judge can decide from the focus alone (state any before-state or plan
 content inline), prefer a regex grader for anything mechanical, and re-check every `llm` FAIL
-against the evidence before recording it. `comment-guidance-plan`'s
-`no-worker-test-execution` judges a `trace` focus, so when the worker dispatch falls outside the
-visible messages it returns FAIL, which its own rubric defines as unverified, not a plugin defect.
+against the evidence before recording it. Calibrated on 2026-10-03 against 25 hand-verified
+judgments (each fed through a file focus): Sonnet 5.5 made 0 errors and Opus 5.5 made 1, so the
+suite keeps `claude-sonnet-5-5` as judge. That bounds how the judge reads a criterion, not its error
+rate in a run: judging the agent's final message (`last_message`) in eval runs, the same judge
+failed 3 of that set's 9 PASS items (the reports above), so every `llm` FAIL is still rechecked.
 `python3 scripts/eval_recheck.py <results-dir>/aggregate-result.json` replays every failed `llm`
 grader with a judge that must give a reason per criterion and lists disagreements as "NEEDS
 REVIEW"; it calls `claude -p` once per failure and never changes a recorded score.
+
+A `regex` grader with `target: trace` sees the whole trace as compact JSON, one message per line;
+a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's carry `null`.
+`comment-guidance-plan` uses that: `bulk-implementer-instructed` requires at least two
+`bulk-implementer` dispatches to carry the no-build/no-test instruction, and `no-worker-test-command`
+fails the case if a subagent's own Bash call, run or denied, contains `unittest`, `pytest`,
+`node --test`, `npm test`, `py_compile`, `eslint`, or `git commit`. Other forms (a test file run
+directly, another linter) pass it, and no measured worker has made a Bash call yet, so it has not
+been exercised on a real violation.
 
 Prerequisites: Claude Code >= 2.1.273, verified locally for `--keep-temp` support; on Linux the
 `Bash` grants above additionally require bubblewrap and socat to be installed for the eval

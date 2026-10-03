@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -132,6 +133,38 @@ class MainTests(unittest.TestCase):
         with mock.patch.object(er.subprocess, "run", return_value=reply):
             _, out, _ = self.run_main([str(self.path), "--case", "comment-guidance-*"])
         self.assertIn("recheck UNPARSED -> NEEDS REVIEW", out)
+
+    def test_judge_runs_outside_the_repository(self):
+        reply = subprocess.CompletedProcess([], 0, "OVERALL: FAIL", "")
+        with mock.patch.object(er.subprocess, "run", return_value=reply) as run:
+            self.run_main([str(self.path), "--case", "comment-guidance-*"])
+        cwd = run.call_args.kwargs["cwd"]
+        self.assertEqual(os.path.dirname(cwd), er.tempfile.gettempdir())
+        self.assertTrue(os.path.basename(cwd).startswith("eval_recheck-"))
+
+    def test_relative_claude_path_is_made_absolute(self):
+        reply = subprocess.CompletedProcess([], 0, "OVERALL: FAIL", "")
+        with mock.patch.object(er.shutil, "which", return_value=os.path.join("bin", "claude")), \
+                mock.patch.object(er.subprocess, "run", return_value=reply) as run:
+            self.run_main([str(self.path), "--case", "comment-guidance-*", "--claude", "bin/claude"])
+        self.assertEqual(run.call_args.args[0][0], os.path.abspath(os.path.join("bin", "claude")))
+
+    def test_silent_judge_reports_exit_status_and_stderr(self):
+        reply = subprocess.CompletedProcess([], 1, "", "not logged in\n")
+        with mock.patch.object(er.subprocess, "run", return_value=reply):
+            code, out, _ = self.run_main([str(self.path), "--case", "comment-guidance-*"])
+        self.assertEqual(code, 0)
+        self.assertIn("recheck UNPARSED -> NEEDS REVIEW", out)
+        self.assertIn("judge printed nothing; exit 1: not logged in", out)
+
+    def test_failed_judge_call_needs_review_and_the_run_continues(self):
+        effects = [subprocess.TimeoutExpired(["claude"], 600), FileNotFoundError("claude")]
+        with mock.patch.object(er.subprocess, "run", side_effect=effects):
+            code, out, _ = self.run_main([str(self.path), "--claude", "claude"])
+        self.assertEqual(code, 0)
+        self.assertIn("behaviour-prr-6 run 0 rubric-5: harness FAIL FAIL PASS; recheck ERROR -> NEEDS REVIEW", out)
+        self.assertIn("comment-guidance-repair run 0 rubric: harness FAIL FAIL FAIL; recheck ERROR -> NEEDS REVIEW", out)
+        self.assertIn("2 of 2 need review", out)
 
     def test_unreadable_aggregate_exits_2(self):
         bad = Path(self.tmp.name) / "bad.json"

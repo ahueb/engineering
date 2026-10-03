@@ -3,7 +3,7 @@
 Fresh-session scenarios for judging audit quality. Each needs a representative repository; grade against the expectations listed.
 
 Each scenario below is implemented as an executable, outcome-graded eval case: scenario N is
-`evals/behaviour-prr-N` (`behaviour-prr-1` … `behaviour-prr-7`), relative to the plugin root
+`evals/behaviour-prr-N` (`behaviour-prr-1` … `behaviour-prr-8`), relative to the plugin root
 (`plugins/engineering/`). Each case's `fixture.sh` builds the shared `evals/fixture-service.sh`
 orders-api repository and adds the scenario's distinguishing artefacts, and its graders check
 the report's machine-checkable `VERDICT:`/`GATE G<n>:` lines (see
@@ -42,7 +42,9 @@ Expectations:
 
 ## 4. Assess whether a service that is not ready for GA could safely run as a 1% internal canary behind a kill switch. Make the release boundary explicit.
 
-**Expected:** The audit may return CONDITIONALLY READY only for the strictly bounded canary if no hard gate fails within that boundary and explicit controls, stop criteria, owner, and reassessment/expiry are present; it must still say not ready for GA.
+**Expected:** The audit may return CONDITIONALLY READY only for the strictly bounded canary if no hard gate fails within that boundary and explicit controls, stop criteria, owner, and reassessment/expiry are present; it must still say not ready for GA. A gate it rates UNKNOWN for the canary has material evidence missing for that exposure, which the NOT READY rule covers, so it rules out CONDITIONALLY READY.
+
+The fixture is such a canary: release 1.4.0 runs as its own Deployment beside stable 1.3.2; only SSO-authenticated employee traffic through `corp-gateway` reaches it, at weight 1, behind strict mTLS and a caller allow-list; its kill switch is a canary-only ConfigMap that `src/flags.js` re-reads on every request; canary rows are marked `internal`; count-based alerts page on-call; a staging drill exercised the switch, the route, and an alert; and `docs/canary-plan.md` names stop criteria, an owner, a decision authority, a reassessment date, and a disposition for each residual risk. A restore drill, a load test, and disaster recovery remain GA blockers. Every date is relative to the day the fixture is built.
 
 Expectations:
 - Does not weaken GA criteria to obtain a conditional verdict.

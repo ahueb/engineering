@@ -11,13 +11,29 @@ bash "$DIR/../fixture-service.sh" --no-commit
 CANARY_DIGEST=sha256:4f6b2c9d0e1a7b3c5d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c
 STABLE_DIGEST=sha256:1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d
 
+# Every date is relative to the day the fixture is built, so the evidence is always a few days old
+# and the canary window always lies ahead, whenever the eval runs.
+NOW=$(date -u +%s)
+day() { # day OFFSET: the date OFFSET days from today, as YYYY-MM-DD (GNU date, else BSD date)
+  local t=$((NOW + $1 * 86400))
+  date -u -d "@$t" +%F 2>/dev/null || date -u -r "$t" +%F
+}
+PCI_REVIEW=$(day -60)
+RELEASED=$(day -5)
+STAGED=$(day -4)
+DRILLED=$(day -3)
+DEPLOY_COMMITTED=$(day -2)
+MIGRATION=$(day 3)
+WINDOW_START=$(day 4)
+WINDOW_END=$(day 18)
+
 cat > package.json <<'JSON'
 { "name": "orders-api", "version": "1.4.0", "private": true,
   "scripts": { "test": "node --test tests/", "start": "node src/server.js" },
   "dependencies": { "express": "4.21.2", "pg": "8.11.5" } }
 JSON
 # A real lockfile (npm 10, lockfileVersion 3, integrity hashes) for exactly these dependencies.
-cp "$DIR/package-lock.json" package-lock.json
+cp "$DIR/package-lock.fixture.json" package-lock.json
 
 cat > src/flags.js <<'JS'
 // Per-track kill switch. The canary Deployment mounts its own ConfigMap at /etc/orders-api/flags
@@ -183,8 +199,23 @@ test('database errors return 503 instead of crashing', async () => {
 });
 JS
 
+# Node 24 is a supported LTS line (end of life 2028-04-30); fixture-service.sh's Node 20 is not.
+cat > .github/workflows/ci.yml <<'YML'
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci
+      - run: npm test
+YML
+
 cat > Dockerfile <<'DOCKER'
-FROM node:20.17-alpine
+FROM node:24.21.0-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
@@ -201,11 +232,11 @@ on:
 jobs:
   image:
     runs-on: ubuntu-latest
-    permissions: { contents: read, packages: write, id-token: write }
+    permissions: { contents: read, packages: write, id-token: write, attestations: write }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with: { node-version: 24 }
       - run: npm ci
       - run: npm test
       - uses: docker/login-action@v3
@@ -214,7 +245,7 @@ jobs:
         run: |
           docker build -t registry.example.com/orders-api:${GITHUB_REF_NAME} .
           docker push registry.example.com/orders-api:${GITHUB_REF_NAME}
-          echo "digest=$(docker inspect --format '{{index .RepoDigests 0}}' registry.example.com/orders-api:${GITHUB_REF_NAME})" >> "$GITHUB_OUTPUT"
+          echo "digest=$(docker inspect --format '{{index .RepoDigests 0}}' registry.example.com/orders-api:${GITHUB_REF_NAME} | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v1
         with: { subject-name: registry.example.com/orders-api, subject-digest: "${{ steps.build.outputs.digest }}", push-to-registry: true }
       - run: echo "${GITHUB_REF_NAME} ${{ steps.build.outputs.digest }} ${GITHUB_SHA}" > release-digests.txt
@@ -222,7 +253,9 @@ jobs:
         with: { name: release-digests, path: release-digests.txt }
 YML
 
-git init -q && git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0"
+git init -q && git add -A
+GIT_AUTHOR_DATE="$RELEASED 09:30:00 +0000" GIT_COMMITTER_DATE="$RELEASED 09:30:00 +0000" \
+  git -c user.email=dev@example.com -c user.name=dev commit -qm "orders-api 1.4.0"
 git -c user.email=dev@example.com -c user.name=dev tag v1.4.0
 RELEASE_SHA=$(git rev-parse v1.4.0)
 
@@ -399,6 +432,7 @@ SET lock_timeout = '2s';
 ALTER TABLE orders ADD COLUMN internal BOOLEAN NOT NULL DEFAULT false;
 SQL
 cat > deploy/migrations/0003_add_internal_flag.down.sql <<'SQL'
+SET lock_timeout = '2s';
 ALTER TABLE orders DROP COLUMN internal;
 SQL
 
@@ -431,7 +465,7 @@ cat > docs/canary-plan.md <<MD
   payments on-call pager.
 - **Owner:** payments on-call rotation; canary-window primary J. Rivera. Decision authority: the
   payments engineering manager.
-- **Window and reassessment:** 2026-10-06 to 2026-10-20. Reassess on 2026-10-20 or after any stop
+- **Window and reassessment:** ${WINDOW_START} to ${WINDOW_END}. Reassess on ${WINDOW_END} or after any stop
   event, whichever comes first. Widening beyond 1% or to external users needs a new readiness review.
 - **Compliance:** orders-api stores order IDs and totals only; card data stays in payments-gateway.
   See \`docs/pci-scope.md\`.
@@ -440,31 +474,33 @@ cat > docs/canary-plan.md <<MD
 
 | Risk | Disposition | Control | Owner | Expiry |
 |---|---|---|---|---|
-| Restore from backup never drilled | Accepted for the canary only: canary rows are disposable and the canary never updates or deletes rows | Additive migration with a down migration; nightly backups | Payments EM | 2026-10-20 |
-| No load test | Accepted: about 25 requests an hour | Count-based alerts; rollback by weight | Payments EM | 2026-10-20 |
-| Migration 0003 runs on the shared orders table that stable uses | Accepted: additive, metadata-only on PostgreSQL 16, \`lock_timeout\` 2 s; applied in production 2026-10-05 02:00 UTC (lowest traffic) before any canary traffic. Stable 1.3.2 reads rows with \`SELECT *\`, so its responses gain \`internal: false\`; checkout ignores unknown fields (its contract test \`orders_response_extra_fields\`) | Down migration; abort before apply if the lock is not acquired | Payments EM | 2026-10-20 |
-| Tests use a fake database | Accepted: the canary's DB calls are the same two queries as 1.3.2 plus the internal flag | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | 2026-10-20 |
+| Restore from backup never drilled | Accepted for the canary only: canary rows are disposable and the canary never updates or deletes rows | Additive migration with a down migration; nightly backups | Payments EM | ${WINDOW_END} |
+| No load test | Accepted: about 25 requests an hour | Count-based alerts; rollback by weight | Payments EM | ${WINDOW_END} |
+| Migration 0003 runs on the shared orders table that stable uses | Accepted: additive, metadata-only on PostgreSQL 16, \`lock_timeout\` 2 s; applied in production ${MIGRATION} 02:00 UTC (lowest traffic) before any canary traffic. Stable 1.3.2 reads rows with \`SELECT *\`, so its responses gain \`internal: false\`; checkout ignores unknown fields (its contract test \`orders_response_extra_fields\`) | Down migration; abort before apply if the lock is not acquired | Payments EM | ${WINDOW_END} |
+| Tests use a fake database | Accepted: the canary's DB calls are the same two queries as 1.3.2 plus the internal flag | Wrong-total reports page on-call; staging run in \`docs/ci-runs.md\` | Payments on-call | ${WINDOW_END} |
 
 ## Out of scope (GA blockers)
 
 No restore drill, no load test, no disaster-recovery plan.
 MD
 
-cat > docs/kill-switch-drill.md <<'MD'
-# Kill-switch and rollback drill (staging, 2026-09-30)
+cat > docs/kill-switch-drill.md <<MD
+# Kill-switch and rollback drill (staging, ${DRILLED})
 
 Setup: staging mirrors deploy/ (stable 1.3.2 x2, canary 1.4.0 x1, routes.yaml, destination-rule.yaml).
 
-1. 14:02:10 UTC: set `enabled: "false"` in orders-api-canary-flags. First canary 503 at 14:02:45
+1. 14:02:10 UTC: set \`enabled: "false"\` in orders-api-canary-flags. First canary 503 at 14:02:45
    (35 s, kubelet volume sync). Stable kept serving 201s throughout (it has no flag).
-2. 14:05:00: set `enabled: "true"`; canary served 201s again at 14:05:31. No pod restart.
+2. 14:05:00: set \`enabled: "true"\`; canary served 201s again at 14:05:31. No pod restart.
 3. 14:07:00: set the canary weight to 0 in orders-api-corp; the last canary request was logged at
    14:07:03 (3 s).
-4. A request to public-gateway with `x-internal-user: true` was served by stable (header removed).
+4. A request to public-gateway with \`x-internal-user: true\` was served by stable (header removed).
 5. 50 requests from the checkout service (in mesh) all went to stable; a request from a pod
    without a sidecar was refused (strict mTLS, deploy/mesh-security.yaml).
-6. 14:10:00: forced 3 canary 500s with a staging fault flag. OrdersCanary5xx fired at 14:12:30 and
-   paged the payments rotation (staging PagerDuty incident 4471, acknowledged 14:13:05).
+6. 14:10:00: a NetworkPolicy blocked the staging canary pod's database egress, so its next 3
+   requests returned 503 after the 2 s connection timeout. OrdersCanary5xx fired at 14:12:30 and
+   paged the payments rotation (staging PagerDuty incident 4471, acknowledged 14:13:05). The
+   NetworkPolicy was removed at 14:15:00.
 
 Operator: J. Rivera. Recorded by: payments on-call.
 MD
@@ -472,29 +508,29 @@ MD
 cat > docs/ci-runs.md <<MD
 # Release evidence for v1.4.0
 
-- Release workflow run 412 on tag v1.4.0 (commit \`${RELEASE_SHA}\`): \`npm ci\`, \`npm test\`
+- Release workflow run 412 on tag v1.4.0, ${RELEASED} (commit \`${RELEASE_SHA}\`): \`npm ci\`, \`npm test\`
   (8 tests passed), image built and pushed, build provenance attested; the uploaded
   \`release-digests\` artifact records digest \`${CANARY_DIGEST}\` for that commit.
-- Staging deploy 2026-09-29: migration 0003 applied, then rolled back with the down migration and
+- Staging deploy ${STAGED}: migration 0003 applied, then rolled back with the down migration and
   re-applied; canary smoke test (create and read an order) passed against the staging database.
 MD
 
-cat > docs/pci-scope.md <<'MD'
-# PCI DSS scope (2026-08 review)
+cat > docs/pci-scope.md <<MD
+# PCI DSS scope (review of ${PCI_REVIEW})
 
 orders-api stores order IDs, totals, and timestamps. It never receives card numbers or
 authentication data; payments-gateway owns card handling and is the only service in the
-cardholder data environment. The 2026-08 scoping review by the security team placed orders-api
+cardholder data environment. The ${PCI_REVIEW} scoping review by the security team placed orders-api
 outside the CDE; no PCI requirement applies to this canary.
 MD
 
-cat > docs/runbook.md <<'MD'
+cat > docs/runbook.md <<MD
 # Orders API runbook
-- Abort the canary: set the canary weight to 0 in `orders-api-corp` (deploy/routes.yaml), then
-  `enabled: "false"` in orders-api-canary-flags, then scale `deployment/orders-api-canary` to 0.
-- Roll back stable: `kubectl rollout undo deployment/orders-api-stable`.
-- Migration 0003 rollback: apply `deploy/migrations/0003_add_internal_flag.down.sql` after the
-  canary is scaled to 0 (applied and rolled back in staging on 2026-09-29).
+- Abort the canary: set the canary weight to 0 in \`orders-api-corp\` (deploy/routes.yaml), then
+  \`enabled: "false"\` in orders-api-canary-flags, then scale \`deployment/orders-api-canary\` to 0.
+- Roll back stable: \`kubectl rollout undo deployment/orders-api-stable\`.
+- Migration 0003 rollback: apply \`deploy/migrations/0003_add_internal_flag.down.sql\` after the
+  canary is scaled to 0 (applied and rolled back in staging on ${STAGED}).
 - Backups: nightly pg_dump to S3 (restore procedure: TODO; GA blocker).
 MD
 
@@ -504,4 +540,6 @@ Order service for the checkout flow. Owner: payments team. Alerts: canary alerts
 `deploy/alerts.yaml`; GA alerting is not yet designed. Canary: see `docs/canary-plan.md`.
 MD
 
-git add -A && git -c user.email=dev@example.com -c user.name=dev commit -qm "deploy: canary 1.4.0 at 1%, pinned to the digest from release run 412"
+git add -A
+GIT_AUTHOR_DATE="$DEPLOY_COMMITTED 16:00:00 +0000" GIT_COMMITTER_DATE="$DEPLOY_COMMITTED 16:00:00 +0000" \
+  git -c user.email=dev@example.com -c user.name=dev commit -qm "deploy: canary 1.4.0 at 1%, pinned to the digest from release run 412"

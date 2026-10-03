@@ -14,14 +14,22 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 - Every multi-bullet `llm` rubric in the eval cases is split into one grader per bullet (`rubric`, `rubric-2`, ...), because the eval judge returned FAIL on whole rubrics whose every bullet it passed when judged alone (`comment-guidance-review-only`, `behaviour-prr-6`).
 - `comment-guidance-review-only` drops its `no-bash` grader, which counted refused calls to a tool the run never had, and its no-change bullet now forbids claiming any edit or proposing executable-code changes while allowing the suggested comment wording its prompt permits.
 - `comment-guidance-plan`'s `doc-contract-preserved` judges `docs/window_contract.md` against PLAN.md's interface stated inline, and `comment-guidance-implementation`'s unrelated-comments criterion states the file's pre-change comments inline, since the judge sees only the changed file; `comment-guidance-repair`'s documentation bullet names the module docstring, and `behaviour-prr-3`'s `rubric-5` states the gaps it refers to.
+- Readiness scenario 4 is now a properly bounded 1% internal canary that expects CONDITIONALLY READY (its fixture has a wired, per-track kill switch, SSO-only routing with strict mTLS, a real lockfile, a consistent release history, and dates relative to the day it is built), and scenario 5's prompt names its exposure (GA to all customers).
+- `comment-guidance-mechanical`'s hardware-sentence ground truth (F-BUFFER-HARDWARE) covers the hardware wording only; "our message buffer" may become "our message queue".
+- `comment-guidance-plan` checks worker conduct with `bulk-implementer-instructed` (two dispatches carry the no-build/no-test instruction) and `no-worker-test-command` (a full-trace regex over subagent Bash calls for a fixed list of test, build, lint, and commit commands), replacing `no-worker-test-execution`, whose judge could not see the dispatch.
+- `behaviour-prr-4`'s `gate` grader accepts only `GATE G5: PASS` (a canary's deployment gate cannot be N/A), and `comment-guidance-doc-plan`'s `no-plan-complete` also catches `PLAN_COMPLETE` at the start of a line when it is bold, backticked, indented, quoted, a list item, or a heading, or is followed by the coverage line.
+- Mechanical criteria in `comment-guidance-doc-plan`, `-mechanical`, `-repair`, `behaviour-prr-4`, and `behaviour-comment-cleanup` are regex graders, and a duplicate `behaviour-prr-7` bullet is dropped.
 - `plugins/engineering/evals/README.md` runs each read case in its own invocation so only `comment-guidance-change-review` gets `Bash(git *)`, and documents what `tool_used`, the judge, and prefix Bash grants actually do.
 
 ### Added
 
-- A `repo-evidence` regex grader on `behaviour-prr-1`..`-7`: the report must cite one of the paths its scenario's fixture creates, so an audit of an empty workspace no longer passes.
-- Regex graders for mechanical criteria: `gate-lines` and `gate-evidence` on `behaviour-prr-1` (12 `GATE` lines; an E-level on each rated gate row) replace its first rubric bullet, and `hardware-sentence-unchanged` on `comment-guidance-mechanical` replaces the bullet that kept the UART hardware sentence; the remaining `prose-renamed` graders now state that sentence as the rename's one exception.
+- A `repo-evidence` regex grader on `behaviour-prr-1`..`-8`: the report must cite one of the paths its scenario's fixture creates, so an audit of an empty workspace no longer passes.
+- Regex graders for mechanical criteria: `gate-lines` and `gate-evidence` on `behaviour-prr-1` (12 `GATE` lines; an E-level on each rated gate row) replace its first rubric bullet, and `hardware-sentence-unchanged` on `comment-guidance-mechanical` replaces the bullet that kept the UART hardware sentence; the remaining `prose-renamed` grader states that sentence as the rename's one exception.
 - `/evals/results/` in `.gitignore`, for results written when the repository root is the eval target.
-- Risk register entries R16–R19 for measured eval findings, R15 restated as a scenario-4 fixture defect, and 2026-10-02/03 rows in `plugins/engineering/evals/RESULTS.md`.
+- `no-conditional-over-unknown` on `behaviour-prr-4`: a CONDITIONALLY READY report fails if any gate line is UNKNOWN, because the skill defines a gate UNKNOWN as material evidence missing and makes a material unknown NOT READY.
+- Readiness scenario 8: the original scenario-4 canary proposal, whose kill switch is never wired in, expecting NOT READY with G5 FAIL.
+- `scripts/eval_recheck.py`, which replays failed `llm` graders with a judge that must give reasons and reports a failed judge call as NEEDS REVIEW, with unit tests run by `ci.sh` and on the Windows CI job.
+- Risk register entries R16–R19 for measured eval findings (R19 since closed; R15 restated after the scenario split), and 2026-10-02/03 rows in `plugins/engineering/evals/RESULTS.md`.
 
 ## [2.10.0] - 2026-09-16
 

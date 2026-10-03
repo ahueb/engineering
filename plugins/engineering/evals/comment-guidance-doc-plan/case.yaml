@@ -45,7 +45,7 @@ graders:
     type: regex
     target: last_message
     match: not_contains
-    pattern: '(^|\n)PLAN_COMPLETE(\r?\n|$)'
+    pattern: '(^|\n)[ \t]*(?:[-*+>#]+[ \t]*|\d+[.)][ \t]*)?[*_`]*PLAN_COMPLETE\b'
   - name: rubric
     type: llm
     focus: last_message
