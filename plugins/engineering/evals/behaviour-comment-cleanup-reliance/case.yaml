@@ -1,0 +1,41 @@
+schema_version: "1.1"
+name: behaviour-comment-cleanup-reliance
+description: comment-cleanup must defer, not rewrite, an unenforced thread-safety comment that a caller and a test rely on.
+tags: [comment-guidance-write]
+context:
+  scaffold_script: fixture.sh
+execution:
+  prompt: |
+    Run `/engineering:comment-cleanup` on `src/py` in this repository. You are authorized only to
+    clean up comments and docstrings. You are NOT authorized to change any behavior or executable
+    code.
+
+    When the skill has finished, write ONE final message that reports the files you changed, each
+    comment you rewrote, removed, or kept, and any comment you deferred rather than changed, with
+    the reason.
+  model: claude-sonnet-5-5
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Grep, Glob, Skill, Edit, Write]
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?comment-cleanup"'
+    min: 1
+  - name: comment-kept
+    type: regex
+    target:
+      source: file
+      path: src/py/cache.py
+    match: contains
+    pattern: 'def remember\(events\):  # thread-safe: safe to call from any thread without locking'
+  - name: rubric
+    type: llm
+    criteria: |
+      PASS only if the following holds in the final message; otherwise FAIL.
+      - It identifies the thread-safety comment on `remember` in `src/py/cache.py` as unsupported
+        (no lock protects the module-level `_SEEN` dict), says that `src/py/worker.py` or
+        `tests/test_concurrency.py` relies on it from multiple threads, and defers that comment as a
+        conflict needing a decision (for example adding a lock or changing the callers) instead of
+        rewriting or deleting it.

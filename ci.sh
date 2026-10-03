@@ -69,6 +69,7 @@ SHELL_FILES=(
   "$PLUGIN/evals/comment-guidance-implementation/fixture.sh" "$PLUGIN/evals/comment-guidance-plan/fixture.sh"
   "$PLUGIN/evals/comment-guidance-change-review/fixture.sh" "$PLUGIN/evals/comment-guidance-mechanical/fixture.sh"
   "$PLUGIN/evals/comment-guidance-repair/fixture.sh" "$PLUGIN/evals/comment-guidance-doc-plan/fixture.sh"
+  "$PLUGIN/evals/behaviour-comment-cleanup-reliance/fixture.sh"
 )
 BASH_FILES=()
 for f in "${SHELL_FILES[@]}"; do

@@ -21,6 +21,17 @@
       "requires_input_diff": false,
       "scenario_id": "B01"
     },
+    "behaviour-comment-cleanup-reliance": {
+      "base_files": {
+        "src/py/cache.py": "\"\"\"Shared cache of the order-event timestamps seen so far.\"\"\"\n\n_SEEN = {}\n\n\ndef remember(events):  # thread-safe: safe to call from any thread without locking\n    \"\"\"Count each event's timestamp and return how many distinct timestamps are known.\"\"\"\n    for timestamp_ns, _payload in events:\n        _SEEN[timestamp_ns] = _SEEN.get(timestamp_ns, 0) + 1\n    return len(_SEEN)\n",
+        "src/py/worker.py": "\"\"\"Fan order events out to a thread pool; every batch is recorded through the shared cache.\"\"\"\nfrom concurrent.futures import ThreadPoolExecutor\n\nfrom src.py.cache import remember\n\n\ndef record_batches(batches, workers=4):\n    \"\"\"Record every batch, each on one of `workers` pool threads.\"\"\"\n    with ThreadPoolExecutor(max_workers=workers) as pool:\n        list(pool.map(remember, batches))\n",
+        "tests/test_concurrency.py": "import unittest\n\nfrom src.py import cache\nfrom src.py.worker import record_batches\n\n\nclass ConcurrentRecordingTests(unittest.TestCase):\n    def setUp(self):\n        cache._SEEN.clear()\n\n    def test_batches_recorded_from_worker_threads(self):\n        batches = [[(t, \"p\")] for t in range(100)]\n        record_batches(batches, workers=8)\n        # Relies on remember() being safe to call from any thread, as its comment says.\n        self.assertEqual(len(cache._SEEN), 100)\n"
+      },
+      "input_overrides": {},
+      "mode": "cleanup",
+      "requires_input_diff": false,
+      "scenario_id": "B09"
+    },
     "comment-guidance-change-review": {
       "base_files": {
         "docs/authorization.md": "# Authorization contract\n\n`authorize(user, resource)` returns True only when `resource.owner_id == user[\"id\"]`.\nAdmin bypass is a separate check via `is_admin` and is not part of `authorize`.\n",

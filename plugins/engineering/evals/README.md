@@ -21,7 +21,7 @@ Negative cases pass trivially on the without-plugin arm; run them with `--ablati
 
 Run with the session default model. On a 200K-context model such as Haiku the skill listing overruns its default budget and the least-invoked skills lose their descriptions, so trigger cases fail for a reason unrelated to the description text; `settings.recommended.json` raises `skillListingBudgetFraction` to 0.02 for normal sessions, but eval runs do not read user settings (the eval sandbox loads no user settings, hooks, or other plugins).
 
-Every run is a model call on your account (about 9 USD for the full suite at one run per case). With a path target (`.` from `plugins/engineering`, or `plugins/engineering` from the repository root) raw results land in `plugins/engineering/evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`. Do not target the repository root (`claude plugin eval .` run from the root): the 2026-10-02 run that did so recorded the repository root as its suite root and wrote its results to `<repo>/evals/results/` (now also ignored). Any invocation without `--tag` or `--case` runs all 56 cases under one set of flags. Every suite below needs its own invocation, `--scaffold`, and its own grants; without `--scaffold` the workspaces are empty and the behaviour and comment-guidance results are void.
+Every run is a model call on your account (about 9 USD for the full suite at one run per case). With a path target (`.` from `plugins/engineering`, or `plugins/engineering` from the repository root) raw results land in `plugins/engineering/evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`. Do not target the repository root (`claude plugin eval .` run from the root): the 2026-10-02 run that did so recorded the repository root as its suite root and wrote its results to `<repo>/evals/results/` (now also ignored). Any invocation without `--tag` or `--case` runs all 57 cases under one set of flags. Every suite below needs its own invocation, `--scaffold`, and its own grants; without `--scaffold` the workspaces are empty and the behaviour and comment-guidance results are void.
 
 ## Output-behavior (outcome-graded) cases
 
@@ -77,11 +77,13 @@ cost far more per run, and need write grants the trigger suite does not.
 
 ## Comment-guidance suite
 
-Eight native cases (`behaviour-comment-cleanup` plus `comment-guidance-review-only`,
+Nine native cases (`behaviour-comment-cleanup` plus `comment-guidance-review-only`,
 `comment-guidance-implementation`, `comment-guidance-plan`, `comment-guidance-change-review`,
-`comment-guidance-mechanical`, `comment-guidance-repair`, `comment-guidance-doc-plan`) exercise
-comment/docstring guidance end to end: explicit cleanup, natural-language review, implementation,
-plan-execution, change-review, mechanical rename, hard-repair, and plan-auditor. Each is tagged
+`comment-guidance-mechanical`, `comment-guidance-repair`, `comment-guidance-doc-plan`, and
+`behaviour-comment-cleanup-reliance`) exercise comment/docstring guidance end to end: explicit
+cleanup, natural-language review, implementation, plan-execution, change-review, mechanical rename,
+hard-repair, plan-auditor, and a cleanup that must defer a thread-safety comment a caller and a test
+rely on. Each is tagged
 `comment-guidance-write` or `comment-guidance-read`; `behaviour-comment-cleanup` carries both
 `behaviour`/`behaviour-cleanup` and `comment-guidance-write`. Run reads and writes as separate
 invocations with separate budgets:
