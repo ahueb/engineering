@@ -1,6 +1,6 @@
 ---
 name: comment-cleanup
-description: Audit or improve code comments and docstrings within a requested scope, preserving accurate contracts, rationale, directives, and documentation consumers. Use for explicit comment or docstring review, cleanup, normalization, or documentation-drift requests. Review-only requests do not edit. Not for automatically cleaning comments during unrelated implementation or refactoring.
+description: Audit or improve code comments and docstrings within a requested scope, preserving accurate contracts, rationale, directives, and documentation consumers. Use when asked to check, review, or audit comments or docstrings for accuracy, staleness, or drift, or to clean up or normalize them. Review-only requests do not edit. Not for automatically cleaning comments during unrelated implementation or refactoring.
 argument-hint: "[path or scope, default whole repository]"
 context: fork
 agent: general-purpose

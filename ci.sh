@@ -64,6 +64,7 @@ SHELL_FILES=(
   "$HERE/ci/shims/claude-official-fail" "$HERE/ci/shims/claude-official-mutate" "$HERE/ci/shims/claude-release-ok" "$HERE/ci/shims/gh-fake"
   "$PLUGIN/evals/change-eval/plan-execution/run.sh" "$PLUGIN/evals/fixture-service.sh"
   "$PLUGIN/evals/behaviour-prr-4/fixture.sh" "$PLUGIN/evals/behaviour-prr-8/fixture.sh"
+  "$PLUGIN/evals/cleanup-trigger-01/fixture.sh"
   "$PLUGIN/evals/behaviour-comment-cleanup/fixture.sh" "$PLUGIN/evals/comment-guidance-review-only/fixture.sh"
   "$PLUGIN/evals/comment-guidance-implementation/fixture.sh" "$PLUGIN/evals/comment-guidance-plan/fixture.sh"
   "$PLUGIN/evals/comment-guidance-change-review/fixture.sh" "$PLUGIN/evals/comment-guidance-mechanical/fixture.sh"
