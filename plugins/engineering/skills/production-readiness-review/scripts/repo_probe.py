@@ -117,8 +117,8 @@ def safe_run(args: list[str], cwd: Path, timeout: float = 5.0) -> tuple[int, str
 
 # Neutralises the fsmonitor and hook execution points for every git call. `git status` can
 # also run a filter driver that the repository's own config defines and its attributes select,
-# so git_info blanks every repository-scope driver first (repo_filter_drivers) and skips
-# submodules (SECURITY.md; risk register R20).
+# so git_info blanks every repository-scope driver first (repo_filter_drivers) and never looks
+# inside a submodule's work tree (SECURITY.md; risk register R20).
 GIT_HARDENING = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
 FILTER_KEY_RE = re.compile(r"^filter\.(.+)\.[^.]+$")
 
@@ -127,8 +127,17 @@ def repo_filter_drivers(root: Path) -> tuple[list[str] | None, str | None]:
     """Names of the filter drivers the repository's own config defines (local and worktree
     scope, following includes), or (None, reason) when they cannot all be neutralised with
     `-c`: git splits `-c name=value` at the first `=`, so a driver named `a=b` would survive."""
+    # Worktree config exists only with extensions.worktreeConfig; without it `--worktree` reads
+    # the local file again, and fails outright once a linked worktree exists.
+    code, out, err = safe_run(
+        ["git", *GIT_HARDENING, "config", "--local", "--includes", "--bool", "--get", "extensions.worktreeConfig"],
+        root,
+    )
+    if code not in (0, 1):
+        return None, "git config extensions.worktreeConfig failed: {}".format(err or code)
+    scopes = ["--local", "--worktree"] if out == "true" else ["--local"]
     names: set[str] = set()
-    for scope in ("--local", "--worktree"):
+    for scope in scopes:
         code, out, err = safe_run(
             ["git", *GIT_HARDENING, "config", scope, "--includes", "--name-only", "--get-regexp", r"^filter\."],
             root,
@@ -167,8 +176,10 @@ def git_info(start: Path) -> tuple[Path, dict]:
             for key, value in (("clean", ""), ("smudge", ""), ("process", ""), ("required", "false")):
                 neutralise += ["-c", "filter.{}.{}={}".format(name, key, value)]
         status_code, out, err = safe_run(
+            # `dirty` still reports a submodule whose checked-out commit differs from the recorded
+            # one, without running git inside the submodule's work tree.
             ["git", *GIT_HARDENING, *neutralise, "status", "--porcelain=v1", "--untracked-files=normal",
-             "--ignore-submodules=all"],
+             "--ignore-submodules=dirty"],
             root,
         )
         if status_code == 0:

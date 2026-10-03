@@ -424,6 +424,35 @@ class FilterDriverTests(unittest.TestCase):
             _git(root / "sub", "config", "filter.y.clean", _touch_cmd(marker))
             self.assert_blocked(root, root / "sub" / "f.txt", marker)
 
+    def test_linked_worktree_without_extension_collects_status(self) -> None:
+        # Without extensions.worktreeConfig, `git config --worktree` exits 128 once a linked
+        # worktree exists; the probe must still collect status, from either worktree.
+        with tempfile.TemporaryDirectory() as td:
+            root, linked, marker = Path(td) / "r", Path(td) / "w", Path(td) / "marker"
+            _make_repo(root)
+            _git(root, "worktree", "add", "-q", str(linked))
+            _git(root, "config", "filter.x.clean", _touch_cmd(marker))
+            report = self.assert_blocked(root, root / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+            report = self.assert_blocked(linked, linked / "f.txt", marker)
+            self.assertEqual("collected", report["git"]["status"])
+
+    def test_submodule_commit_drift_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            sub, root, marker = Path(td) / "sub", Path(td) / "r", Path(td) / "marker"
+            _make_repo(sub, "f.txt filter=y\n")
+            _make_repo(root, "g.txt -text\n")
+            _git(root, "-c", "protocol.file.allow=always", "submodule", "-q", "add", str(sub), "sub")
+            _git(root, "commit", "-q", "-m", "add submodule")
+            (root / "sub" / "f.txt").write_text("b\n", encoding="utf-8")
+            _git(root / "sub", "commit", "-q", "-am", "move the submodule to another commit")
+            _git(root / "sub", "config", "filter.y.clean", _touch_cmd(marker))
+            _stat_dirty(root / "sub" / "f.txt")
+            report = run_probe(root)
+            self.assertFalse(marker.exists(), "the probe ran a submodule's filter")
+            self.assertEqual("collected", report["git"]["status"])
+            self.assertTrue(report["git"]["dirty"])
+
     def test_racily_clean_entry_does_not_run_filter(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root, marker = Path(td) / "r", Path(td) / "marker"
