@@ -1697,6 +1697,7 @@ s35() {
       if OUT="$(cd "$repo" && PATH="$bindir:$PATH" CLAUDE_FAKE_INSTALLED=1 CLAUDE_FAKE_LIST_VERSION="$list_version" ./release.sh tag "$new" 2>&1)"; then RC=0; else RC=$?; fi
       [ "$RC" -eq 1 ] && ok "S35 tag-mismatch ($list_version): exit 1" || bad "S35 tag-mismatch ($list_version): expected exit 1, got $RC: $OUT"
       case "$OUT" in *"reset --hard origin/main"*) ok "S35 tag-mismatch ($list_version): prints the sync steps" ;; *) bad "S35 tag-mismatch ($list_version): sync steps missing: $OUT" ;; esac
+      case "$OUT" in *"status --short"*) ok "S35 tag-mismatch ($list_version): says to check for uncommitted work first" ;; *) bad "S35 tag-mismatch ($list_version): no uncommitted-work check: $OUT" ;; esac
       case "$OUT" in *"local install updated"*) bad "S35 tag-mismatch ($list_version): claimed an update" ;; *) ok "S35 tag-mismatch ($list_version): no false update claim" ;; esac
     done
   else

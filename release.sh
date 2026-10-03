@@ -127,6 +127,7 @@ refresh_local_install() {
     return 0
   fi
   echo "local install is ${have:-unknown}, not $want. If your engineering marketplace is this folder, sync it to the release and update again:" >&2
+  echo "  git -C \"$HERE\" status --short   # commit or stash anything listed: reset --hard discards it" >&2
   echo "  git -C \"$HERE\" branch backup/pre-v$want-sync main" >&2
   echo "  git -C \"$HERE\" checkout main && git -C \"$HERE\" reset --hard origin/main" >&2
   echo "  claude plugin update engineering@engineering" >&2
