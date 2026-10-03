@@ -115,8 +115,9 @@ def safe_run(args: list[str], cwd: Path, timeout: float = 5.0) -> tuple[int, str
         return 127, "", str(exc)
 
 
-# Config-driven execution points are neutralised so a hostile .git/config in a cloned repo
-# cannot run commands through the probe (core.fsmonitor, hooks).
+# Neutralises the fsmonitor and hook execution points. It does not stop every config-driven
+# command: `git status` below can still run a filter driver that the repository's own config
+# defines and its attributes select (SECURITY.md; risk register R20).
 GIT_HARDENING = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
 
 

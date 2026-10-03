@@ -22,7 +22,7 @@ graders:
     type: regex
     target: trace
     match: contains
-    pattern: '"type":"tool_result","content":"(?!\d+\\t)(?![^"\n:]*:\d+:)(?:(?!"type":"tool_result")[^\n])*Ran \d+ tests? in [0-9.]+s'
+    pattern: '"type":"tool_result","content":"(?!\d+\\t)(?!\d+:)(?![^"\n:]*:\d+:)(?:(?!"type":"tool_result")[^\n])*Ran \d+ tests? in [0-9.]+s'
   - name: hard-repair-dispatched
     type: tool_used
     tool: Agent

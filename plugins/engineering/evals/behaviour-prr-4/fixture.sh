@@ -450,9 +450,10 @@ spec:
         - { destination: { host: orders-api, subset: stable }, weight: 100 }
 ---
 # Employee traffic enters through corp-gateway, which requires corporate SSO
-# (deploy/corp-gateway-auth.yaml). It alone can reach the canary. The canary weight is committed
-# at 0; at window start, after migration 0003 is applied in production, on-call sets it to 1 (1% of
-# employee requests). Setting it back to 0 stops all canary traffic.
+# (deploy/corp-gateway-auth.yaml). It alone can reach the canary. The weights are committed as
+# stable 100 / canary 0; at window start, after migration 0003 is applied in production, on-call sets
+# them to stable 99 / canary 1 (1% of employee requests). Setting them back to 100 / 0 stops all
+# canary traffic.
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata: { name: orders-api-corp }
@@ -519,8 +520,8 @@ cat > docs/canary-plan.md <<MD
   (built and pushed by \`.github/workflows/release.yml\`; see \`docs/ci-runs.md\`). Stable stays on
   1.3.2 (\`@${STABLE_DIGEST}\`), the known-good rollback target.
 - **Exposure:** at most 1% of employee requests. Only \`corp-gateway\` (corporate SSO required, \`deploy/corp-gateway-auth.yaml\`) can
-  reach the canary: its weight in \`deploy/routes.yaml\` is committed at 0 and set to 1 at window
-  start, after migration 0003 is applied in production. \`public-gateway\` removes the
+  reach the canary: the weights in \`deploy/routes.yaml\` are committed as stable 100 / canary 0
+  and set to stable 99 / canary 1 at window start, after migration 0003 is applied in production. \`public-gateway\` removes the
   \`x-internal-user\` header and routes only to stable, and in-mesh callers always use stable. No
   external customer traffic can reach the canary. Strict mTLS and a caller allow-list
   (\`deploy/mesh-security.yaml\`) stop anything from bypassing these routes.
@@ -536,7 +537,7 @@ cat > docs/canary-plan.md <<MD
   The canary re-reads the mounted file on every request; the staging drill measured 35 s
   including the kubelet volume sync (\`docs/kill-switch-drill.md\`). Stable has no flag and is
   unaffected.
-- **Rollback:** set the canary weight to 0 in \`orders-api-corp\` (takes effect in seconds), then the
+- **Rollback:** set the weights back to stable 100 / canary 0 in \`orders-api-corp\` (takes effect in seconds), then the
   kill switch, then scale the canary to 0.
 - **Stop criteria (any one triggers rollback):** 2 or more canary 5xx responses in 30 minutes, canary
   p99 above 500 ms over 30 minutes with at least 5 requests (both page payments on-call through
@@ -567,12 +568,12 @@ cat > docs/kill-switch-drill.md <<MD
 # Kill-switch and rollback drill (staging, ${DRILLED})
 
 Setup: staging mirrors deploy/ (stable 1.3.2 x2, canary 1.4.0 x1, routes.yaml, destination-rule.yaml,
-mesh-security.yaml, corp-gateway-auth.yaml).
+mesh-security.yaml, corp-gateway-auth.yaml) with the window weights applied: stable 99 / canary 1.
 
 1. 14:02:10 UTC: set \`enabled: "false"\` in orders-api-canary-flags. First canary 503 at 14:02:45
    (35 s, kubelet volume sync). Stable kept serving 201s throughout (it has no flag).
 2. 14:05:00: set \`enabled: "true"\`; canary served 201s again at 14:05:31. No pod restart.
-3. 14:07:00: set the canary weight to 0 in orders-api-corp; the last canary request was logged at
+3. 14:07:00: set the weights to stable 100 / canary 0 in orders-api-corp; the last canary request was logged at
    14:07:03 (3 s).
 4. A request to public-gateway with \`x-internal-user: true\` was served by stable (header removed).
 5. 50 requests from the checkout service (in mesh) all went to stable; a request from a pod
@@ -608,7 +609,7 @@ MD
 
 cat > docs/runbook.md <<MD
 # Orders API runbook
-- Abort the canary: set the canary weight to 0 in \`orders-api-corp\` (deploy/routes.yaml), then
+- Abort the canary: set the weights to stable 100 / canary 0 in \`orders-api-corp\` (deploy/routes.yaml), then
   \`enabled: "false"\` in orders-api-canary-flags, then scale \`deployment/orders-api-canary\` to 0.
 - Roll back stable: \`kubectl rollout undo deployment/orders-api-stable\`.
 - Migration 0003 rollback: apply \`deploy/migrations/0003_create_canary_orders.down.sql\` after the
