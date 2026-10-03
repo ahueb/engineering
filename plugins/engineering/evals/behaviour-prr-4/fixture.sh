@@ -27,6 +27,7 @@ DOCS_COMMITTED=$(day -2)
 MIGRATION=$(day 3)
 WINDOW_START=$(day 4)
 WINDOW_END=$(day 18)
+WINDOW_MID=$(day 11)
 
 cat > package.json <<'JSON'
 { "name": "orders-api", "version": "1.4.0", "private": true,
@@ -509,6 +510,34 @@ cat > deploy/migrations/0003_create_canary_orders.down.sql <<'SQL'
 DROP TABLE canary_orders;
 SQL
 
+cat > deploy/canary-rbac.yaml <<'YML'
+# The payments on-call group can stop the canary in production and nothing more: patch the corp
+# route weights and the canary's kill-switch ConfigMap, and scale the canary Deployment.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: { name: orders-api-canary-operator }
+rules:
+  - apiGroups: [networking.istio.io]
+    resources: [virtualservices]
+    resourceNames: [orders-api-corp]
+    verbs: [get, patch]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [orders-api-canary-flags]
+    verbs: [get, patch]
+  - apiGroups: [apps]
+    resources: [deployments/scale]
+    resourceNames: [orders-api-canary]
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: { name: orders-api-canary-operator }
+subjects:
+  - { kind: Group, name: payments-oncall, apiGroup: rbac.authorization.k8s.io }
+roleRef: { kind: Role, name: orders-api-canary-operator, apiGroup: rbac.authorization.k8s.io }
+YML
+
 git add -A
 GIT_AUTHOR_DATE="$CANARY_COMMITTED 16:00:00 +0000" GIT_COMMITTER_DATE="$CANARY_COMMITTED 16:00:00 +0000" \
   git -c user.email=dev@example.com -c user.name=dev commit -qm "deploy: canary 1.4.0 at weight 0, pinned to the digest from release run 412"
@@ -543,7 +572,7 @@ cat > docs/canary-plan.md <<MD
   p99 above 500 ms over 30 minutes with at least 5 requests (both page payments on-call through
   \`deploy/alerts.yaml\`), or any report of a wrong canary order total, which employees send to the
   payments on-call pager.
-- **Owner:** payments on-call rotation; canary-window primary J. Rivera. Decision authority: the
+- **Owner:** payments on-call rotation (\`docs/oncall.md\`); canary-window primary J. Rivera. Decision authority: the
   payments engineering manager.
 - **Window and reassessment:** ${WINDOW_START} to ${WINDOW_END}. Reassess on ${WINDOW_END} or after any stop
   event, whichever comes first. Widening beyond 1% or to external users needs a new readiness review.
@@ -588,12 +617,29 @@ mesh-security.yaml, corp-gateway-auth.yaml) with the window weights applied: sta
 Operator: J. Rivera. Recorded by: payments on-call.
 MD
 
+cat > docs/oncall.md <<MD
+# Payments on-call for the orders-api canary window (${WINDOW_START} to ${WINDOW_END})
+
+- Rotation: \`payments-oncall\` (PagerDuty schedule PAYMENTS-PRIMARY).
+- Window coverage: primary J. Rivera (${WINDOW_START} to ${WINDOW_MID}), then A. Okafor (${WINDOW_MID} to
+  ${WINDOW_END}); secondary for the whole window: M. Chen.
+- Escalation: the primary, then the secondary after 10 minutes, then the payments engineering
+  manager after 20 minutes.
+- Access: members of \`payments-oncall\` can patch the corp route weights and the canary's
+  kill-switch ConfigMap and scale the canary (\`deploy/canary-rbac.yaml\`, applied with the canary
+  manifests).
+- Paging: OrdersCanary5xx and OrdersCanarySlow page this rotation; the staging drill's test alert
+  paged it (\`docs/kill-switch-drill.md\`, step 6).
+MD
+
 cat > docs/ci-runs.md <<MD
 # Release evidence for v1.4.0
 
 - Release workflow run 412 on tag v1.4.0, ${RELEASED} (commit \`${RELEASE_SHA}\`): \`npm ci\`, \`npm test\`
   (8 tests passed), image built and pushed, build provenance attested; the uploaded
   \`release-digests\` artifact records digest \`${CANARY_DIGEST}\` for that commit.
+- Provenance checked ${STAGED}: \`gh attestation verify oci://registry.example.com/orders-api@${CANARY_DIGEST} --repo example/orders-api\`
+  succeeded; the attestation names \`.github/workflows/release.yml\` on tag \`v1.4.0\` at commit \`${RELEASE_SHA}\`.
 - Staging deploy ${STAGED}: migration 0003 applied, then rolled back with the down migration and
   re-applied; canary smoke test (create and read an order) passed against the staging database.
 MD
