@@ -4,6 +4,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-03
+
 ### Changed
 
 - `SECURITY.md` no longer says a hostile repository cannot execute commands through the readiness probe: its git hardening stops hooks and fsmonitor, not repository-configured filter drivers (risk register R20). The readiness skill limits further git commands to `rev-parse`, `ls-tree`, `cat-file -t/-s/-p`, and `diff-tree --no-textconv --no-ext-diff`, and says to review an untrusted local checkout in a disposable environment.
@@ -309,7 +311,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/ahueb/engineering/compare/v2.8.0...v2.9.0
