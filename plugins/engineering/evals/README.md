@@ -39,14 +39,22 @@ criterion per grader (`rubric`, `rubric-2`, ...; see "Judge" below) — no relia
 (`VERDICT: NOT READY`, gates UNKNOWN or FAIL) otherwise passes scenarios 1, 2, 3, and 7, as
 all four did on 2026-10-02. A report that names a scenario path only to say it is missing would
 still satisfy `repo-evidence`; none of 42 empty-workspace reports did.
-Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only). `Bash(git *)` also
-permits git commands that write; the skill limits itself to read-only plumbing, and no grader checks
-the workspace for changes:
+Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only). The git grants
+allow only the hardened read-only plumbing the skill uses; Claude Code matches each rule's text before
+its `*` exactly as written, and it also auto-allows plain read-only `git` forms such as `git status`
+and `git log` without any grant:
 
 ```bash
 cd plugins/engineering
 claude plugin eval . --tag behaviour-readiness --scaffold --trust-plugin --ablation none \
-  --judge-model sonnet --allow-tools Read Grep Glob "Bash(python3 *)" "Bash(git *)" --max-cost-usd 13
+  --judge-model sonnet --allow-tools Read Grep Glob "Bash(python3 *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null rev-parse *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null ls-tree *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff-tree --no-textconv --no-ext-diff *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -t *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -s *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -p *)" \
+  --max-cost-usd 13
 ```
 
 Before the skill told it to run the probe as its own call, every run on 2026-10-02 and 2026-10-03
@@ -55,7 +63,7 @@ that added `echo "exit=$?"; cd ... && git ...`; the 3 that used plain `git statu
 or `git log --stat -3 | head` ran. So the probe ran in 0/21 runs on 2026-10-02 and 3/27 on
 2026-10-03, and most reports carry no probe output.
 Since the skill runs the probe as its own call, it ran in 24/24 runs. The suite also grants
-`Bash(git *)`, so the skill can run the hardened `git -c ...` commands that tie HEAD to the tagged
+those hardened git forms, so the skill can run the hardened `git -c ...` commands that tie HEAD to the tagged
 release: with `Bash(python3 *)` alone all 28 git calls in one 24-run measurement were denied, and
 scenario 4 could not show that `src/` at HEAD matched the release.
 
