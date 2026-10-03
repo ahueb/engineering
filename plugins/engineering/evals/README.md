@@ -39,19 +39,25 @@ criterion per grader (`rubric`, `rubric-2`, ...; see "Judge" below) — no relia
 (`VERDICT: NOT READY`, gates UNKNOWN or FAIL) otherwise passes scenarios 1, 2, 3, and 7, as
 all four did on 2026-10-02. A report that names a scenario path only to say it is missing would
 still satisfy `repo-evidence`; none of 42 empty-workspace reports did.
-Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only):
+Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only). `Bash(git *)` also
+permits git commands that write; the skill limits itself to read-only plumbing, and no grader checks
+the workspace for changes:
 
 ```bash
 cd plugins/engineering
 claude plugin eval . --tag behaviour-readiness --scaffold --trust-plugin --ablation none \
-  --judge-model sonnet --allow-tools Read Grep Glob "Bash(python3 *)" --max-cost-usd 13
+  --judge-model sonnet --allow-tools Read Grep Glob "Bash(python3 *)" "Bash(git *)" --max-cost-usd 13
 ```
 
-In every run on 2026-10-02 and 2026-10-03 (48/48) the first call to the bundled `repo_probe.py`
-chained it with `git` in one Bash call. The 44 that used `git -C <dir> ...` were denied, as was one
+Before the skill told it to run the probe as its own call, every run on 2026-10-02 and 2026-10-03
+(48/48) chained the first call to the bundled `repo_probe.py` with `git` in one Bash call. The 44 that used `git -C <dir> ...` were denied, as was one
 that added `echo "exit=$?"; cd ... && git ...`; the 3 that used plain `git status --short | head`
 or `git log --stat -3 | head` ran. So the probe ran in 0/21 runs on 2026-10-02 and 3/27 on
 2026-10-03, and most reports carry no probe output.
+Since the skill runs the probe as its own call, it ran in 24/24 runs. The suite also grants
+`Bash(git *)`, so the skill can run the hardened `git -c ...` commands that tie HEAD to the tagged
+release: with `Bash(python3 *)` alone all 28 git calls in one 24-run measurement were denied, and
+scenario 4 could not show that `src/` at HEAD matched the release.
 
 `behaviour-comment-cleanup` exercises `/engineering:comment-cleanup` against a small polyglot
 repository and asserts that every protected directive comment (lint/type suppressions, build
@@ -180,8 +186,15 @@ a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's 
 `bulk-implementer` dispatches to carry the no-build/no-test instruction, and `no-worker-test-command`
 fails the case if a subagent's own Bash call, run or denied, invokes `-m unittest`, `-m pytest`,
 `-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`, or `git commit` (reading a file
-such as `pytest.ini` does not count). Other forms (a test file run directly, another linter) pass it, and no measured worker has made a Bash call yet, so it has not
-been exercised on a real violation.
+such as `pytest.ini` does not count). Other forms (a test file run directly, another linter) pass it, and it also fires on a read-only mention such as `which pytest`
+or `grep pytest`. Measured workers have made only read-only Bash calls, so it has not been exercised on a real violation.
+`tests-ran` (implementation, plan, and repair cases) looks for unittest's "Ran N tests" line in a tool result. A `Read`
+result (content starting with a line number) or a `Grep` content result (`path:line:` or, for one file,
+`line:`) does not count, so
+reading or searching a stored log such as the repair case's `failed_check.txt` does not satisfy it; printing
+the log through Bash, or a `Grep` without line numbers, still would. In the plan and implementation cases the run must be the parent's; in the
+repair case the `hard-repair` subagent's run counts. `probe-ran` (every readiness scenario) matches the readiness
+probe's own JSON output in a tool result.
 
 Prerequisites: Claude Code >= 2.1.273, verified locally for `--keep-temp` support; on Linux the
 `Bash` grants above additionally require bubblewrap and socat to be installed for the eval
