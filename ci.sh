@@ -63,6 +63,8 @@ SHELL_FILES=(
   "$PLUGIN/hooks/readonly-guard.sh" "$HERE/scripts/ci/install-claude.sh" "$HERE/.githooks/pre-push"
   "$HERE/ci/shims/claude-official-fail" "$HERE/ci/shims/claude-official-mutate" "$HERE/ci/shims/claude-release-ok" "$HERE/ci/shims/gh-fake"
   "$PLUGIN/evals/change-eval/plan-execution/run.sh" "$PLUGIN/evals/fixture-service.sh"
+  "$PLUGIN/evals/behaviour-prr-4/fixture.sh" "$PLUGIN/evals/behaviour-prr-8/fixture.sh"
+  "$PLUGIN/evals/cleanup-trigger-01/fixture.sh"
   "$PLUGIN/evals/behaviour-comment-cleanup/fixture.sh" "$PLUGIN/evals/comment-guidance-review-only/fixture.sh"
   "$PLUGIN/evals/comment-guidance-implementation/fixture.sh" "$PLUGIN/evals/comment-guidance-plan/fixture.sh"
   "$PLUGIN/evals/comment-guidance-change-review/fixture.sh" "$PLUGIN/evals/comment-guidance-mechanical/fixture.sh"
@@ -106,10 +108,10 @@ python3 -W error -m py_compile "$PRR/scripts/repo_probe.py" && ok "py_compile" |
 python3 -X dev -m unittest "$PRR/tests/test_repo_probe.py" >/dev/null 2>&1 && ok "unit tests" || bad "unit tests"
 rm -rf "$PRR/tests/__pycache__" "$PRR/scripts/__pycache__"
 
-step "scripts unit tests (merge_settings, safe_write)"
-(cd "$HERE" && python3 -W error -m py_compile scripts/merge_settings.py scripts/safe_write.py) && ok "py_compile" || bad "py_compile"
+step "scripts unit tests (merge_settings, safe_write, eval_recheck)"
+(cd "$HERE" && python3 -W error -m py_compile scripts/merge_settings.py scripts/safe_write.py scripts/eval_recheck.py) && ok "py_compile" || bad "py_compile"
 UT_TMP="$(mktemp)"
-if (cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write >"$UT_TMP" 2>&1); then
+if (cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write scripts.tests.test_eval_recheck >"$UT_TMP" 2>&1); then
   ok "unit tests"
 else
   grep -E '^(FAIL|ERROR):|Error:' "$UT_TMP" | head -20 | sed 's/^/   /' >&2

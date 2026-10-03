@@ -36,12 +36,12 @@ Do not review, build, or test any package while others are still running.
 
 1. Collect every report. Reconcile assumptions that conflict across packages by editing the affected files directly; this is expected and is cheaper than a second implementer round.
 2. Diff the working tree against the plan's file list. Any file changed outside its package's ownership is a defect to resolve now. Cap a package at roughly 15 files; split larger ones.
-3. Run one integrated verification with `/engineering:verification-loop`: build, type check, lint, then the full test suite. Launch independent checks in parallel.
+3. Run one integrated verification with `/engineering:verification-loop`: build, type check, lint, then the full test suite. A permission rule's denial of one command form does not mean every form is denied: if a permission rule (not the user) denies a command, retry it once as a single command with no redirect, pipe, or chain, invoking Python as `python3` on POSIX systems, before reporting it as not run. Launch independent checks in parallel.
 4. On failure, dispatch `engineering:test-triage` with the captured failure output (it has no Bash and will not rerun anything), then repair in the main session. Use `engineering:hard-repair` for a failure that survives two repair attempts. Rerun the exact failing check, then the full pass.
 
 ## 4. Adversarial audit
 
-Only after the integrated pass is green:
+Only after the integrated pass is green. This audit is required: the final report must state that `engineering:plan-auditor` ran and what it returned, or why it could not run.
 
 1. Dispatch in one batch: `engineering:plan-auditor` with the plan and the full diff, and `engineering:semantic-reviewer` with the diff. Add `engineering:security-reviewer` when any package touched a trust boundary.
 2. The auditor's job is to prove the plan is not done: a plan item is complete when the required repository artifact satisfies its acceptance criterion, not when the implementer reports completion. Executable-behavior claims need the corresponding implementation and verification evidence. Documentation and instruction tasks require the specified text/artifacts, working references, preserved constraints, and any applicable consumer or behavior checks; prose is not execution evidence. Every gap, partial implementation, silent scope reduction, or unverified claim is reported.

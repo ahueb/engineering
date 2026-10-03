@@ -63,7 +63,7 @@ jobs:
         run: scripts/ci/install-claude.ps1
       - name: Unit tests under dev mode
         shell: pwsh
-        run: python -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write scripts.tests.test_comment_guidance_checks
+        run: python -X dev -m unittest scripts.tests.test_merge_settings scripts.tests.test_safe_write scripts.tests.test_comment_guidance_checks scripts.tests.test_eval_recheck
       - name: Comment-guidance structure check
         shell: pwsh
         run: python scripts/comment_guidance_checks.py structure --repo .

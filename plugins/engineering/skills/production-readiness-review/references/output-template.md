@@ -126,9 +126,14 @@ Order by decision impact, not convenience. For each:
    - Acceptance evidence: what a reviewer must see to mark it resolved.
    - Owner: use known owner, otherwise `unassigned` (do not invent one).
 
-## Residual risk and bounded release conditions
+## Gap disposition, residual risk, and bounded release conditions
 
-For READY/CONDITIONALLY READY, record each material residual with:
+For every verdict, including NOT READY, give each material gap one disposition for the stated exposure:
+- **Blocks:** must close before the exposure it names; name the gate and the exposure. Under CONDITIONALLY READY, Blocks name only a wider exposure, such as GA.
+- **Pre-launch check** (CONDITIONALLY READY only): production state that exists after deployment but before any canary traffic and cannot be evidenced earlier; name the owner and the acceptance evidence. Evidence that needs live canary traffic is a stop criterion, not a pre-launch check. If any check fails, the verdict is NOT READY. A check whose owner is unknown cannot support CONDITIONALLY READY.
+- **Acceptable with control:** could ship within this exposure once the blockers close, given the named compensating control, stop trigger, and owner.
+
+For READY/CONDITIONALLY READY, also record each accepted residual with:
 - risk;
 - exposure boundary;
 - compensating control;

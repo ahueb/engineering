@@ -21,6 +21,11 @@ execution:
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill, Edit, Write, "Bash(python3 *)"]
 graders:
+  - name: tests-ran
+    type: regex
+    target: trace
+    match: contains
+    pattern: '"type":"tool_result","content":"(?!\d+\\t)(?!\d+:)(?![^"\n:]*:\d+:)(?:(?!"type":"tool_result")[^\n])*Ran \d+ tests? in [0-9.]+s[^\n]*"parent_tool_use_id":null'
   - name: implementation-loop-fired
     type: tool_used
     tool: Skill
@@ -51,14 +56,34 @@ graders:
       source: file
       path: src/py/contracts.py
     criteria: |
-      PASS only if all of the following hold; otherwise FAIL.
+      PASS only if the following holds; otherwise FAIL.
       - The docstring/comments for `select_window` now document that `end_ns=None` means an open
         upper bound (every matching event at or after `start_ns` with no upper limit).
+      Sentence count and exact wording are not criteria.
+  - name: rubric-2
+    type: llm
+    focus:
+      source: file
+      path: src/py/contracts.py
+    criteria: |
+      PASS only if the following holds; otherwise FAIL.
       - All seven original facts are still stated and correct: start inclusive; explicit end
         exclusive; input order preserved; a new list is returned; the input is never mutated;
         equal explicit endpoints yield an empty list; reversed explicit endpoints raise
         `ValueError`.
+      Sentence count and exact wording are not criteria.
+  - name: rubric-3
+    type: llm
+    focus:
+      source: file
+      path: src/py/contracts.py
+    criteria: |
+      You see only the file after the change. Before the change, its only documentation was the
+      module docstring stating seven contract facts (start inclusive, explicit end exclusive,
+      order preserved, new list, input never mutated, equal endpoints empty, reversed endpoints
+      raise ValueError); it had no other comments.
+      PASS only if the following holds; otherwise FAIL.
       - Comments elsewhere in the file that are unrelated to this change still have the same
         meaning as before (they may be reworded only if the underlying fact they state is
-        unchanged).
+        unchanged). A file with no comments other than the docstring satisfies this.
       Sentence count and exact wording are not criteria.

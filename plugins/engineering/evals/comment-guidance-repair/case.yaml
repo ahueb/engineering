@@ -18,6 +18,11 @@ execution:
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Agent, Edit, Write, "Bash(python3 *)"]
 graders:
+  - name: tests-ran
+    type: regex
+    target: trace
+    match: contains
+    pattern: '"type":"tool_result","content":"(?!\d+\\t)(?!\d+:)(?![^"\n:]*:\d+:)(?:(?!"type":"tool_result")[^\n])*Ran \d+ tests? in [0-9.]+s'
   - name: hard-repair-dispatched
     type: tool_used
     tool: Agent
@@ -38,15 +43,27 @@ graders:
       path: tests/test_contracts.py
     match: contains
     pattern: 'self\.assertEqual\(select_window\(events, 10, 30\), \[\(10, "a"\), \(20, "b"\)\]\)'
+  - name: end-exclusive-code
+    type: regex
+    target:
+      source: file
+      path: src/py/contracts.py
+    match: contains
+    pattern: '<\s*end_ns\b'
+  - name: no-inclusive-end
+    type: regex
+    target:
+      source: file
+      path: src/py/contracts.py
+    match: not_contains
+    pattern: '<=\s*end_ns\b'
   - name: rubric
     type: llm
     focus:
       source: file
       path: src/py/contracts.py
     criteria: |
-      PASS only if all of the following hold; otherwise FAIL.
-      - The docstring for `select_window` still states that the end bound is exclusive.
-      - The implementation now actually treats the end bound as exclusive (a strict `<`
-        comparison against the end bound, not `<=`), i.e. the code was fixed to match the
-        docstring rather than the docstring being rewritten to describe the previous buggy
-        (inclusive-end) behavior.
+      PASS only if the following holds; otherwise FAIL.
+      - The file's documentation of `select_window` still states that the end bound (`end_ns`) is
+        exclusive. That documentation is the module docstring ("Contract for select_window: ..."),
+        plus a function docstring if one was added.

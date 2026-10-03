@@ -3,11 +3,12 @@
 Fresh-session scenarios for judging audit quality. Each needs a representative repository; grade against the expectations listed.
 
 Each scenario below is implemented as an executable, outcome-graded eval case: scenario N is
-`evals/behaviour-prr-N` (`behaviour-prr-1` … `behaviour-prr-7`), relative to the plugin root
+`evals/behaviour-prr-N` (`behaviour-prr-1` … `behaviour-prr-8`), relative to the plugin root
 (`plugins/engineering/`). Each case's `fixture.sh` builds the shared `evals/fixture-service.sh`
 orders-api repository and adds the scenario's distinguishing artefacts, and its graders check
 the report's machine-checkable `VERDICT:`/`GATE G<n>:` lines (see
-`../output-template.md`) plus an `llm` rubric drawn from the "Expectations" list below. See
+`output-template.md`), that the report cites one of the scenario's own artefact paths, plus
+an `llm` rubric drawn from the "Expectations" list below. See
 `evals/README.md` for the invocation and cost budget.
 
 ## 1. Audit the current repository for GA production readiness. The repo has strong unit tests and CI, but do not assume any external operational controls that are not evidenced.
@@ -41,14 +42,16 @@ Expectations:
 
 ## 4. Assess whether a service that is not ready for GA could safely run as a 1% internal canary behind a kill switch. Make the release boundary explicit.
 
-**Expected:** The audit may return CONDITIONALLY READY only for the strictly bounded canary if no hard gate fails within that boundary and explicit controls, stop criteria, owner, and reassessment/expiry are present; it must still say not ready for GA.
+**Expected:** The audit may return CONDITIONALLY READY only for the strictly bounded canary if no hard gate fails within that boundary and explicit controls, stop criteria, owner, and reassessment/expiry are present; it must still say not ready for GA. A gate it rates UNKNOWN for the canary has material evidence missing for that exposure, which the NOT READY rule covers, so it rules out CONDITIONALLY READY. Anything that must happen before the canary starts may only be a pre-launch check of production state that cannot be evidenced before deployment, with an owner and closing evidence.
+
+The fixture is such a canary: release 1.4.0 runs as its own Deployment beside stable 1.3.2; only SSO-authenticated employee traffic through `corp-gateway` reaches it, at 1% of employee requests once the window opens, behind strict mTLS and a caller allow-list; its kill switch is a canary-only ConfigMap that `src/flags.js` re-reads on every request; the canary reads and writes orders exactly as stable does and records its new orders' ids in its own `canary_orders` table, so the orders schema is unchanged and every order reads on either track; stable, the mesh policy, the routes, and the SSO gateway policy predate the canary commit, which adds only canary objects and the canary route at stable 100 / canary 0 (set to 99 / 1 at window start, after the migration); count-based alerts page on-call; a staging drill exercised the switch, the route, and an alert; and `docs/canary-plan.md` names stop criteria, an owner, a decision authority, a reassessment date, and a disposition for each residual risk. A restore drill, a load test, and disaster recovery remain GA blockers. Every date is relative to the day the fixture is built.
 
 Expectations:
 - Does not weaken GA criteria to obtain a conditional verdict.
 - Records the precise exposure boundary and rollback/stop trigger.
 - Requires explicit ownership and reassessment conditions for material residual risk.
 
-## 5. Review an AI-enabled service for production readiness. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
+## 5. Review an AI-enabled service for production readiness for GA to all customers. Its normal web-service controls are strong, but model versioning, evaluation slices, prompt-injection/tool-abuse tests, provider fallback, and model cost ceilings are not evidenced.
 
 **Expected:** The audit activates the AI/ML domain overlay and treats missing AI-specific evidence as material rather than declaring the system ready from generic web-service controls alone.
 
@@ -75,3 +78,12 @@ Expectations:
 - Fails G12 for the missing vulnerability-handling/reporting path rather than marking it a lesser residual risk.
 - Does not accept a checklist claim of CRA conformity as sufficient evidence.
 - Returns NOT READY as a non-compensable consequence of the failed hard gate.
+
+## 8. Assess whether a service that is not ready for GA could safely run as a 1% internal canary behind a kill switch. Make the release boundary explicit. (The kill switch is defined but never wired in.)
+
+**Expected:** The audit finds that `src/flags.js` is never imported or called, so the proposed stop mechanism does not exist, and that the canary plan has no stop criteria, enforced ceiling, or reassessment date. It returns NOT READY with G5 FAIL rather than CONDITIONALLY READY, and still says the service is not ready for GA.
+
+Expectations:
+- Names the unwired kill switch as a blocker.
+- Treats the plan's missing stop criteria, ceiling enforcement, and reassessment date as gaps that must close first.
+- Does not weaken GA criteria.

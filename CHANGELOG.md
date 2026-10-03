@@ -4,13 +4,46 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-10-03
+
 ### Changed
 
+- `SECURITY.md` no longer says a hostile repository cannot execute commands through the readiness probe: its git hardening stops hooks and fsmonitor, not repository-configured filter drivers (risk register R20). The readiness skill limits further git commands to `rev-parse`, `ls-tree`, `cat-file -t/-s/-p`, and `diff-tree --no-textconv --no-ext-diff`, and says to review an untrusted local checkout in a disposable environment.
+- `comment-cleanup` rewrites an unenforced behavioral guarantee in readable code (thread-safety, ordering, atomicity, idempotency, exactly-once) to what the code does and what callers must do, instead of deferring it, when no caller, test, or specification relies on the guarantee; if one does, it defers and reports the conflict, and Defer stays for claims whose evidence is out of reach. Its description now names check, review, or audit for accuracy, staleness, or drift.
+- `verification-loop`, `implementation-loop`, `plan-execution`, and the `hard-repair` agent treat a permission rule's denial of one command form (not a user's rejection) as not denying every form: they retry once as one plain command (no redirect, pipe, or chain; Python as `python3` on POSIX systems) and copy required output into a file from the tool result. `plan-execution`'s post-verification `plan-auditor` pass is required and reported.
+- `production-readiness-review` gives every material gap a disposition (blocks the exposure, or acceptable with a named control once blockers close) on every verdict, including NOT READY; resolves every UNKNOWN gate before choosing CONDITIONALLY READY, which may depend only on pre-launch checks of production state that exists after deployment, before any canary traffic, and cannot be evidenced earlier; and runs its probe as its own call, with further `git` commands run separately, without `-C`, with the probe's hardening, and limited to commands that run no repository-configured filter or diff driver.
+- `change-review` dispatches `security-reviewer` on every trust-boundary change however small, says so in the report, and drops any finding or note whose only basis is cosmetic formatting or whitespace that changes no behavior.
 - The recommended session model is `opus[1m]` (Opus 5.5) at `xhigh` effort, replacing `fable[1m]` at `low`; the per-model effort entries move from `claude-fable-5-1` (`low`) and `claude-sonnet-5` (`medium`) to `claude-opus-5-5` (`xhigh`) and `claude-sonnet-5-5` (`medium`).
 - `auditor` (and so `/engineering:deep-audit`) runs on `opus` instead of `fable`, still at `xhigh`.
 - `scout` runs on `sonnet` at `low` effort instead of `haiku`.
 - Every `claude plugin eval` case pinned to `claude-sonnet-5` is pinned to `claude-sonnet-5-5`, and `ci.sh --full`'s rules-file load scenario (S21) calls `claude -p --model sonnet --effort low` instead of `--model haiku`.
 - `install.sh` requires Claude Code 2.1.284 or later (was 2.1.267), the first version whose `opus` and `sonnet` aliases resolve to Opus 5.5 and Sonnet 5.5; CI's pinned Claude Code moves from 2.1.269 to 2.1.284 so its scratch installs still pass that check.
+- Every multi-bullet `llm` rubric in the eval cases is split into one grader per bullet (`rubric`, `rubric-2`, ...), because the eval judge returned FAIL on whole rubrics whose every bullet it passed when judged alone (`comment-guidance-review-only`, `behaviour-prr-6`).
+- `comment-guidance-review-only` drops its `no-bash` grader, which counted refused calls to a tool the run never had, and its no-change bullet now forbids claiming any edit or proposing executable-code changes while allowing the suggested comment wording its prompt permits.
+- `comment-guidance-plan`'s `doc-contract-preserved` judges `docs/window_contract.md` against PLAN.md's interface stated inline, and `comment-guidance-implementation`'s unrelated-comments criterion states the file's pre-change comments inline, since the judge sees only the changed file; `comment-guidance-repair`'s documentation bullet names the module docstring, and `behaviour-prr-3`'s `rubric-5` states the gaps it refers to.
+- Readiness scenario 4 is now a properly bounded 1% internal canary that expects CONDITIONALLY READY (its fixture has a wired, per-track kill switch, SSO-only routing with strict mTLS, canary orders written to `orders` as stable writes them and recorded in a new `canary_orders` table, so the orders schema is unchanged; a canary commit that adds only canary objects and the canary route at weight 0 until the window opens; corp-gateway's SSO policy in the repository; a real lockfile, a consistent release history, and dates relative to the day it is built), and scenario 5's prompt names its exposure (GA to all customers).
+- `comment-guidance-mechanical`'s hardware-sentence ground truth (F-BUFFER-HARDWARE) covers the hardware wording only; "our message buffer" may become "our message queue".
+- `comment-guidance-plan` checks worker conduct with `bulk-implementer-instructed` (two dispatches carry the no-build/no-test instruction) and `no-worker-test-command` (a full-trace regex over subagent Bash calls for a fixed list of test, build, lint, and commit invocations), replacing `no-worker-test-execution`, whose judge could not see the dispatch.
+- Readiness scenario 5's `rubric-4` asks for a blocker-or-acceptable call with a reason for each AI-specific gap, so a justified all-blockers report passes; it previously failed reports that gave every gap its own blocking reason.
+- `comment-guidance-plan`'s `bulk-implementer-instructed` accepts "Do NOT build" and "Don't build" as well as "Do not build".
+- `behaviour-prr-4`'s `gate` grader accepts only `GATE G5: PASS` (a canary's deployment gate cannot be N/A), and `comment-guidance-doc-plan`'s `no-plan-complete` also catches `PLAN_COMPLETE` at the start of a line when it is bold, backticked, indented, quoted, a list item, or a heading, or is followed by the coverage line.
+- Mechanical criteria in `comment-guidance-doc-plan`, `-mechanical`, `-repair`, `behaviour-prr-4`, and `behaviour-comment-cleanup` are regex graders, and a duplicate `behaviour-prr-7` bullet is dropped.
+- `plugins/engineering/evals/README.md` runs each read case in its own invocation so only `comment-guidance-change-review` gets `Bash(git *)`, and documents what `tool_used`, the judge, and prefix Bash grants actually do.
+
+### Added
+
+- A `repo-evidence` regex grader on `behaviour-prr-1`..`-8`: the report must cite one of the paths its scenario's fixture creates, so an audit of an empty workspace no longer passes.
+- Regex graders for mechanical criteria: `gate-lines` and `gate-evidence` on `behaviour-prr-1` (12 `GATE` lines; an E-level on each rated gate row) replace its first rubric bullet, and `hardware-sentence-unchanged` on `comment-guidance-mechanical` replaces the bullet that kept the UART hardware sentence; the remaining `prose-renamed` grader states that sentence as the rename's one exception.
+- The readiness behaviour suite's documented invocation grants `Bash(git *)`, so the skill can tie HEAD to the tagged release with hardened git calls.
+- `/evals/results/` in `.gitignore`, for results written when the repository root is the eval target.
+- `cleanup-trigger-01`..`-10` and `cleanup-no-trigger-01`..`-10`: trigger-quality cases for `comment-cleanup`, scaffolded with the comment-guidance review fixture.
+- `probe-ran` on every readiness scenario and `tests-ran` on `comment-guidance-implementation`, `-plan`, and `-repair`: trace regexes over tool results (the probe's JSON output; unittest's "Ran N tests" line, where a `Read` or a numbered `Grep` of a stored log does not count).
+- `rubric-4` on `behaviour-prr-4`: a CONDITIONALLY READY report may depend only on pre-launch checks of production state, each with an owner and closing evidence.
+- `no-conditional-over-unknown` on `behaviour-prr-4`: a CONDITIONALLY READY report fails if any gate line is UNKNOWN, because the skill defines a gate UNKNOWN as material evidence missing and makes a material unknown NOT READY.
+- Results for the comment-guidance baseline-vs-candidate comparison in `docs/change-eval/comment-guidance-2026-09.md` (2026-10-03): accepted as a three-run screen, with B01, B05, and B02 (skill invocation) improved, B06-B08, I01, I03, and I04 unchanged, I02 passing on the candidate, B03 inconclusive because every baseline run stopped at its denied command, and B04 mixed (completed where the baseline stopped; one contract document adds a guarantee).
+- Readiness scenario 8: the original scenario-4 canary proposal, whose kill switch is never wired in, expecting NOT READY with G5 FAIL.
+- `scripts/eval_recheck.py`, which replays failed `llm` graders with a judge that must give reasons and reports a failed judge call as NEEDS REVIEW, with unit tests run by `ci.sh` and on the Windows CI job.
+- Risk register entries R16–R19 for measured eval findings (R16, R17, and R19 since closed; R15 open; R18 partially mitigated) and R20 for the readiness probe's `git status`, which can run a filter driver the reviewed repository's own configuration defines, and 2026-10-02/03 rows in `plugins/engineering/evals/RESULTS.md`.
 
 ## [2.10.0] - 2026-09-16
 
@@ -278,7 +311,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/ahueb/engineering/compare/v2.8.0...v2.9.0

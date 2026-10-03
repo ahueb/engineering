@@ -18,6 +18,11 @@ execution:
   timeout_seconds: 900
   allowed_tools: [Read, Grep, Glob, Skill, Agent, Edit, Write, "Bash(python3 *)", "Bash(git *)"]
 graders:
+  - name: tests-ran
+    type: regex
+    target: trace
+    match: contains
+    pattern: '"type":"tool_result","content":"(?!\d+\\t)(?!\d+:)(?![^"\n:]*:\d+:)(?:(?!"type":"tool_result")[^\n])*Ran \d+ tests? in [0-9.]+s[^\n]*"parent_tool_use_id":null'
   - name: plan-execution-fired
     type: tool_used
     tool: Skill
@@ -33,6 +38,16 @@ graders:
     tool: Agent
     input_match: 'plan-auditor'
     min: 1
+  - name: bulk-implementer-instructed
+    type: tool_used
+    tool: Agent
+    input_match: '(?:"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer"[\s\S]*(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)|(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)[\s\S]*"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer")'
+    min: 2
+  - name: no-worker-test-command
+    type: regex
+    target: trace
+    match: not_contains
+    pattern: '"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?(?:-m (?:unittest|pytest|py_compile)\b|\bpytest(?=[ ;&|]|\\"|")|node --test|npm (?:run )?test\b|\beslint(?=[ ;&|]|\\"|")|git commit)[^\n]*"parent_tool_use_id":"toolu_'
   - name: verification-output-present
     type: regex
     target:
@@ -46,28 +61,14 @@ graders:
       source: file
       path: docs/window_contract.md
     criteria: |
-      PASS if the file's stated facts about the windowing contract are still present and, where
-      PLAN.md required an update to reflect the new behavior, that update is reflected accurately.
-      FAIL if a fact PLAN.md required to be preserved was dropped or contradicted, or if the file
-      claims something PLAN.md did not ask for and that is not supported by the implemented code.
-  - name: no-worker-test-execution
-    type: llm
-    focus: trace
-    criteria: |
-      Look only at the first 12 and last 12 messages of the visible trace (the earlier messages
-      cover the parent's plan setup and worker dispatch; the later messages cover parent
-      integration and reporting). Determine whether any Agent-dispatched `bulk-implementer` worker
-      itself ran tests, ran a build, ran a linter, or made a commit, as opposed to the parent doing
-      so after merging the packages.
-
-      PASS only when the visible trace shows at least one Agent dispatch of a bulk-implementer
-      whose prompt carries the no-build/no-test/no-lint/no-commit instruction AND no visible
-      evidence that any dispatched worker ran tests, a build, a linter, or a commit itself.
-
-      If the visible trace does not let you establish that (for example no worker dispatch is
-      visible, or a worker's own tool calls are not shown and its report claims it ran checks),
-      say so explicitly and FAIL: an unverifiable chronology is recorded as not passing, and the
-      protocol counts such a run as unverified rather than as a plugin defect.
-
-      Also FAIL when you find positive evidence (an explicit tool call or an explicit statement)
-      that a dispatched bulk-implementer worker ran tests, build, lint, or a commit itself.
+      You see only this file, not PLAN.md or the code, so judge it against this fixed ground
+      truth, which is P-WINDOW's interface in PLAN.md (the plan requires this file to state every
+      fact): `select_window(events, start_ns, end_ns)` returns a new list of
+      `(timestamp_ns, payload)` tuples; start_ns is inclusive (an event exactly at start_ns is
+      included); end_ns is exclusive (an event exactly at end_ns is excluded); the result
+      preserves the input event order; it never mutates the input events list;
+      start_ns == end_ns yields an empty result list; start_ns > end_ns raises ValueError.
+      PASS only if every fact above is stated and none is contradicted. FAIL if a fact is dropped
+      or contradicted, or if the file asserts a behavioral guarantee that is neither one of these
+      facts nor a direct consequence of them (for example thread-safety, sorting, deduplication,
+      or performance). Wording, structure, and examples consistent with the facts are not criteria.
