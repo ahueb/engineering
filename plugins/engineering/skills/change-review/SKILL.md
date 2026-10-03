@@ -13,6 +13,6 @@ Review the change as an adversarial maintainer, not as its author.
 4. Validate suspicious findings against code paths, tests, schemas, configuration, or authoritative documentation before reporting them. Do not assume implementation correctness when the written contract disagrees.
 5. Do not report stylistic preferences, formatting, or arbitrary complexity metrics at all — not as findings, notes, or observations, and not to say you are leaving them out — unless the repository explicitly requires them or they create concrete risk.
 6. For every finding, provide severity, location, failure mechanism, evidence, and a specific remediation direction.
-7. Avoid duplicates. If no material defect is found, say so and list the most important verification gaps or assumptions that remain.
+7. Avoid duplicates. Before reporting, delete any finding or note whose only basis is formatting or whitespace (for example trailing whitespace or blank lines). If no material defect is found, say so and list the most important verification gaps or assumptions that remain.
 8. When the change touches a trust boundary (auth, secrets, external input, file or network access, supply chain, CI), dispatch `engineering:security-reviewer` with the diff text and merge its findings, however small the diff. State in the report that it was dispatched, or why it could not be.
 9. Never modify code during review unless the user explicitly asks for fixes.
