@@ -184,15 +184,16 @@ A `regex` grader with `target: trace` sees the whole trace as compact JSON, one 
 a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's carry `null`.
 `comment-guidance-plan` uses that: `bulk-implementer-instructed` requires at least two
 `bulk-implementer` dispatches to carry the no-build/no-test instruction, and `no-worker-test-command`
-fails the case if a subagent's own Bash call, run or denied, invokes `-m unittest`, `-m pytest`,
-`-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`, or `git commit` (reading a file
-such as `pytest.ini` does not count). Other forms (a test file run directly, another linter) pass it, and it also fires on a read-only mention such as `which pytest`
-or `grep pytest`. Measured workers have made only read-only Bash calls, so it has not been exercised on a real violation.
-`tests-ran` (implementation, plan, and repair cases) looks for unittest's "Ran N tests" line in a tool result. A `Read`
-result (content starting with a line number) or a `Grep` content result (`path:line:` or, for one file,
-`line:`) does not count, so
-reading or searching a stored log such as the repair case's `failed_check.txt` does not satisfy it; printing
-the log through Bash, or a `Grep` without line numbers, still would. In the plan and implementation cases the run must be the parent's; in the
+fails the case if a subagent's own Bash call, run or denied, starts a test, lint, or commit command
+(`python3 -m unittest`, `-m pytest`, or `-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`,
+or `git commit`) at the start of the command or after `;`, `&&`, `||`, `|`, `(`, or a newline,
+optionally after variable assignments, `env`, `time`, `nice`, or `timeout <n>`. A mention such as
+`which pytest`, `grep pytest`, or reading `pytest.ini` does not count; a test file run directly or
+another linter is not detected. Measured workers have made only read-only Bash calls, so it has not
+been exercised on a real violation. `tests-ran` (implementation, plan, and repair cases) pairs a Bash
+call whose command contains `unittest` with that call's own result, matched by tool-call id, and
+requires unittest's "Ran N tests" line in that result, so reading, searching, or printing a stored
+log such as the repair case's `failed_check.txt` does not satisfy it. In the plan and implementation cases the run must be the parent's; in the
 repair case the `hard-repair` subagent's run counts. `probe-ran` (every readiness scenario) matches the readiness
 probe's own JSON output in a tool result.
 
