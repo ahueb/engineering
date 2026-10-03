@@ -13,13 +13,15 @@
 #       (same as `pr` below).
 #   ./release.sh pr X.Y.Z
 #       for an already-pushed release/vX.Y.Z branch: gh pr create (base
-#       main), gh pr checks --watch --fail-fast, gh pr merge --squash
+#       main), wait up to 5 minutes for GitHub to report the PR's checks,
+#       gh pr checks --watch --fail-fast, gh pr merge --squash
 #       --delete-branch. Requires an authenticated `gh`.
 #   ./release.sh tag [X.Y.Z]
 #       fetch origin/main, require its head commit subject to be exactly
 #       "Release engineering X.Y.Z" and plugin.json at that commit to be
 #       X.Y.Z, sign and push tag vX.Y.Z from origin/main, then refresh the
-#       local plugin install. X.Y.Z defaults to origin/main's plugin.json
+#       local plugin install and exit 1 with sync steps if the installed
+#       version is not X.Y.Z. X.Y.Z defaults to origin/main's plugin.json
 #       version.
 #
 # Legacy (deprecated), kept for compatibility:
@@ -71,6 +73,65 @@ check_clean_tree() {
     echo "working tree has unrelated changes; commit or stash them first" >&2
     exit 1
   fi
+}
+
+# GitHub registers a new PR's checks a few seconds after `gh pr create`; until then
+# `gh pr checks --watch` exits 1 with "no checks reported" (cli/cli#7401). Polls until GitHub
+# reports at least one check. RELEASE_CHECKS_TRIES and RELEASE_CHECKS_INTERVAL (seconds) exist
+# for ci.sh.
+wait_for_checks() {
+  local branch="$1" tries="${RELEASE_CHECKS_TRIES:-30}" interval="${RELEASE_CHECKS_INTERVAL:-10}" i=0 count
+  while [ "$i" -lt "$tries" ]; do
+    count="$(gh pr checks "$branch" --json name --jq length 2>/dev/null || true)"
+    case "$count" in ''|*[!0-9]*) count=0 ;; esac
+    if [ "$count" -gt 0 ]; then return 0; fi
+    i=$((i + 1))
+    if [ "$i" -lt "$tries" ]; then sleep "$interval"; fi
+  done
+  return 1
+}
+
+# Prints the installed engineering plugin's version, or nothing when it is not installed or the
+# listing cannot be read.
+installed_version() {
+  claude plugin list --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    plugins = json.load(sys.stdin)
+except ValueError:
+    plugins = []
+for p in plugins if isinstance(plugins, list) else []:
+    if isinstance(p, dict) and p.get("id") == "engineering@engineering":
+        print(p.get("version") or "")
+        break
+' 2>/dev/null || true
+}
+
+# $1 = the version the local install should now have. `claude plugin update` exits 0 even when
+# nothing is newer, and a directory marketplace reads this working tree in place, so the result
+# is checked against the installed version. Returns 1, after printing the sync steps, on a
+# mismatch.
+refresh_local_install() {
+  local want="$1" have
+  if ! claude plugin list 2>/dev/null | grep -q "engineering@engineering"; then
+    echo "engineering@engineering is not installed here; skipping local update"
+    return 0
+  fi
+  if ! claude plugin update engineering@engineering; then
+    echo "WARN: local plugin update failed; run: claude plugin update engineering@engineering" >&2
+    return 0
+  fi
+  have="$(installed_version)"
+  if [ "$have" = "$want" ]; then
+    echo "local install updated to $want"
+    return 0
+  fi
+  echo "local install is ${have:-unknown}, not $want. If your engineering marketplace is this folder, sync it to the release and update again:" >&2
+  echo "  git -C \"$HERE\" status --short   # commit or stash anything listed: reset --hard discards it" >&2
+  echo "  git -C \"$HERE\" branch backup/pre-v$want-sync main" >&2
+  echo "  git -C \"$HERE\" checkout main && git -C \"$HERE\" reset --hard origin/main" >&2
+  echo "  claude plugin update engineering@engineering" >&2
+  return 1
 }
 
 # Fold the CHANGELOG.md "## [Unreleased]" section's content under a new
@@ -320,6 +381,12 @@ do_pr() {
   rm -f "$BODY"
   echo "PR opened for $BRANCH"
 
+  if ! wait_for_checks "$BRANCH"; then
+    echo "no checks reported for $BRANCH after waiting; once GitHub shows them, continue with:" >&2
+    echo "  gh pr checks $BRANCH --watch --fail-fast" >&2
+    echo "  gh pr merge $BRANCH --squash --subject \"Release engineering $V\" --delete-branch" >&2
+    exit 1
+  fi
   if ! gh pr checks "$BRANCH" --watch --fail-fast; then
     echo "gh pr checks failed; after fixing, continue with:" >&2
     echo "  gh pr checks $BRANCH --watch --fail-fast" >&2
@@ -374,15 +441,7 @@ cmd_tag() {
   fi
   echo "pushed v$V"
 
-  if claude plugin list 2>/dev/null | grep -q "engineering@engineering"; then
-    if claude plugin update engineering@engineering; then
-      echo "local install updated to $V"
-    else
-      echo "WARN: local plugin update failed; run: claude plugin update engineering@engineering" >&2
-    fi
-  else
-    echo "engineering@engineering is not installed here; skipping local update"
-  fi
+  refresh_local_install "$V" || exit 1
 }
 
 main() {

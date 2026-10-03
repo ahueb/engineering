@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 from typing import Iterable
 
-SCHEMA_VERSION = "2.1"
+SCHEMA_VERSION = "2.2"
 DEFAULT_MAX_FILES = 50000
 MAX_TEXT_BYTES = 1_000_000
 MAX_PATHS_PER_SIGNAL = 25
@@ -98,27 +98,118 @@ CI_NAMES = {
 }
 
 
-def safe_run(args: list[str], cwd: Path, timeout: float = 5.0) -> tuple[int, str, str]:
+def safe_run(args: list[str], cwd: Path, timeout: float = 5.0, strip: bool = True) -> tuple[int, str, str]:
+    """Run a command without a shell. GIT_NO_LAZY_FETCH stops a partial clone from fetching
+    missing objects through a remote whose transport the repository configures; output is
+    decoded with surrogateescape so any byte survives a round trip into later arguments."""
     try:
         proc = subprocess.run(
             args,
             cwd=str(cwd),
             text=True,
+            errors="surrogateescape",
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout,
             check=False,
-            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0"},
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_LAZY_FETCH": "1"},
+            start_new_session=True,  # no controlling terminal, so a config include of /dev/tty cannot block
         )
-        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+        out = proc.stdout.strip() if strip else proc.stdout
+        return proc.returncode, out, proc.stderr.strip()
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 127, "", str(exc)
 
 
-# Neutralises the fsmonitor and hook execution points. It does not stop every config-driven
-# command: `git status` below can still run a filter driver that the repository's own config
-# defines and its attributes select (SECURITY.md; risk register R20).
-GIT_HARDENING = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null"]
+# Neutralises the fsmonitor and hook execution points for every git call. `git status` can
+# also run a filter driver that the repository's own config defines and its attributes select,
+# so git_info blanks every repository-scope driver first (repo_filter_drivers) and never looks
+# inside a submodule's work tree (SECURITY.md; risk register R20).
+# --no-replace-objects keeps refs/replace from swapping the commit that status compares against.
+GIT_HARDENING = ["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "--no-replace-objects"]
+# Status must look at every tracked file's content, not trust stat data or an untracked cache that a
+# shipped index could forge.
+STATUS_HARDENING = ["-c", "core.checkStat=default", "-c", "core.trustctime=true", "-c", "core.untrackedCache=false"]
+FILTER_KEY_RE = re.compile(r"^filter\.(.+)\.[^.]+$")
+
+
+# Scopes the user controls; every other scope (local, worktree, or anything git cannot attribute)
+# is treated as the reviewed repository's.
+USER_CONFIG_SCOPES = {"system", "global", "command"}
+
+
+def repo_config_entries(root: Path, pattern: str, values: bool) -> tuple[list[tuple[str, str]] | None, str | None]:
+    """Repository-scope (key, value) pairs matching `pattern`, read through git's own config
+    sequence so that includes and includeIf conditions resolve as they do for `git status`.
+    NUL-separated output keeps any byte in a key intact."""
+    args = ["git", *GIT_HARDENING, "config", "-z", "--includes", "--show-scope", "--get-regexp", pattern]
+    if not values:
+        args.insert(-2, "--name-only")
+    code, out, err = safe_run(args, root, strip=False)
+    if code == 1 and not out:
+        return [], None
+    if code != 0:
+        return None, "git config --get-regexp {} failed: {}".format(pattern, err or code)
+    fields = out.split("\0")
+    if fields and fields[-1] == "":
+        fields.pop()
+    if len(fields) % 2:
+        return None, "unexpected git config output for {}".format(pattern)
+    entries = []
+    for scope, item in zip(fields[0::2], fields[1::2]):
+        if scope in USER_CONFIG_SCOPES:
+            continue
+        key, _, value = item.partition("\n")
+        entries.append((key, value))
+    return entries, None
+
+
+def repo_filter_drivers(root: Path) -> tuple[list[str] | None, str | None]:
+    """Names of the filter drivers the repository's own config defines, or (None, reason) when
+    they cannot all be neutralised with `-c`: git splits `-c name=value` at the first `=`, so a
+    driver named `a=b` would survive. Drivers from system and global config are left alone (for
+    example git-lfs), since the user configured them."""
+    entries, reason = repo_config_entries(root, r"^filter\.", values=False)
+    if entries is None:
+        return None, reason
+    names: set[str] = set()
+    for key, _ in entries:
+        match = FILTER_KEY_RE.match(key)
+        if not match or "=" in match.group(1):
+            return None, "repository filter driver {!r} cannot be neutralised".format(key)
+        names.add(match.group(1))
+    return sorted(names), None
+
+
+def partial_clone_reason(root: Path) -> str | None:
+    """A reason to skip `git status` when the repository is a partial clone: status can fetch a
+    missing object through the promisor remote, and git versions that ignore GIT_NO_LAZY_FETCH
+    would run whatever transport the repository configured for it."""
+    entries, reason = repo_config_entries(root, r"^(extensions\.partialclone|remote\..*\.promisor)$", values=True)
+    if entries is None:
+        return reason
+    for key, value in entries:
+        # git reads a bare `promisor` line, and any non-zero integer, as true.
+        if key == "extensions.partialclone" or value.lower() not in ("false", "no", "off", "0"):
+            return "partial clone ({}): status could fetch missing objects through the repository's remote".format(key)
+    return None
+
+
+def hidden_index_entries(cwd: Path) -> tuple[int | None, str | None]:
+    """How many index entries under `cwd` status would not compare: assume-unchanged entries,
+    and skip-worktree entries whose file is present. A shipped index can set either."""
+    code, out, err = safe_run(["git", *GIT_HARDENING, "ls-files", "-v", "-z"], cwd, strip=False)
+    if code != 0:
+        return None, "git ls-files failed: {}".format(err or code)
+    hidden = 0
+    for entry in out.split("\0"):
+        if len(entry) < 3:
+            continue
+        tag, path = entry[0], entry[2:]
+        if tag.islower() or (tag == "S" and os.path.lexists(cwd / path)):
+            hidden += 1
+    return hidden, None
 
 
 def git_info(start: Path) -> tuple[Path, dict]:
@@ -127,22 +218,57 @@ def git_info(start: Path) -> tuple[Path, dict]:
     if not shutil.which("git"):
         return start, {"available": False, "is_repo": False}
 
-    code, out, _ = safe_run(["git", *GIT_HARDENING, "-C", str(start), "rev-parse", "--show-toplevel"], start)
+    code, out, _ = safe_run(["git", *GIT_HARDENING, "rev-parse", "--show-toplevel"], start, strip=False)
+    out = out[:-1] if out.endswith("\n") else out
     if code != 0 or not out:
         return start, {"available": True, "is_repo": False}
 
+    # Every later call runs from the scan root, so HEAD and config come from the repository that
+    # contains it even when core.worktree points git's work tree somewhere else.
     root = Path(out).resolve()
-    _, head, _ = safe_run(["git", *GIT_HARDENING, "rev-parse", "HEAD"], root)
-    _, branch, _ = safe_run(["git", *GIT_HARDENING, "branch", "--show-current"], root)
-    status_code, status, _ = safe_run(["git", *GIT_HARDENING, "status", "--porcelain=v1", "--untracked-files=normal"], root)
+    scan_root = start.resolve()
+    _, head, _ = safe_run(["git", *GIT_HARDENING, "rev-parse", "--verify", "-q", "HEAD"], start)
+    _, branch, _ = safe_run(["git", *GIT_HARDENING, "branch", "--show-current"], start)
 
-    counts: collections.Counter[str] = collections.Counter()
-    dirty = False
-    if status_code == 0:
-        for line in status.splitlines():
+    skip_reason = None
+    if scan_root != root and root not in scan_root.parents:
+        skip_reason = "git's work tree {} does not contain the scan root".format(root)
+    if skip_reason is None:
+        skip_reason = partial_clone_reason(start)
+    if skip_reason is None:
+        hidden, skip_reason = hidden_index_entries(start)
+        if hidden:
+            skip_reason = "{} index entries are marked assume-unchanged or skip-worktree, so status would not compare them".format(hidden)
+    drivers = None
+    if skip_reason is None:
+        drivers, skip_reason = repo_filter_drivers(start)
+    status = None
+    if drivers is not None:
+        neutralise: list[str] = []
+        for name in drivers:
+            for key, value in (("clean", ""), ("smudge", ""), ("process", ""), ("required", "false")):
+                neutralise += ["-c", "filter.{}.{}={}".format(name, key, value)]
+        status_code, out, err = safe_run(
+            # `dirty` still reports a submodule whose checked-out commit differs from the recorded
+            # one, without running git inside the submodule's work tree.
+            ["git", *GIT_HARDENING, *STATUS_HARDENING, *neutralise, "status", "--porcelain=v1",
+             "--untracked-files=normal", "--ignore-submodules=dirty"],
+            start,
+            strip=False,
+        )
+        if status_code == 0:
+            status = out
+        else:
+            skip_reason = "git status failed: {}".format(err or status_code)
+
+    counts: collections.Counter[str] | None = None
+    dirty = None
+    if status is not None:
+        counts = collections.Counter()
+        dirty = False
+        for line in status.split("\n"):
             if len(line) >= 2:
-                code2 = line[:2]
-                counts[code2] += 1
+                counts[line[:2]] += 1
                 dirty = True
 
     return root, {
@@ -151,9 +277,11 @@ def git_info(start: Path) -> tuple[Path, dict]:
         "toplevel": str(root),
         "head": head or None,
         "branch": branch or None,
+        "status": "collected" if status is not None else "not collected",
+        "status_skip_reason": skip_reason if status is None else None,
         "dirty": dirty,
-        "status_entry_count": sum(counts.values()),
-        "status_code_counts": dict(sorted(counts.items())),
+        "status_entry_count": sum(counts.values()) if counts is not None else None,
+        "status_code_counts": dict(sorted(counts.items())) if counts is not None else None,
     }
 
 
@@ -385,6 +513,7 @@ def build_report(start: Path, max_files: int, max_seconds: float, max_text_bytes
         "The probe does not contact external systems, inspect production configuration, or execute builds/tests.",
         "The probe does not emit file contents, environment-variable values, or credential material.",
         "Common vendor/build/cache directories are excluded to reduce noise.",
+        "Git status honours the repository's own index flags that hide edits (skip-worktree, assume-valid) and its ignore rules and does not look inside submodule work trees, so a clean status does not prove that every scanned file matches HEAD.",
     ]
     if capped:
         limitations.append(f"File scan stopped at max_files={max_files}; results are incomplete.")

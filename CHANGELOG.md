@@ -4,6 +4,26 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-03
+
+### Changed
+
+- The readiness probe no longer runs filter drivers that the reviewed repository's own config defines: before `git status` it blanks the `clean`, `smudge`, and `process` commands of every driver defined outside system and global config, read through git's own config sequence so includes and conditional includes resolve as they do for `git status`; it disables lazy fetching and skips status in a partial clone; it ignores replace refs and compares file content rather than stat data a shipped index could forge; it skips status when the index marks a present file assume-unchanged or skip-worktree or when git's work tree does not contain the scan root; it never looks inside a submodule's work tree while still reporting a submodule checked out at another commit; and it reports status as not collected, with a reason, when a driver cannot be blanked or status fails (risk register R20, now mitigated). It also reports an unstaged change on the first status line with its own code and an unborn HEAD as null. The probe's JSON schema is 2.2: `git` gains `status` and `status_skip_reason`, and `dirty` and the status counts are null when status was not collected. `SECURITY.md` says to sanitize any other untrusted checkout with `git clone --no-local`.
+- `release.sh pr` waits up to 5 minutes for GitHub to report the PR's checks before watching them, instead of failing with "no checks reported" right after creating the PR, and exits 1 with the manual commands if none appear. `release.sh tag` checks the installed plugin version after `claude plugin update` and, if it is not the tagged version, exits 1 with the steps to sync local `main` and update again, instead of always printing "local install updated"; the steps start by checking for uncommitted work, which their `git reset --hard` would discard.
+- `production-readiness-review` gives every material gap its own row in a gap table; lists CONDITIONALLY READY pre-launch checks in a table that says why each cannot be evidenced before deployment; names what is not a pre-launch check (group membership and access rights in the access system, RBAC committed in the repository, on-call rosters and paging tests, image attestation and registry digests, staging drills, configuration in the repository) and says to evidence it, rate its gate UNKNOWN, or, if the exposure does not need it, accept the gap with a control; requires nothing but the pre-launch checks before a bounded exposure starts, so any other action required first makes its gate UNKNOWN and the verdict NOT READY; and records each applicable domain overlay in G12's row.
+- `bulk-implementer` reads `comment-guidance.md` before writing or rewriting any documentation, docstring, or contract text, and C09 adds that new documentation states only what the code or the authorized contract establishes.
+- `plan-auditor` counts each top-level plan item once in its `PLAN ITEMS:` line.
+- The readiness eval suite's documented invocation grants the six hardened read-only git forms the skill uses instead of `Bash(git *)`, says these rules are not a read-only boundary, and raises its cost cap to 16 USD.
+- `tests-ran` (`comment-guidance-implementation`, `-plan`, `-repair`) requires the result, passing or failing, of the Bash call that ran `-m unittest`, with at least one test, so printing a stored log no longer satisfies it; `no-worker-test-command` matches test, lint, and commit commands only where a command starts (after any variable assignments, `env`, `time`, `nice`, `timeout`, or interpreter options), so `which pytest` no longer fires it and `pytest>log` does; `comment-guidance-doc-plan`'s `plan-items-format` accepts a quoted, listed, or emphasized `PLAN ITEMS: 2 total` line.
+- Readiness scenario 4's fixture adds the on-call group's production rights to stop the canary, the window's on-call rota, and the image attestation's verification; scenario 5's fixture adds the customer auth, alerting, pinned image, and dated restore drill its prompt now names; scenario 6's `rubric-5` names the high-availability claim it rates in a shorter criterion.
+
+### Added
+
+- `behaviour-comment-cleanup-reliance` (B09): `comment-cleanup` must keep and report, not rewrite, an unenforced thread-safety comment that a caller and a test rely on.
+- `prelaunch-table` on `behaviour-prr-4`: a CONDITIONALLY READY report must contain the pre-launch table.
+- `scripts/eval_recheck.py --include-passes --grader GLOB`, to recheck the judgments the harness passed as well; its prompt no longer tells the judge which verdict it is rechecking.
+- 2026-10-03 rows in `plugins/engineering/evals/RESULTS.md` for these changes: all eight readiness scenarios pass 3/3 on the evidence, every comment-guidance case passes at least 2/3, and both trigger suites fire on 30/30 positive and 0/30 negative runs.
+
 ## [2.11.0] - 2026-10-03
 
 ### Changed
@@ -311,7 +331,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/ahueb/engineering/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1

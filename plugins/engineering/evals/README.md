@@ -21,7 +21,7 @@ Negative cases pass trivially on the without-plugin arm; run them with `--ablati
 
 Run with the session default model. On a 200K-context model such as Haiku the skill listing overruns its default budget and the least-invoked skills lose their descriptions, so trigger cases fail for a reason unrelated to the description text; `settings.recommended.json` raises `skillListingBudgetFraction` to 0.02 for normal sessions, but eval runs do not read user settings (the eval sandbox loads no user settings, hooks, or other plugins).
 
-Every run is a model call on your account (about 9 USD for the full suite at one run per case). With a path target (`.` from `plugins/engineering`, or `plugins/engineering` from the repository root) raw results land in `plugins/engineering/evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`. Do not target the repository root (`claude plugin eval .` run from the root): the 2026-10-02 run that did so recorded the repository root as its suite root and wrote its results to `<repo>/evals/results/` (now also ignored). Any invocation without `--tag` or `--case` runs all 56 cases under one set of flags. Every suite below needs its own invocation, `--scaffold`, and its own grants; without `--scaffold` the workspaces are empty and the behaviour and comment-guidance results are void.
+Every run is a model call on your account (about 9 USD for the full suite at one run per case). With a path target (`.` from `plugins/engineering`, or `plugins/engineering` from the repository root) raw results land in `plugins/engineering/evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`. Do not target the repository root (`claude plugin eval .` run from the root): the 2026-10-02 run that did so recorded the repository root as its suite root and wrote its results to `<repo>/evals/results/` (now also ignored). Any invocation without `--tag` or `--case` runs all 57 cases under one set of flags. Every suite below needs its own invocation, `--scaffold`, and its own grants; without `--scaffold` the workspaces are empty and the behaviour and comment-guidance results are void.
 
 ## Output-behavior (outcome-graded) cases
 
@@ -39,14 +39,24 @@ criterion per grader (`rubric`, `rubric-2`, ...; see "Judge" below) — no relia
 (`VERDICT: NOT READY`, gates UNKNOWN or FAIL) otherwise passes scenarios 1, 2, 3, and 7, as
 all four did on 2026-10-02. A report that names a scenario path only to say it is missing would
 still satisfy `repo-evidence`; none of 42 empty-workspace reports did.
-Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only). `Bash(git *)` also
-permits git commands that write; the skill limits itself to read-only plumbing, and no grader checks
-the workspace for changes:
+Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only). The git grants
+cover the hardened read-only plumbing the skill uses, but they are not a read-only boundary: a rule
+matches any command that starts with its text before the `*`, so it also admits further options (for
+example `--ext-diff` or `--output=<file>` after the `diff-tree` prefix), and Claude Code auto-allows
+plain read-only `git` forms such as `git status` and `git log` without any grant. The skill's
+instructions are what keep the model to the hardened commands:
 
 ```bash
 cd plugins/engineering
 claude plugin eval . --tag behaviour-readiness --scaffold --trust-plugin --ablation none \
-  --judge-model sonnet --allow-tools Read Grep Glob "Bash(python3 *)" "Bash(git *)" --max-cost-usd 13
+  --judge-model sonnet --allow-tools Read Grep Glob "Bash(python3 *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null rev-parse *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null ls-tree *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff-tree --no-textconv --no-ext-diff *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -t *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -s *)" \
+  "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -p *)" \
+  --max-cost-usd 16
 ```
 
 Before the skill told it to run the probe as its own call, every run on 2026-10-02 and 2026-10-03
@@ -55,7 +65,7 @@ that added `echo "exit=$?"; cd ... && git ...`; the 3 that used plain `git statu
 or `git log --stat -3 | head` ran. So the probe ran in 0/21 runs on 2026-10-02 and 3/27 on
 2026-10-03, and most reports carry no probe output.
 Since the skill runs the probe as its own call, it ran in 24/24 runs. The suite also grants
-`Bash(git *)`, so the skill can run the hardened `git -c ...` commands that tie HEAD to the tagged
+those hardened git forms, so the skill can run the hardened `git -c ...` commands that tie HEAD to the tagged
 release: with `Bash(python3 *)` alone all 28 git calls in one 24-run measurement were denied, and
 scenario 4 could not show that `src/` at HEAD matched the release.
 
@@ -77,11 +87,13 @@ cost far more per run, and need write grants the trigger suite does not.
 
 ## Comment-guidance suite
 
-Eight native cases (`behaviour-comment-cleanup` plus `comment-guidance-review-only`,
+Nine native cases (`behaviour-comment-cleanup` plus `comment-guidance-review-only`,
 `comment-guidance-implementation`, `comment-guidance-plan`, `comment-guidance-change-review`,
-`comment-guidance-mechanical`, `comment-guidance-repair`, `comment-guidance-doc-plan`) exercise
-comment/docstring guidance end to end: explicit cleanup, natural-language review, implementation,
-plan-execution, change-review, mechanical rename, hard-repair, and plan-auditor. Each is tagged
+`comment-guidance-mechanical`, `comment-guidance-repair`, `comment-guidance-doc-plan`, and
+`behaviour-comment-cleanup-reliance`) exercise comment/docstring guidance end to end: explicit
+cleanup, natural-language review, implementation, plan-execution, change-review, mechanical rename,
+hard-repair, plan-auditor, and a cleanup that must defer a thread-safety comment a caller and a test
+rely on. Each is tagged
 `comment-guidance-write` or `comment-guidance-read`; `behaviour-comment-cleanup` carries both
 `behaviour`/`behaviour-cleanup` and `comment-guidance-write`. Run reads and writes as separate
 invocations with separate budgets:
@@ -166,7 +178,10 @@ and a case passes only when every one passes. Splitting does not make the judge 
 rating), and split votes 4 of 9 FAIL on three identical `comment-guidance-repair` files under a
 criterion that named a function docstring the file lacks (see `RESULTS.md`). The
 `behaviour-prr-1` bullet is now the regex graders `gate-lines` and `gate-evidence`, and the repair
-bullet is reworded; `behaviour-prr-6`'s `rubric-5` is unchanged. Splitting can also drop an exception one
+bullet is reworded. Wording matters as much: a `behaviour-prr-6` `rubric-5` that named the HA and
+multi-region claims and also excluded E3 ratings on gate FAILs made the judge fail all three reports
+in one run, none of which rated the claim above E1; replayed as final messages, the same reports
+passed under the current, shorter criterion. Splitting can also drop an exception one
 bullet made to another: `comment-guidance-mechanical`'s hardware-sentence bullet is now the regex
 `hardware-sentence-unchanged`, and its `prose-renamed` grader states that sentence as the rename's
 one exception. Write criteria the judge can decide from the focus alone (state any before-state or plan
@@ -178,21 +193,24 @@ rate in a run: judging the agent's final message (`last_message`) in eval runs, 
 failed 3 of that set's 9 PASS items (the reports above), so every `llm` FAIL is still rechecked.
 `python3 scripts/eval_recheck.py <results-dir>/aggregate-result.json` replays every failed `llm`
 grader with a judge that must give a reason per criterion and lists disagreements as "NEEDS
-REVIEW"; it calls `claude -p` once per failure and never changes a recorded score.
+REVIEW"; it calls `claude -p` once per failure and never changes a recorded score. Add `--include-passes --grader <glob>` to recheck the judgments the harness passed as well, which is how false passes are found; the recorded results use it for scenario 4's `rubric-4` and scenario 5's `rubric` and `rubric-4`.
 
 A `regex` grader with `target: trace` sees the whole trace as compact JSON, one message per line;
 a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's carry `null`.
 `comment-guidance-plan` uses that: `bulk-implementer-instructed` requires at least two
 `bulk-implementer` dispatches to carry the no-build/no-test instruction, and `no-worker-test-command`
-fails the case if a subagent's own Bash call, run or denied, invokes `-m unittest`, `-m pytest`,
-`-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`, or `git commit` (reading a file
-such as `pytest.ini` does not count). Other forms (a test file run directly, another linter) pass it, and it also fires on a read-only mention such as `which pytest`
-or `grep pytest`. Measured workers have made only read-only Bash calls, so it has not been exercised on a real violation.
-`tests-ran` (implementation, plan, and repair cases) looks for unittest's "Ran N tests" line in a tool result. A `Read`
-result (content starting with a line number) or a `Grep` content result (`path:line:` or, for one file,
-`line:`) does not count, so
-reading or searching a stored log such as the repair case's `failed_check.txt` does not satisfy it; printing
-the log through Bash, or a `Grep` without line numbers, still would. In the plan and implementation cases the run must be the parent's; in the
+fails the case if a subagent's own Bash call, run or denied, starts a test, lint, or commit command
+(`python3 -m unittest`, `-m pytest`, or `-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`,
+or `git commit`) at the start of the command or after `;`, `&&`, `||`, `|`, `(`, or a newline,
+optionally after variable assignments, `env`, `time`, `nice`, or `timeout <n>`, and with interpreter
+options such as `-X dev` before `-m`. A mention such as
+`which pytest`, `grep pytest`, or reading `pytest.ini` does not count; a test file run directly or
+another linter is not detected. Measured workers have made only read-only Bash calls, so it has not
+been exercised on a real violation. `tests-ran` (implementation, plan, and repair cases) pairs a Bash
+call whose command runs `-m unittest` with that call's own result, matched by tool-call id, whether
+the tests passed or failed, and requires unittest's "Ran N tests" line with N of at least 1 in that
+result, so reading, searching, or printing a stored log such as the repair case's
+`failed_check.txt` does not satisfy it. In the plan and implementation cases the run must be the parent's; in the
 repair case the `hard-repair` subagent's run counts. `probe-ran` (every readiness scenario) matches the readiness
 probe's own JSON output in a tool result.
 

@@ -182,6 +182,45 @@
         }
       ]
     },
+    "behaviour-comment-cleanup-reliance": {
+      "allowed_tool_artifacts": [
+        "__pycache__/",
+        ".pytest_cache/",
+        "*.pyc"
+      ],
+      "allowed_writes": [
+        {
+          "path": "src/py/cache.py",
+          "regions": "comments_and_docstrings"
+        },
+        {
+          "path": "src/py/worker.py",
+          "regions": "comments_and_docstrings"
+        }
+      ],
+      "authorized_code_changes": [],
+      "immutable_paths": [
+        "tests/test_concurrency.py"
+      ],
+      "max_file_bytes": 262144,
+      "mode": "cleanup",
+      "protected_directives": [],
+      "required_artifacts": [],
+      "scenario_id": "B09",
+      "semantic_facts": [
+        {
+          "fact": "remember() updates the module-level _SEEN dict with no lock, so nothing enforces its thread-safety comment.",
+          "id": "F-UNENFORCED-THREAD-SAFETY",
+          "path": "src/py/cache.py"
+        },
+        {
+          "fact": "worker.py calls remember() from pool threads, and the test says it relies on the thread-safety comment, so the comment must be deferred as a conflict, not rewritten or deleted.",
+          "id": "F-RELIED-UPON",
+          "path": "tests/test_concurrency.py"
+        }
+      ],
+      "structured_regions": []
+    },
     "comment-guidance-change-review": {
       "allowed_tool_artifacts": [
         "__pycache__/",

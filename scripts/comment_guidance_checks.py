@@ -95,6 +95,7 @@ CASE_DIRS = {
     "B06": "comment-guidance-mechanical",
     "B07": "comment-guidance-repair",
     "B08": "comment-guidance-doc-plan",
+    "B09": "behaviour-comment-cleanup-reliance",
 }
 
 CASE_TAGS = {
@@ -106,6 +107,7 @@ CASE_TAGS = {
     "B06": {"comment-guidance-write"},
     "B07": {"comment-guidance-write"},
     "B08": {"comment-guidance-read"},
+    "B09": {"comment-guidance-write"},
 }
 
 SKILL_FIRED_BASELINE_SHA256 = "b10f153b0eaf22f01db29888e0948dc7d0bd0fa504f1a3d21a925c541e763ef2"
@@ -119,6 +121,7 @@ CASE_MODES = {
     "B06": "mechanical",
     "B07": "repair",
     "B08": "doc_plan",
+    "B09": "cleanup",
 }
 
 REVIEW_MODES = {"review", "change_review", "doc_plan"}
@@ -482,7 +485,7 @@ def structure_checks(repo):
         check(
             "case_dirs_and_tags",
             not case_issues,
-            "issues: {}".format(case_issues) if case_issues else "all eight cases present with expected layout/tags",
+            "issues: {}".format(case_issues) if case_issues else "all nine cases present with expected layout/tags",
         )
     )
 

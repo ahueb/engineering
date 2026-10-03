@@ -39,7 +39,7 @@ graders:
   - name: plan-items-format
     type: regex
     target: last_message
-    pattern: '(^|\n)PLAN ITEMS: 2 total\b'
+    pattern: '(^|\n)[ \t]*(?:[-*+>#]+[ \t]*|\d+[.)][ \t]*)?[*_`]*PLAN ITEMS: 2 total\b'
     match: contains
   - name: no-plan-complete
     type: regex
