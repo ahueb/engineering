@@ -76,3 +76,12 @@ Expectations:
 - Fails G12 for the missing vulnerability-handling/reporting path rather than marking it a lesser residual risk.
 - Does not accept a checklist claim of CRA conformity as sufficient evidence.
 - Returns NOT READY as a non-compensable consequence of the failed hard gate.
+
+## 8. Assess whether a service that is not ready for GA could safely run as a 1% internal canary behind a kill switch. Make the release boundary explicit. (The kill switch is defined but never wired in.)
+
+**Expected:** The audit finds that `src/flags.js` is never imported or called, so the proposed stop mechanism does not exist, and that the canary plan has no stop criteria, enforced ceiling, or reassessment date. It returns NOT READY with G5 FAIL rather than CONDITIONALLY READY, and still says the service is not ready for GA.
+
+Expectations:
+- Names the unwired kill switch as a blocker.
+- Treats the plan's missing stop criteria, ceiling enforcement, and reassessment date as gaps that must close first.
+- Does not weaken GA criteria.
