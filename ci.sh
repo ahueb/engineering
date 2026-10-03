@@ -1649,8 +1649,9 @@ s35() {
   if OUT="$(cd "$repo" && PATH="$bindir:$PATH" GH_FAKE_LOG="$ghlog" ./release.sh pr "$new" 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 0 ] && ok "S35 pr: exit 0" || bad "S35 pr: expected exit 0, got $RC: $OUT"
   local gh_order
-  gh_order="$(grep -E '^pr (create|checks|merge)' "$ghlog" | awk '{print $2}' | tr '\n' ' ')"
-  [ "$gh_order" = "create checks merge " ] && ok "S35 pr: gh called create, checks, merge in order" || bad "S35 pr: gh call order was '$gh_order'"
+  gh_order="$(grep -E '^pr (create|merge)|^pr checks .*--watch' "$ghlog" | awk '{print $2}' | tr '\n' ' ')"
+  [ "$gh_order" = "create checks merge " ] && ok "S35 pr: gh called create, checks --watch, merge in order" || bad "S35 pr: gh call order was '$gh_order'"
+  grep -q "^pr checks release/v$new --json name --jq length$" "$ghlog" && ok "S35 pr: waits for GitHub to report checks before watching" || bad "S35 pr: no check-registration poll before the watch"
   grep -q "^pr create --base main --head release/v$new " "$ghlog" && ok "S35 pr: pr create targets main from release/v$new" || bad "S35 pr: pr create arguments wrong: $(grep '^pr create' "$ghlog")"
   grep -q "^pr checks release/v$new --watch --fail-fast$" "$ghlog" && ok "S35 pr: pr checks watches the branch" || bad "S35 pr: pr checks arguments wrong"
   grep -q "^pr merge release/v$new --squash --subject Release engineering $new --delete-branch$" "$ghlog" && ok "S35 pr: pr merge squashes with the release subject and deletes the branch" || bad "S35 pr: pr merge arguments wrong: $(grep '^pr merge' "$ghlog")"
@@ -1663,6 +1664,43 @@ s35() {
     *) bad "S35 tag: refusal message missing: $OUT" ;;
   esac
   [ -z "$(git -C "$repo" tag -l "v$new")" ] && ok "S35 tag: no tag created by the refusal" || bad "S35 tag: tag created despite the refusal"
+
+  # --- pr: keeps polling while GitHub reports no checks, then watches and merges
+  : > "$ghlog"; rm -f "$ghlog.checks"
+  if OUT="$(cd "$repo" && PATH="$bindir:$PATH" GH_FAKE_LOG="$ghlog" GH_FAKE_NO_CHECKS_CALLS=2 RELEASE_CHECKS_INTERVAL=0 ./release.sh pr "$new" 2>&1)"; then RC=0; else RC=$?; fi
+  [ "$RC" -eq 0 ] && ok "S35 pr-wait: exit 0 once checks are reported" || bad "S35 pr-wait: expected exit 0, got $RC: $OUT"
+  [ "$(grep -c "^pr checks release/v$new --json name --jq length$" "$ghlog")" -eq 3 ] && ok "S35 pr-wait: polled until checks were reported" || bad "S35 pr-wait: poll count was $(grep -c -- '--json name' "$ghlog")"
+  grep -q '^pr merge' "$ghlog" && ok "S35 pr-wait: merged after the checks passed" || bad "S35 pr-wait: did not merge"
+
+  # --- pr: gives up when no checks ever appear, without merging
+  : > "$ghlog"; rm -f "$ghlog.checks"
+  if OUT="$(cd "$repo" && PATH="$bindir:$PATH" GH_FAKE_LOG="$ghlog" GH_FAKE_NO_CHECKS_CALLS=99 RELEASE_CHECKS_TRIES=3 RELEASE_CHECKS_INTERVAL=0 ./release.sh pr "$new" 2>&1)"; then RC=0; else RC=$?; fi
+  [ "$RC" -eq 1 ] && ok "S35 pr-timeout: exit 1" || bad "S35 pr-timeout: expected exit 1, got $RC: $OUT"
+  case "$OUT" in *"no checks reported for release/v$new"*) ok "S35 pr-timeout: says no checks were reported" ;; *) bad "S35 pr-timeout: message missing: $OUT" ;; esac
+  if grep -q '^pr merge' "$ghlog"; then bad "S35 pr-timeout: merged without checks"; else ok "S35 pr-timeout: did not merge"; fi
+
+  # --- tag: checks the installed version after updating (needs an SSH key for `git tag -s`)
+  if command -v ssh-keygen >/dev/null 2>&1; then
+    ssh-keygen -q -t ed25519 -N "" -f "$work/signkey" -C ci >/dev/null 2>&1
+    git -C "$repo" config gpg.format ssh
+    git -C "$repo" config user.signingkey "$work/signkey"
+    git -C "$repo" push -q origin "release/v$new:main"
+    if OUT="$(cd "$repo" && PATH="$bindir:$PATH" CLAUDE_FAKE_INSTALLED=1 CLAUDE_FAKE_LIST_VERSION="$new" ./release.sh tag "$new" 2>&1)"; then RC=0; else RC=$?; fi
+    [ "$RC" -eq 0 ] && ok "S35 tag-match: exit 0" || bad "S35 tag-match: expected exit 0, got $RC: $OUT"
+    case "$OUT" in *"local install updated to $new"*) ok "S35 tag-match: reports the update" ;; *) bad "S35 tag-match: update line missing: $OUT" ;; esac
+    git --git-dir="$work/origin.git" rev-parse -q --verify "refs/tags/v$new" >/dev/null && ok "S35 tag-match: tag pushed" || bad "S35 tag-match: tag not pushed"
+    local list_version
+    for list_version in "$cur" garbage; do
+      git -C "$repo" tag -d "v$new" >/dev/null 2>&1
+      git -C "$repo" push -q origin ":refs/tags/v$new" >/dev/null 2>&1
+      if OUT="$(cd "$repo" && PATH="$bindir:$PATH" CLAUDE_FAKE_INSTALLED=1 CLAUDE_FAKE_LIST_VERSION="$list_version" ./release.sh tag "$new" 2>&1)"; then RC=0; else RC=$?; fi
+      [ "$RC" -eq 1 ] && ok "S35 tag-mismatch ($list_version): exit 1" || bad "S35 tag-mismatch ($list_version): expected exit 1, got $RC: $OUT"
+      case "$OUT" in *"reset --hard origin/main"*) ok "S35 tag-mismatch ($list_version): prints the sync steps" ;; *) bad "S35 tag-mismatch ($list_version): sync steps missing: $OUT" ;; esac
+      case "$OUT" in *"local install updated"*) bad "S35 tag-mismatch ($list_version): claimed an update" ;; *) ok "S35 tag-mismatch ($list_version): no false update claim" ;; esac
+    done
+  else
+    echo "   skip: ssh-keygen not available for the tag-verification scenarios"
+  fi
 
   # --- deprecated form: warns and, with --no-commit, bumps without committing
   local head_before newer

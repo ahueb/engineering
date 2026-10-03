@@ -6,7 +6,9 @@
 # delegated to the real CLI.
 #   --version        -> a version new enough for install.sh's precondition
 #   plugin validate  -> exit 0
-#   plugin list      -> empty listing (release.sh then skips the local update)
+#   plugin list      -> empty listing (release.sh then skips the local update); with
+#                       CLAUDE_FAKE_INSTALLED=1, lists engineering@engineering, and --json
+#                       reports version $CLAUDE_FAKE_LIST_VERSION ("garbage" prints non-JSON)
 #   plugin update    -> exit 0
 # Anything else exits 0 silently.
 set -euo pipefail
@@ -23,10 +25,23 @@ if [ "${1:-}" = "plugin" ]; then
       exit 0
       ;;
     list)
-      case "${3:-}" in
-        --json) echo "[]" ;;
-        *) : ;;
-      esac
+      if [ "${CLAUDE_FAKE_INSTALLED:-0}" = "1" ]; then
+        case "${3:-}" in
+          --json)
+            if [ "${CLAUDE_FAKE_LIST_VERSION:-}" = "garbage" ]; then
+              echo "not json"
+            else
+              printf '[{"id":"engineering@engineering","version":"%s"}]\n' "${CLAUDE_FAKE_LIST_VERSION:-}"
+            fi
+            ;;
+          *) echo "  engineering@engineering" ;;
+        esac
+      else
+        case "${3:-}" in
+          --json) echo "[]" ;;
+          *) : ;;
+        esac
+      fi
       exit 0
       ;;
     update)
