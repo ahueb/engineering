@@ -40,9 +40,11 @@ criterion per grader (`rubric`, `rubric-2`, ...; see "Judge" below) — no relia
 all four did on 2026-10-02. A report that names a scenario path only to say it is missing would
 still satisfy `repo-evidence`; none of 42 empty-workspace reports did.
 Run them with grants that exclude `Edit`/`Write` (the audit must stay read-only). The git grants
-allow only the hardened read-only plumbing the skill uses; Claude Code matches each rule's text before
-its `*` exactly as written, and it also auto-allows plain read-only `git` forms such as `git status`
-and `git log` without any grant:
+cover the hardened read-only plumbing the skill uses, but they are not a read-only boundary: a rule
+matches any command that starts with its text before the `*`, so it also admits further options (for
+example `--ext-diff` or `--output=<file>` after the `diff-tree` prefix), and Claude Code auto-allows
+plain read-only `git` forms such as `git status` and `git log` without any grant. The skill's
+instructions are what keep the model to the hardened commands:
 
 ```bash
 cd plugins/engineering
@@ -54,7 +56,7 @@ claude plugin eval . --tag behaviour-readiness --scaffold --trust-plugin --ablat
   "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -t *)" \
   "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -s *)" \
   "Bash(git -c core.fsmonitor=false -c core.hooksPath=/dev/null cat-file -p *)" \
-  --max-cost-usd 13
+  --max-cost-usd 16
 ```
 
 Before the skill told it to run the probe as its own call, every run on 2026-10-02 and 2026-10-03
