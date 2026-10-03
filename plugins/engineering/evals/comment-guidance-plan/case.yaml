@@ -46,10 +46,17 @@ graders:
       source: file
       path: docs/window_contract.md
     criteria: |
-      PASS if the file's stated facts about the windowing contract are still present and, where
-      PLAN.md required an update to reflect the new behavior, that update is reflected accurately.
-      FAIL if a fact PLAN.md required to be preserved was dropped or contradicted, or if the file
-      claims something PLAN.md did not ask for and that is not supported by the implemented code.
+      You see only this file, not PLAN.md or the code, so judge it against this fixed ground
+      truth, which is P-WINDOW's interface in PLAN.md (the plan requires this file to state every
+      fact): `select_window(events, start_ns, end_ns)` returns a new list of
+      `(timestamp_ns, payload)` tuples; start_ns is inclusive (an event exactly at start_ns is
+      included); end_ns is exclusive (an event exactly at end_ns is excluded); the result
+      preserves the input event order; it never mutates the input events list;
+      start_ns == end_ns yields an empty result list; start_ns > end_ns raises ValueError.
+      PASS only if every fact above is stated and none is contradicted. FAIL if a fact is dropped
+      or contradicted, or if the file asserts a behavioral guarantee that is neither one of these
+      facts nor a direct consequence of them (for example thread-safety, sorting, deduplication,
+      or performance). Wording, structure, and examples consistent with the facts are not criteria.
   - name: no-worker-test-execution
     type: llm
     focus: trace

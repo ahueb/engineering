@@ -44,8 +44,17 @@ graders:
       source: file
       path: src/py/contracts.py
     criteria: |
-      PASS only if all of the following hold; otherwise FAIL.
-      - The docstring for `select_window` still states that the end bound is exclusive.
+      PASS only if the following holds; otherwise FAIL.
+      - The file's documentation of `select_window` still states that the end bound (`end_ns`) is
+        exclusive. That documentation is the module docstring ("Contract for select_window: ..."),
+        plus a function docstring if one was added.
+  - name: rubric-2
+    type: llm
+    focus:
+      source: file
+      path: src/py/contracts.py
+    criteria: |
+      PASS only if the following holds; otherwise FAIL.
       - The implementation now actually treats the end bound as exclusive (a strict `<`
         comparison against the end bound, not `<=`), i.e. the code was fixed to match the
         docstring rather than the docstring being rewritten to describe the previous buggy

@@ -11,6 +11,17 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 - `scout` runs on `sonnet` at `low` effort instead of `haiku`.
 - Every `claude plugin eval` case pinned to `claude-sonnet-5` is pinned to `claude-sonnet-5-5`, and `ci.sh --full`'s rules-file load scenario (S21) calls `claude -p --model sonnet --effort low` instead of `--model haiku`.
 - `install.sh` requires Claude Code 2.1.284 or later (was 2.1.267), the first version whose `opus` and `sonnet` aliases resolve to Opus 5.5 and Sonnet 5.5; CI's pinned Claude Code moves from 2.1.269 to 2.1.284 so its scratch installs still pass that check.
+- Every multi-bullet `llm` rubric in the eval cases is split into one grader per bullet (`rubric`, `rubric-2`, ...), because the eval judge returned FAIL on whole rubrics whose every bullet it passed when judged alone (`comment-guidance-review-only`, `behaviour-prr-6`).
+- `comment-guidance-review-only` drops its `no-bash` grader, which counted refused calls to a tool the run never had, and its no-change bullet now forbids claiming any edit or proposing executable-code changes while allowing the suggested comment wording its prompt permits.
+- `comment-guidance-plan`'s `doc-contract-preserved` judges `docs/window_contract.md` against PLAN.md's interface stated inline, and `comment-guidance-implementation`'s unrelated-comments criterion states the file's pre-change comments inline, since the judge sees only the changed file; `comment-guidance-repair`'s documentation bullet names the module docstring, and `behaviour-prr-3`'s `rubric-5` states the gaps it refers to.
+- `plugins/engineering/evals/README.md` runs each read case in its own invocation so only `comment-guidance-change-review` gets `Bash(git *)`, and documents what `tool_used`, the judge, and prefix Bash grants actually do.
+
+### Added
+
+- A `repo-evidence` regex grader on `behaviour-prr-1`..`-7`: the report must cite one of the paths its scenario's fixture creates, so an audit of an empty workspace no longer passes.
+- Regex graders for mechanical criteria: `gate-lines` and `gate-evidence` on `behaviour-prr-1` (12 `GATE` lines; an E-level on each rated gate row) replace its first rubric bullet, and `hardware-sentence-unchanged` on `comment-guidance-mechanical` replaces the bullet that kept the UART hardware sentence; the remaining `prose-renamed` graders now state that sentence as the rename's one exception.
+- `/evals/results/` in `.gitignore`, for results written when the repository root is the eval target.
+- Risk register entries R16–R19 for measured eval findings, R15 restated as a scenario-4 fixture defect, and 2026-10-02/03 rows in `plugins/engineering/evals/RESULTS.md`.
 
 ## [2.10.0] - 2026-09-16
 

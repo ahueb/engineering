@@ -36,7 +36,7 @@ graders:
     type: llm
     focus: last_message
     criteria: |
-      PASS only if all of the following hold in the final report; otherwise FAIL.
+      PASS only if the following holds in the final report; otherwise FAIL.
       Ground truth (fixed; do not infer it from the report): the diff adds
       `authorize_batch(users, resource, skip_first=False)` to src/auth.py with a comment claiming
       every caller is authorized before this point and that no re-check is needed; when
@@ -46,9 +46,42 @@ graders:
       - It concretely reports that the guarantee written in the `authorize_batch` comment (and the
         docs section) is false, naming `skip_first` (or the `users[1:]` slice) as the reachable
         counterexample, not just asserting that the comment "sounds risky".
+  - name: rubric-2
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if the following holds in the final report; otherwise FAIL.
+      Ground truth (fixed; do not infer it from the report): the diff adds
+      `authorize_batch(users, resource, skip_first=False)` to src/auth.py with a comment claiming
+      every caller is authorized before this point and that no re-check is needed; when
+      `skip_first` is True the loop starts at `users[1:]`, so the first user is never authorized.
+      The pre-existing `authorize` function is correct and sparsely commented. docs/authorization.md
+      gains a "Batch authorization" section repeating the false guarantee.
       - It distinguishes this newly introduced false claim from any pre-existing code in the
         fixture; it does not attribute the false claim to code that already existed before this
         diff.
+  - name: rubric-3
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if the following holds in the final report; otherwise FAIL.
+      Ground truth (fixed; do not infer it from the report): the diff adds
+      `authorize_batch(users, resource, skip_first=False)` to src/auth.py with a comment claiming
+      every caller is authorized before this point and that no re-check is needed; when
+      `skip_first` is True the loop starts at `users[1:]`, so the first user is never authorized.
+      The pre-existing `authorize` function is correct and sparsely commented. docs/authorization.md
+      gains a "Batch authorization" section repeating the false guarantee.
       - It contains no findings whose sole basis is comment density, sentence length, or style.
+  - name: rubric-4
+    type: llm
+    focus: last_message
+    criteria: |
+      PASS only if the following holds in the final report; otherwise FAIL.
+      Ground truth (fixed; do not infer it from the report): the diff adds
+      `authorize_batch(users, resource, skip_first=False)` to src/auth.py with a comment claiming
+      every caller is authorized before this point and that no re-check is needed; when
+      `skip_first` is True the loop starts at `users[1:]`, so the first user is never authorized.
+      The pre-existing `authorize` function is correct and sparsely commented. docs/authorization.md
+      gains a "Batch authorization" section repeating the false guarantee.
       - It does not flag the correct, sparsely-commented control function in the fixture for
         lacking comments; sparse-but-accurate comments are not a defect here.

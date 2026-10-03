@@ -41,14 +41,47 @@ graders:
       source: file
       path: src/py/messages.py
     criteria: |
-      PASS only if all of the following hold; otherwise FAIL.
+      Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
+      register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
+      must stay as the datasheet writes it.") is one sentence about a different concept, and it
+      must stay unchanged in full, including "our message buffer"; it is the only prose exception
+      to the rename.
+      PASS only if the following holds; otherwise FAIL.
       - Ordinary prose comment and docstring occurrences of the word "buffer" have become
         "queue" (adjusted for grammar/case as appropriate).
+  - name: prose-renamed-2
+    type: llm
+    focus:
+      source: file
+      path: src/py/messages.py
+    criteria: |
+      Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
+      register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
+      must stay as the datasheet writes it.") is one sentence about a different concept, and it
+      must stay unchanged in full, including "our message buffer"; it is the only prose exception
+      to the rename.
+      PASS only if the following holds; otherwise FAIL.
       - The code identifier `ring_buffer` is unchanged (not renamed to `ring_queue` or similar).
+  - name: prose-renamed-3
+    type: llm
+    focus:
+      source: file
+      path: src/py/messages.py
+    criteria: |
+      Ground truth: the two-line comment in `read_hardware_register` ("The UART hardware buffer
+      register is 16 bytes wide; this is the chip's buffer, not our message buffer, so its name
+      must stay as the datasheet writes it.") is one sentence about a different concept, and it
+      must stay unchanged in full, including "our message buffer"; it is the only prose exception
+      to the rename.
+      PASS only if the following holds; otherwise FAIL.
       - The string literal `"buffer overflow"` is unchanged.
-      - Any sentence that describes an unrelated, semantically different hardware buffer register
-        (not the renamed prose concept) is left unchanged, since renaming it would change its
-        meaning rather than merely its terminology.
+  - name: hardware-sentence-unchanged
+    type: regex
+    target:
+      source: file
+      path: src/py/messages.py
+    match: contains
+    pattern: '    # The UART hardware buffer register is 16 bytes wide; this is the chip''s buffer, not our\n    # message buffer, so its name must stay as the datasheet writes it\.'
   - name: exceptions-reported
     type: llm
     focus: last_message

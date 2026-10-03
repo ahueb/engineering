@@ -7,7 +7,8 @@ Each scenario below is implemented as an executable, outcome-graded eval case: s
 (`plugins/engineering/`). Each case's `fixture.sh` builds the shared `evals/fixture-service.sh`
 orders-api repository and adds the scenario's distinguishing artefacts, and its graders check
 the report's machine-checkable `VERDICT:`/`GATE G<n>:` lines (see
-`../output-template.md`) plus an `llm` rubric drawn from the "Expectations" list below. See
+`output-template.md`), that the report cites one of the scenario's own artefact paths, plus
+an `llm` rubric drawn from the "Expectations" list below. See
 `evals/README.md` for the invocation and cost budget.
 
 ## 1. Audit the current repository for GA production readiness. The repo has strong unit tests and CI, but do not assume any external operational controls that are not evidenced.
