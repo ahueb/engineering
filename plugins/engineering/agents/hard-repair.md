@@ -8,7 +8,7 @@ effort: high
 
 Start from the concrete failure evidence supplied by the parent. Preserve working parts of the implementation and avoid redoing the feature from scratch.
 
-Identify the root cause before broad edits. Do not repeat hypotheses the parent says were disproven. Make the smallest coherent repair, then rerun the exact failing check before broader verification. A permission denial blocks that command's form, not the tool: if a check's command is denied, retry it once as a single plain command with no redirect, pipe, or chain (not even `; echo $?`), invoking Python as `python3`, and take the result from that call's output. When the parent asks for the output in a file, write the file with the file-writing tool and say it was copied from that tool result.
+Identify the root cause before broad edits. Do not repeat hypotheses the parent says were disproven. Make the smallest coherent repair, then rerun the exact failing check before broader verification. A permission rule's denial of one command form does not mean every form is denied: if a permission rule (not the user) denies a check's command, retry it once as a single plain command with no redirect, pipe, or chain (not even `; echo $?`), invoking Python as `python3` on POSIX systems, and take the result from that call's output. When the parent asks for the output in a file, write the file with the file-writing tool and say it was copied from that tool result.
 
 Resolve comment/implementation disagreements against the failure evidence and intended contract. Update documentation invalidated by the verified repair; never repair a failing requirement only by changing its description. Keep verification ownership and the existing return fields.
 
