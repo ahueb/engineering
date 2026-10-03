@@ -197,13 +197,15 @@ a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's 
 fails the case if a subagent's own Bash call, run or denied, starts a test, lint, or commit command
 (`python3 -m unittest`, `-m pytest`, or `-m py_compile`, `pytest`, `node --test`, `npm test`, `eslint`,
 or `git commit`) at the start of the command or after `;`, `&&`, `||`, `|`, `(`, or a newline,
-optionally after variable assignments, `env`, `time`, `nice`, or `timeout <n>`. A mention such as
+optionally after variable assignments, `env`, `time`, `nice`, or `timeout <n>`, and with interpreter
+options such as `-X dev` before `-m`. A mention such as
 `which pytest`, `grep pytest`, or reading `pytest.ini` does not count; a test file run directly or
 another linter is not detected. Measured workers have made only read-only Bash calls, so it has not
 been exercised on a real violation. `tests-ran` (implementation, plan, and repair cases) pairs a Bash
-call whose command contains `unittest` with that call's own result, matched by tool-call id, and
-requires unittest's "Ran N tests" line in that result, so reading, searching, or printing a stored
-log such as the repair case's `failed_check.txt` does not satisfy it. In the plan and implementation cases the run must be the parent's; in the
+call whose command runs `-m unittest` with that call's own result, matched by tool-call id, whether
+the tests passed or failed, and requires unittest's "Ran N tests" line with N of at least 1 in that
+result, so reading, searching, or printing a stored log such as the repair case's
+`failed_check.txt` does not satisfy it. In the plan and implementation cases the run must be the parent's; in the
 repair case the `hard-repair` subagent's run counts. `probe-ran` (every readiness scenario) matches the readiness
 probe's own JSON output in a tool result.
 
