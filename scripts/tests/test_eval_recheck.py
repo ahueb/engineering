@@ -82,6 +82,16 @@ class SelectionTests(unittest.TestCase):
         records = list(er.failed_llm_graders(AGGREGATE, "comment-guidance-*"))
         self.assertEqual([r["case"] for r in records], ["comment-guidance-repair"])
 
+    def test_include_passes_selects_passing_llm_graders_too(self):
+        records = list(er.llm_grader_records(AGGREGATE, include_passes=True))
+        self.assertEqual([(r["case"], r["grader"], r["harness"]) for r in records],
+                         [("behaviour-prr-6", "rubric", "PASS"), ("behaviour-prr-6", "rubric-5", "FAIL"),
+                          ("comment-guidance-repair", "rubric", "FAIL")])
+
+    def test_grader_glob_filters(self):
+        records = list(er.llm_grader_records(AGGREGATE, grader_glob="rubric-5", include_passes=True))
+        self.assertEqual([r["grader"] for r in records], ["rubric-5"])
+
 
 class ParseOverallTests(unittest.TestCase):
     def test_last_overall_line_wins(self):
@@ -165,6 +175,31 @@ class MainTests(unittest.TestCase):
         self.assertIn("behaviour-prr-6 run 0 rubric-5: harness FAIL FAIL PASS; recheck ERROR -> NEEDS REVIEW", out)
         self.assertIn("comment-guidance-repair run 0 rubric: harness FAIL FAIL FAIL; recheck ERROR -> NEEDS REVIEW", out)
         self.assertIn("2 of 2 need review", out)
+
+    def test_dry_run_with_passes_lists_them(self):
+        with mock.patch.object(er.subprocess, "run") as run:
+            code, out, _ = self.run_main([str(self.path), "--dry-run", "--include-passes"])
+        run.assert_not_called()
+        self.assertEqual(code, 0)
+        self.assertIn("3 llm grader(s) selected, passes included", out)
+        self.assertIn("behaviour-prr-6 run 0 rubric: harness PASS PASS PASS", out)
+
+    def test_recheck_failing_a_harness_pass_needs_review(self):
+        reply = subprocess.CompletedProcess([], 0, "1. FAIL - not named\nOVERALL: FAIL\n", "")
+        with mock.patch.object(er.subprocess, "run", return_value=reply) as run:
+            code, out, _ = self.run_main([str(self.path), "--include-passes", "--grader", "rubric",
+                                          "--case", "behaviour-prr-6", "--claude", "claude"])
+        self.assertEqual(code, 0)
+        self.assertIn("behaviour-prr-6 run 0 rubric: harness PASS PASS PASS; recheck FAIL -> NEEDS REVIEW", out)
+        self.assertIn("1 of 1 need review", out)
+        self.assertIn("re-checking an eval judge's PASS verdict", run.call_args.kwargs["input"])
+
+    def test_grader_glob_matching_nothing_selects_zero(self):
+        with mock.patch.object(er.subprocess, "run") as run:
+            code, out, _ = self.run_main([str(self.path), "--grader", "nope", "--include-passes"])
+        run.assert_not_called()
+        self.assertEqual(code, 0)
+        self.assertIn("0 llm grader(s) selected, passes included", out)
 
     def test_unreadable_aggregate_exits_2(self):
         bad = Path(self.tmp.name) / "bad.json"

@@ -178,7 +178,7 @@ rate in a run: judging the agent's final message (`last_message`) in eval runs, 
 failed 3 of that set's 9 PASS items (the reports above), so every `llm` FAIL is still rechecked.
 `python3 scripts/eval_recheck.py <results-dir>/aggregate-result.json` replays every failed `llm`
 grader with a judge that must give a reason per criterion and lists disagreements as "NEEDS
-REVIEW"; it calls `claude -p` once per failure and never changes a recorded score.
+REVIEW"; it calls `claude -p` once per failure and never changes a recorded score. Add `--include-passes --grader <glob>` to recheck the judgments the harness passed as well, which is how false passes are found; the recorded results use it for scenario 4's `rubric-4` and scenario 5's `rubric` and `rubric-4`.
 
 A `regex` grader with `target: trace` sees the whole trace as compact JSON, one message per line;
 a subagent's messages carry `"parent_tool_use_id":"toolu_..."` and the parent's carry `null`.
