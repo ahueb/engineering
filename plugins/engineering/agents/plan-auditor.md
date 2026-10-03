@@ -19,6 +19,6 @@ Procedure:
 Emit, for each finding, exactly:
 SEVERITY | plan item | file:line | what is missing or wrong | smallest check that would confirm the fix
 
-Then emit a coverage line: `PLAN ITEMS: <n> total, <n> verified complete, <n> incomplete, <n> not implemented`.
+Then emit a coverage line: `PLAN ITEMS: <n> total, <n> verified complete, <n> incomplete, <n> not implemented`. Count each top-level numbered or bulleted item of the plan, or of each plan in a plan set, once; an item's acceptance criteria and sub-steps belong to that item and are not counted separately.
 
 If every item is verified complete and no correctness finding survives, emit exactly `PLAN_COMPLETE` followed by the coverage line. Do not praise, summarize the diff, or report style.
