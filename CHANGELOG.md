@@ -4,6 +4,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-10-03
+
 ### Changed
 
 - The readiness probe no longer runs filter drivers that the reviewed repository's own config defines: before `git status` it blanks the `clean`, `smudge`, and `process` commands of every driver defined outside system and global config, read through git's own config sequence so includes and conditional includes resolve as they do for `git status`; it disables lazy fetching and skips status in a partial clone; it ignores replace refs and compares file content rather than stat data a shipped index could forge; it skips status when the index marks a present file assume-unchanged or skip-worktree or when git's work tree does not contain the scan root; it never looks inside a submodule's work tree while still reporting a submodule checked out at another commit; and it reports status as not collected, with a reason, when a driver cannot be blanked or status fails (risk register R20, now mitigated). It also reports an unstaged change on the first status line with its own code and an unborn HEAD as null. The probe's JSON schema is 2.2: `git` gains `status` and `status_skip_reason`, and `dirty` and the status counts are null when status was not collected. `SECURITY.md` says to sanitize any other untrusted checkout with `git clone --no-local`.
@@ -329,7 +331,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/ahueb/engineering/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
 [2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1
