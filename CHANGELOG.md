@@ -4,6 +4,10 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 ## [Unreleased]
 
+### Changed
+
+- The plugin's source folder moved from `plugins/engineering/` to `plugins/lathe/`, and the marketplace entry's `source` is `./plugins/lathe`. Installed copies are unaffected apart from the version; the plugin directory listing's source path is now `plugins/lathe`.
+
 ## [3.0.0] - 2026-10-04
 
 ### Changed

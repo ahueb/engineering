@@ -106,7 +106,7 @@ set -Eeuo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CFG="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-POLICY_SRC="$HERE/plugins/engineering/context/CLAUDE.md"
+POLICY_SRC="$HERE/plugins/lathe/context/CLAUDE.md"
 
 # ---- flag/env parsing (step 1) --------------------------------------------------------
 
@@ -478,7 +478,7 @@ try:
     print(json.load(open(sys.argv[1])).get("version", ""))
 except Exception:
     print("")
-' "$HERE/plugins/engineering/.claude-plugin/plugin.json" 2>/dev/null || true)"
+' "$HERE/plugins/lathe/.claude-plugin/plugin.json" 2>/dev/null || true)"
 
 # ---- step 3: preflight (read-only): mode, policy state, marketplace comparison ----------
 
