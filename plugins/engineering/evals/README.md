@@ -21,7 +21,7 @@ Negative cases pass trivially on the without-plugin arm; run them with `--ablati
 
 Run with the session default model. On a 200K-context model such as Haiku the skill listing overruns its default budget and the least-invoked skills lose their descriptions, so trigger cases fail for a reason unrelated to the description text; `settings.recommended.json` raises `skillListingBudgetFraction` to 0.02 for normal sessions, but eval runs do not read user settings (the eval sandbox loads no user settings, hooks, or other plugins).
 
-Every run is a model call on your account (about 9 USD for the full suite at one run per case). With a path target (`.` from `plugins/engineering`, or `plugins/engineering` from the repository root) raw results land in `plugins/engineering/evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`. Do not target the repository root (`claude plugin eval .` run from the root): the 2026-10-02 run that did so recorded the repository root as its suite root and wrote its results to `<repo>/evals/results/` (now also ignored). Any invocation without `--tag` or `--case` runs all 57 cases under one set of flags. Every suite below needs its own invocation, `--scaffold`, and its own grants; without `--scaffold` the workspaces are empty and the behaviour and comment-guidance results are void.
+Every run is a model call on your account (about 9 USD for the full suite at one run per case). With a path target (`.` from `plugins/engineering`, or `plugins/engineering` from the repository root) raw results land in `plugins/engineering/evals/results/`, which is ignored by git; summarise a run in `RESULTS.md`. Do not target the repository root (`claude plugin eval .` run from the root): the 2026-10-02 run that did so recorded the repository root as its suite root and wrote its results to `<repo>/evals/results/` (now also ignored). Any invocation without `--tag` or `--case` runs all 62 cases under one set of flags. Every suite below needs its own invocation, `--scaffold`, and its own grants; without `--scaffold` the workspaces are empty and the behaviour and comment-guidance results are void.
 
 ## Output-behavior (outcome-graded) cases
 
@@ -84,6 +84,16 @@ claude plugin eval . --case behaviour-comment-cleanup --scaffold --trust-plugin 
 These two invocations are separate on purpose: `--case 'prr-*'` (the trigger-quality suite
 above) must never be widened to `behaviour-*` — the `behaviour-*` cases are outcome-graded,
 cost far more per run, and need write grants the trigger suite does not.
+
+## Security-reviewer suite
+
+The five `behaviour-security-*` cases run `/engineering:change-review` on an uncommitted diff and grade the merged report. Cases 1, 3, and 4 test detection and exposure reasoning (a public route to a shell command; Redis published on all interfaces by a config-only change; `pull_request_target` running PR code with secrets). Cases 2 and 5 test restraint: an operator-only caller must not be rated High or Critical, and an authorization check applied by a blueprint hook and a scoped base class must not be reported missing. Graders are `tool_used`, `regex`, and one-criterion `llm` rubrics.
+
+```bash
+cd plugins/engineering
+claude plugin eval . --tag behaviour-security --scaffold --trust-plugin --ablation none --runs 3 \
+  --judge-model sonnet --allow-tools Read Grep Glob Skill Agent "Bash(git *)" --max-cost-usd 20 --no-publish
+```
 
 ## Comment-guidance suite
 

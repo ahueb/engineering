@@ -40,7 +40,7 @@ Do not chain other commands onto it: it already reports the git HEAD, branch, an
 
 For large repositories, dispatch read-only evidence collection in one batch and keep gate synthesis and the final verdict with the primary auditor:
 - `engineering:scout`: locate test, CI, deployment, migration, operations, observability, and security files the probe did not surface, returning paths only.
-- `engineering:security-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Collect evidence for gate G3 (authentication, authorization, secrets, dependency and supply-chain controls, trust boundaries).
+- `engineering:security-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Collect evidence for gate G3 (authentication, authorization, secrets, dependency and supply-chain controls, trust boundaries). Pass the scoped target exposure and environment boundary, marked as supplied rather than verified; its EXPOSURE, CONTROLS, and UNDETERMINED sections are G3 evidence.
 - `engineering:semantic-reviewer`: Scope: the whole candidate, not a change. Return evidence with `path:line`, not a verdict. Examine the critical-journey tests for gate G2 and report weak oracles, mocked contracts, and untested failure modes.
 - `engineering:browser-tester`: only when the candidate is a web application that can be run locally without new dependencies. One dispatch per critical journey via `/engineering:browser-testing` step 3; the result is direct G2 evidence for that journey and nothing else.
 

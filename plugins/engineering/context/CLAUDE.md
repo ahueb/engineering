@@ -64,7 +64,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 | `bulk-implementer` | a bounded output-heavy implementation specifiable without transferring most of the main session context | full |
 | `architect` | cross-cutting, difficult-to-reverse design decisions whose invariants are not already clear | read-only |
 | `semantic-reviewer` | correctness properties not adequately covered by deterministic checks, or material semantic/concurrency/migration/compatibility/data-integrity risk | read-only |
-| `security-reviewer` | change touches a trust boundary: auth, secrets, external input, file/network access, supply chain, or CI | read-only |
+| `security-reviewer` | change touches a trust boundary or exposure: auth, secrets, external input, file/network access, listeners or deployment configuration, privileges, supply chain, CI, or agent tool wiring | read-only |
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
 | `browser-tester` | one named user journey must be exercised in a real browser against a running app; returns pass/fail with snapshot, console, and network evidence, never edits | read-only + Playwright MCP, no Bash |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
