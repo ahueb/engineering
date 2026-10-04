@@ -176,6 +176,8 @@ Two independent kinds of checking apply to the comment-guidance cases, and neith
 ### Tuning
 
 - `maxEffortLevel` caps the highest `effort` value agents and skills may request.
+- Each agent runs at its own `effort` frontmatter, not the session's level; `CLAUDE_CODE_EFFORT_LEVEL` overrides that frontmatter and `maxEffortLevel` caps it.
+- On Opus 5.5 and Sonnet 5.5 the main session's effort comes from `modelSettings.<model>.effortLevel`; a top-level `effortLevel` in user settings applies only to older models.
 - `skillOverrides` / `skillListingMaxDescChars` control per-skill description length in the listing budget.
 - `--plugin-dir ./plugins` runs against this checkout's plugin code without a version bump, for trying edits.
 - `claude plugin eval --threshold` can gate the trigger evals in a CI job; `ci.sh` does not run them because each run bills model usage.
@@ -184,7 +186,7 @@ Two independent kinds of checking apply to the comment-guidance cases, and neith
 
 | Kind | Names |
 |---|---|
-| Agents | `engineering:scout` (sonnet, low), `engineering:test-triage` (sonnet, low, no Bash), `engineering:mechanical-worker` (sonnet, low), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, no Bash, has Playwright MCP), `engineering:auditor` (opus, xhigh, Bash guarded by a plugin hook allowlist) |
+| Agents | `engineering:scout` (sonnet, low), `engineering:test-triage` (sonnet, low, no Bash), `engineering:mechanical-worker` (sonnet, medium), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, no Bash, has Playwright MCP), `engineering:auditor` (opus, xhigh, Bash guarded by a plugin hook allowlist) |
 | Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review`, `comment-cleanup` (forked, sonnet, medium; audit or bounded cleanup of comments and docstrings, edits comment/docstring spans only) |
 | Research skills (forked, no shell) | `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
 | User-only escalation | `/engineering:deep-audit` (forks to `engineering:auditor`, opus, xhigh) |

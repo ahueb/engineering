@@ -4,6 +4,15 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- `mechanical-worker` runs at `medium` effort instead of `low`, runs its check as its own command after the edits, retries a check a permission rule denied once as a single plain `python3` command, and says which check could not run instead of reporting the change done. In a measured rename task the tests actually ran in 9 of 12 runs, against 0 of 9 with the previous text at `low`, at the same cost per run.
+- README's Tuning section states how agent `effort` frontmatter, `CLAUDE_CODE_EFFORT_LEVEL`, `maxEffortLevel`, and `modelSettings` interact on Opus 5.5 and Sonnet 5.5.
+
+### Added
+
+- An Effort measurements section in `plugins/engineering/evals/RESULTS.md`: `bulk-implementer` and `architect` stay at `medium` because `high` showed no clear gain; `mechanical-worker` moves to `medium`.
+
 ## [2.13.0] - 2026-10-03
 
 ### Changed

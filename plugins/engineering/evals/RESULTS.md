@@ -61,6 +61,18 @@ Recorded from the `behaviour-security` invocation in `README.md` with `-j 3` (Cl
 
 `comment-guidance-change-review` (B05), rerun because `change-review` step 8 and `security-reviewer` changed: every grader 3/3 on the final tree (0.56 USD) and on the two trees before it (0.57 and 0.55 USD). The first run, before the audit fixes, failed `rubric-3` (no style-only finding) once (0.53 USD).
 
+## Effort measurements
+
+Run on 2026-10-04 (Claude Code 2.1.289, Opus 5.5 and Sonnet 5.5) after an adversarial review of every agent's and skill's `effort`. Each arm is a copy of the plugin that differs from the shipped one only in one agent's `model`/`effort` frontmatter (and, for `mechanical-worker`, its verification sentence). The measurement cases and harness copies were scratch and are not part of the suite; every failed or contested `llm` judgment was rechecked with `scripts/eval_recheck.py --include-passes`.
+
+| Agent | Arms and task | Runs per arm | Result | Cost (USD) | Decision |
+|---|---|---:|---|---:|---|
+| `bulk-implementer` | Sonnet `medium` / Sonnet `high` / Opus `low`, on the plan-execution benchmark's `two-package-refactor` and `four-package-feature`, the parent told to send every package to `bulk-implementer` | 6 | Every arm passed every test and changed no file outside the plan. The first integrated test run passed in 6/6, 6/6, and 5/6 runs. Mean cost 0.51 / 0.54 / 0.62 and wall-clock 80 / 82 / 104 s per run. Without the fan-out instruction, the Sonnet parent edited directly instead of dispatching `bulk-implementer` in 9 of 16 runs | 10.03 + 5.61 | Keep `medium`: `high` bought nothing on fixtures already at ceiling at `medium` |
+| `architect` | Opus `medium` / `high`, three design questions on a snapshot of this repository (adding an agent, propagating changed recommended settings, effort variants in the benchmark), five one-criterion rubrics each | 9 | Rechecked: invariant rubrics 32/36 vs 35/36 (the gap is all in one case); one-minimal-design rubric 7/9 vs 6/9 (harness 7/9 vs 3/9, and both judges fail every `high` run of the benchmark question for proposing a broader design than asked). Cost 6.55 vs 8.07 | 14.62 | Keep `medium`: mixed and small, for 23% more cost |
+| `mechanical-worker` | Sonnet `low` and `medium`: rename a function across four files, "verify the change", with only `Bash(python3 *)` granted | 3-12 | Tests actually ran: `low` with the shipped text 0/9; `low` with a verification paragraph 0/6; `low` with that paragraph plus "as its own command after the edits" and a one-time plain retry 4/12; `medium` with the same wording 9/12; `medium` with the shipped text 0/3. Failing runs chained the edit and the test run into one shell command, which the permission rules denied, then redid the edit with the editor and never ran the tests. Every arm renamed correctly, and none reported an unrun check as passing. 0.13-0.14 per run at both levels | 5.78 | `medium` plus the new wording (9/12 vs 4/12; about p = 0.1) |
+
+`comment-guidance-mechanical` (B06) after the `mechanical-worker` change: every grader 3/3, and `scripts/comment_guidance_checks.py artifacts` PASS on all three retained workspaces (0.48 USD).
+
 ## Comment-guidance suite results
 
 Cases B01-B08 and installation/context tests I01-I04, as specified in

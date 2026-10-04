@@ -68,7 +68,7 @@ AGENT_FROZEN_FIELDS = {
     },
     "bulk-implementer": {"tools": "Read, Grep, Glob, Bash, Edit, Write", "model": "sonnet", "effort": "medium"},
     "hard-repair": {"tools": "Read, Grep, Glob, Bash, Edit, Write", "model": "opus", "effort": "high"},
-    "mechanical-worker": {"tools": "Read, Grep, Glob, Bash, Edit, Write", "model": "sonnet", "effort": "low"},
+    "mechanical-worker": {"tools": "Read, Grep, Glob, Bash, Edit, Write", "model": "sonnet", "effort": "medium"},
     "plan-auditor": {"tools": "Read, Grep, Glob", "model": "opus", "effort": "high"},
     "scout": {"tools": "Read, Grep, Glob", "model": "sonnet", "effort": "low"},
     "security-reviewer": {"tools": "Read, Grep, Glob", "model": "opus", "effort": "medium"},
