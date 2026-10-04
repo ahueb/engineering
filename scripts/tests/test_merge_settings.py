@@ -172,23 +172,24 @@ class MergeRuleTests(unittest.TestCase):
             self.assertFalse(merged["enabledPlugins"]["superpowers@claude-plugins-official"])
 
     def test_lathe_plugin_forced_true_from_false(self):
-        current = {"enabledPlugins": {"lathe@engineering": False}}
+        current = {"enabledPlugins": {"lathe@lathe": False}}
         recommended = {}
         for mode in ("enforce", "defaults"):
             merged, _ = ms.merge(current, recommended, mode)
-            self.assertTrue(merged["enabledPlugins"]["lathe@engineering"])
+            self.assertTrue(merged["enabledPlugins"]["lathe@lathe"])
 
     def test_lathe_plugin_forced_true_when_absent_entirely(self):
         merged, _ = ms.merge({}, {}, "enforce")
-        self.assertTrue(merged["enabledPlugins"]["lathe@engineering"])
+        self.assertTrue(merged["enabledPlugins"]["lathe@lathe"])
 
-    def test_legacy_engineering_plugin_entry_dropped(self):
+    def test_legacy_plugin_entries_dropped(self):
         for value in (True, False):
-            current = {"enabledPlugins": {"engineering@engineering": value, "x@y": True}}
+            current = {"enabledPlugins": {"engineering@engineering": value, "lathe@engineering": value, "x@y": True}}
             for mode in ("enforce", "defaults"):
                 merged, _ = ms.merge(current, {}, mode)
                 self.assertNotIn("engineering@engineering", merged["enabledPlugins"])
-                self.assertTrue(merged["enabledPlugins"]["lathe@engineering"])
+                self.assertNotIn("lathe@engineering", merged["enabledPlugins"])
+                self.assertTrue(merged["enabledPlugins"]["lathe@lathe"])
                 self.assertTrue(merged["enabledPlugins"]["x@y"])
 
     def test_key_order_schema_first_then_current_then_new(self):
@@ -264,7 +265,7 @@ class MergeRuleTests(unittest.TestCase):
         self.assertTrue(merged["enabledPlugins"]["superpowers@claude-plugins-official"])
         self.assertIn("claude-plugins-official", merged["extraKnownMarketplaces"])
         for k in merged["enabledPlugins"]:
-            if k not in ("superpowers@claude-plugins-official", "lathe@engineering"):
+            if k not in ("superpowers@claude-plugins-official", "lathe@lathe"):
                 self.fail("no-official should not add new official entries: %s" % k)
 
     def test_purge_official_removes_true_keeps_false_and_removes_marketplace(self):
@@ -396,7 +397,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             current = write(
                 Path(td) / "current.json",
-                json.dumps({"$schema": ms.SCHEMA_URL, "enabledPlugins": {"lathe@engineering": True}}),
+                json.dumps({"$schema": ms.SCHEMA_URL, "enabledPlugins": {"lathe@lathe": True}}),
             )
             recommended = write(Path(td) / "recommended.json", "{}")
             proc = run_cli(
@@ -419,7 +420,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             current = write(
                 Path(td) / "current.json",
-                json.dumps({"$schema": ms.SCHEMA_URL, "model": "opus", "enabledPlugins": {"lathe@engineering": True}}),
+                json.dumps({"$schema": ms.SCHEMA_URL, "model": "opus", "enabledPlugins": {"lathe@lathe": True}}),
             )
             recommended = write(Path(td) / "recommended.json", json.dumps({"model": "opus[1m]"}))
             proc = run_cli(
@@ -477,7 +478,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             already_merged = {
                 "$schema": ms.SCHEMA_URL,
-                "enabledPlugins": {"lathe@engineering": True},
+                "enabledPlugins": {"lathe@lathe": True},
             }
             current = write(Path(td) / "current.json", json.dumps(already_merged))
             recommended = write(Path(td) / "recommended.json", "{}")

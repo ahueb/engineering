@@ -343,7 +343,7 @@ rm -rf "$HOOK_OUTER_PLAIN" "$HOOK_OUTER_SPACE"
 # ============================================================================================
 # Installer behavioural scenarios (default and --full tiers). Every scenario runs in a fresh
 # CLAUDE_CONFIG_DIR, passes --yes unless it tests the prompt, and uninstalls
-# lathe@engineering from that config at the end (best effort). Assertions on
+# lathe@lathe from that config at the end (best effort). Assertions on
 # settings.json use python3 -c structural checks, never byte compares.
 # ============================================================================================
 
@@ -537,7 +537,7 @@ run_capture() {
 
 uninstall_in() {
   local cfg="$1"
-  CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
 }
 
 shim_bin() {
@@ -591,8 +591,8 @@ count_stamps() {
   find "$1/backups/engineering" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' '
 }
 
-marketplace_has_engineering() {
-  # marketplace_has_engineering CFG -> 0 when an 'engineering' marketplace is registered
+marketplace_has_lathe() {
+  # marketplace_has_lathe CFG -> 0 when a 'lathe' marketplace is registered
   local listing
   listing="$(CLAUDE_CONFIG_DIR="$1" claude plugin marketplace list --json 2>/dev/null || true)"
   printf '%s' "$listing" | python3 -c '
@@ -603,7 +603,7 @@ except Exception:
     sys.exit(1)
 if isinstance(data, dict):
     data = data.get("marketplaces", [])
-sys.exit(0 if any(isinstance(e, dict) and e.get("name") == "engineering" for e in data) else 1)
+sys.exit(0 if any(isinstance(e, dict) and e.get("name") == "lathe" for e in data) else 1)
 '
 }
 
@@ -646,7 +646,7 @@ s02() {
   python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1] + "/settings.json"))
-assert d["enabledPlugins"]["lathe@engineering"] is True
+assert d["enabledPlugins"]["lathe@lathe"] is True
 ' "$cfg" && ok "S2: settings merged" || bad "S2: settings not merged"
   uninstall_in "$cfg"; rm -rf "$cfg"
 
@@ -718,7 +718,7 @@ assert d["env"]["FOO"] == "bar"
 assert d["modelSettings"]["claude-opus-5"]["effortLevel"] == "high"
 assert d["enabledPlugins"]["sample@claude-plugins-official"] is False
 assert "ref" not in d["extraKnownMarketplaces"]["widgets"]["source"]
-assert d["enabledPlugins"]["lathe@engineering"] is True
+assert d["enabledPlugins"]["lathe@lathe"] is True
 PY
   uninstall_in "$cfg"; rm -rf "$cfg"
 }
@@ -1014,7 +1014,7 @@ s15() {
   after_hash="$(sha256_of "$cfg/settings.json")"
   [ "$before_mtime" = "$after_mtime" ] && [ "$before_hash" = "$after_hash" ] && ok "S15: settings.json unchanged" || bad "S15: settings.json changed by dry-run"
   [ ! -e "$cfg/CLAUDE.md" ] && [ ! -e "$cfg/rules" ] && [ ! -d "$cfg/backups/engineering" ] && [ ! -e "$cfg/engineering-installer.json" ] && ok "S15: no CLAUDE.md/rules/backups created" || bad "S15: dry-run created files"
-  if marketplace_has_engineering "$cfg"; then bad "S15: marketplace was registered by dry-run"; else ok "S15: no marketplace registered"; fi
+  if marketplace_has_lathe "$cfg"; then bad "S15: marketplace was registered by dry-run"; else ok "S15: no marketplace registered"; fi
   case "$OUT" in *"predicted marketplace entry:"*) ok "S15: predicted marketplace entry printed" ;; *) bad "S15: predicted marketplace entry missing" ;; esac
   local predicted; predicted="$(printf '%s\n' "$OUT" | sed -n '/predicted marketplace entry:/{n;p;}')"
 
@@ -1024,7 +1024,7 @@ s15() {
 import json, sys
 predicted = json.loads(sys.argv[1])["source"]
 d = json.load(open(sys.argv[2] + "/settings.json"))
-actual = d["extraKnownMarketplaces"]["engineering"]["source"]
+actual = d["extraKnownMarketplaces"]["lathe"]["source"]
 assert actual == predicted, (predicted, actual)
 ' "$predicted" "$cfg" && ok "S15: predicted marketplace entry matches actual" || bad "S15: predicted entry does not match actual"
   uninstall_in "$cfg"; rm -rf "$cfg"
@@ -1045,7 +1045,7 @@ assert actual == predicted, (predicted, actual)
   [ -L "$cfg/settings.json" ] && [ -L "$cfg/rules" ] && ok "S15 (symlinked state): symlinks intact" || bad "S15 (symlinked state): symlinks changed"
   [ ! -e "$cfg/real-rules/engineering-policy.md" ] && [ ! -d "$cfg/backups/engineering" ] && [ ! -e "$cfg/engineering-installer.json" ] && [ ! -e "$cfg/CLAUDE.md" ] \
     && ok "S15 (symlinked state): nothing written" || bad "S15 (symlinked state): dry-run created files"
-  if marketplace_has_engineering "$cfg"; then bad "S15 (symlinked state): marketplace registered by dry-run"; else ok "S15 (symlinked state): no marketplace registered"; fi
+  if marketplace_has_lathe "$cfg"; then bad "S15 (symlinked state): marketplace registered by dry-run"; else ok "S15 (symlinked state): no marketplace registered"; fi
   rm -rf "$cfg" "$ext"
 
   # dry-run over the S12 state: legacy CLAUDE.md policy awaiting migration
@@ -1060,7 +1060,7 @@ assert actual == predicted, (predicted, actual)
   [ ! -e "$cfg/rules" ] && [ ! -d "$cfg/backups/engineering" ] && [ ! -e "$cfg/engineering-installer.json" ] && [ ! -e "$cfg/settings.json" ] \
     && ok "S15 (legacy state): nothing written" || bad "S15 (legacy state): dry-run created files"
   case "$OUT" in *"would prompt to migrate legacy CLAUDE.md to rules/engineering-policy.md"*) ok "S15 (legacy state): preview mentions migration" ;; *) bad "S15 (legacy state): preview does not mention migration: $OUT" ;; esac
-  if marketplace_has_engineering "$cfg"; then bad "S15 (legacy state): marketplace registered by dry-run"; else ok "S15 (legacy state): no marketplace registered"; fi
+  if marketplace_has_lathe "$cfg"; then bad "S15 (legacy state): marketplace registered by dry-run"; else ok "S15 (legacy state): no marketplace registered"; fi
   rm -rf "$cfg"
 }
 
@@ -1287,19 +1287,19 @@ s19() {
     *"rolled back to"*|*"rollback skipped"*|*"rollback failed"*) bad "S19b: rollback ran before the first write: $OUT" ;;
     *) ok "S19b: no rollback line (nothing had been written)" ;;
   esac
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 
   step "S19c: claude-old-plugin falls back to --policy-target claude-md"
   cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-old-plugin" claude)"
-  mkdir -p "$cfg/plugins/cache/engineering/lathe/0.0.0-legacy/hooks" || bad "S19: setup failed"
-  printf '#!/usr/bin/env bash\ncat "$(dirname "$0")/../context/CLAUDE.md"\n' > "$cfg/plugins/cache/engineering/lathe/0.0.0-legacy/hooks/session-start.sh" || bad "S19: setup failed"
+  mkdir -p "$cfg/plugins/cache/lathe/lathe/0.0.0-legacy/hooks" || bad "S19: setup failed"
+  printf '#!/usr/bin/env bash\ncat "$(dirname "$0")/../context/CLAUDE.md"\n' > "$cfg/plugins/cache/lathe/lathe/0.0.0-legacy/hooks/session-start.sh" || bad "S19: setup failed"
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes --no-official 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 0 ] && ok "S19c: install succeeded" || bad "S19c: install failed (rc=$RC): $OUT"
   [ ! -f "$cfg/rules/engineering-policy.md" ] && ok "S19c: no rules file" || bad "S19c: rules file was created"
   [ -f "$cfg/CLAUDE.md" ] && ok "S19c: policy fell back to CLAUDE.md" || bad "S19c: CLAUDE.md not written"
   case "$OUT" in *"does not support the rules-file policy; keeping the policy in CLAUDE.md"*) ok "S19c: fallback message correct" ;; *) bad "S19c: fallback message missing: $OUT" ;; esac
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1314,15 +1314,15 @@ s22() {
   rm -rf "$cfg" "$bindir"
 }
 
-# ---- S23: foreign 'engineering' marketplace binding is refused ---------------------------------
+# ---- S23: foreign 'lathe' marketplace binding is refused ---------------------------------
 s23() {
-  step "S23: an 'engineering' marketplace bound elsewhere is refused"
+  step "S23: a 'lathe' marketplace bound elsewhere is refused"
   local cfg; cfg="$(new_cfg)"
   CLAUDE_CONFIG_DIR="$cfg" claude plugin marketplace add "$HERE" >/dev/null 2>&1 || bad "S23: setup marketplace add failed"
   run_capture "$cfg" --source ahueb/lathe --no-official --yes
   [ "$RC" -eq 1 ] && ok "S23: foreign binding refused (rc=1)" || bad "S23: expected exit 1, got $RC: $OUT"
   case "$OUT" in *"is registered elsewhere, not 'ahueb/lathe'"*) ok "S23: message says the binding is not the requested source" ;; *) bad "S23: message does not name the requested source: $OUT" ;; esac
-  case "$OUT" in *"run 'claude plugin marketplace remove engineering'"*) ok "S23: message gives the rebind command" ;; *) bad "S23: message missing the rebind command: $OUT" ;; esac
+  case "$OUT" in *"run 'claude plugin marketplace remove lathe'"*) ok "S23: message gives the rebind command" ;; *) bad "S23: message missing the rebind command: $OUT" ;; esac
   [ ! -e "$cfg/rules/engineering-policy.md" ] && [ ! -e "$cfg/CLAUDE.md" ] && [ ! -e "$cfg/engineering-installer.json" ] && ok "S23: nothing installed" || bad "S23: installer wrote despite refusal"
   uninstall_in "$cfg"; rm -rf "$cfg"
 
@@ -1330,7 +1330,7 @@ s23() {
   local bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-renamed-repo" claude)"
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --dry-run --source ahueb/lathe --no-official 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 0 ] && ok "S23: dry-run against the old repository name succeeded" || bad "S23: dry-run against the old repository name failed (rc=$RC): $OUT"
-  case "$OUT" in *"would update marketplace 'engineering' (already bound to 'ahueb/lathe')"*) ok "S23: ahueb/engineering registration matches --source ahueb/lathe" ;; *) bad "S23: old repository name not treated as the same source: $OUT" ;; esac
+  case "$OUT" in *"would update marketplace 'lathe' (already bound to 'ahueb/lathe')"*) ok "S23: ahueb/engineering registration matches --source ahueb/lathe" ;; *) bad "S23: old repository name not treated as the same source: $OUT" ;; esac
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1376,7 +1376,7 @@ s25() {
       bad "S25: version probe was confused by the distractor: $OUT" ;;
     *) ok "S25: no capability-gate fallback message" ;;
   esac
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1384,7 +1384,7 @@ s25() {
 s26() {
   step "S26: cache-directory fallback picks 0.10.0 over 0.9.0"
   local cfg bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-empty-list" claude)"
-  local base="$cfg/plugins/cache/engineering/lathe"
+  local base="$cfg/plugins/cache/lathe/lathe"
   local v
   for v in 0.9.0 0.10.0; do
     mkdir -p "$base/$v/.claude-plugin" "$base/$v/hooks" || bad "S26: setup failed"
@@ -1403,7 +1403,7 @@ import json, sys
 d = json.load(open(sys.argv[1] + "/engineering-installer.json"))
 assert d["policy_target"] == "rules", d
 ' "$cfg" && ok "S26: marker records policy target rules" || bad "S26: marker policy target wrong"
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1437,7 +1437,7 @@ s28() {
   python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-assert d["enabledPlugins"]["lathe@engineering"] is True, d.get("enabledPlugins")
+assert d["enabledPlugins"]["lathe@lathe"] is True, d.get("enabledPlugins")
 ' "$ext/settings.json" && ok "S28: merged settings written through the link" || bad "S28: settings not merged into the target"
   uninstall_in "$cfg"; rm -rf "$cfg" "$ext"
 }
@@ -1538,7 +1538,7 @@ entry = next(f for f in d["files"] if f["rel"] == "settings.json")
 live = hashlib.sha256(open(os.path.realpath(os.path.join(cfg, "settings.json")), "rb").read()).hexdigest()
 assert live == entry["written_sha256"], ("live", live, "written", entry.get("written_sha256"))
 settings = json.load(open(os.path.join(cfg, "settings.json")))
-assert settings["enabledPlugins"]["lathe@engineering"] is True, settings.get("enabledPlugins")
+assert settings["enabledPlugins"]["lathe@lathe"] is True, settings.get("enabledPlugins")
 PY
   local n; n="$(count_stamps "$cfg")"
   [ "$n" = "1" ] && ok "S32: one stamp (no pre-restore backup was taken)" || bad "S32: expected 1 stamp, found $n"
@@ -1553,7 +1553,7 @@ s33() {
   step "S33: a failed official plugin exits 11 and rolls nothing back"
   local cfg bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-official-fail" claude)"
   # The shim fakes the official marketplace registration (so this stays offline) and fails
-  # every official plugin install; lathe@engineering installs for real.
+  # every official plugin install; lathe@lathe installs for real.
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 11 ] && ok "S33: exit 11" || bad "S33: expected exit 11, got $RC: $OUT"
   case "$OUT" in
@@ -1570,9 +1570,9 @@ s33() {
   python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1] + "/settings.json"))
-assert d["enabledPlugins"]["lathe@engineering"] is True
-' "$cfg" && ok "S33: lathe@engineering enabled" || bad "S33: settings not merged"
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+assert d["enabledPlugins"]["lathe@lathe"] is True
+' "$cfg" && ok "S33: lathe@lathe enabled" || bad "S33: settings not merged"
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1862,9 +1862,9 @@ raw = open(sys.argv[1] + "/settings.json").read()
 assert raw.endswith("\n\n"), repr(raw[-4:])
 json.loads(raw)
 d = json.loads(raw)
-assert d.get("enabledPlugins", {}).get("lathe@engineering") is True, d
+assert d.get("enabledPlugins", {}).get("lathe@lathe") is True, d
 PY
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1881,15 +1881,15 @@ s39() {
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes --no-official 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 0 ] && ok "S39: install succeeded" || bad "S39: install failed (rc=$RC): $OUT"
   grep -q '^plugin uninstall engineering@engineering --scope user$' "$cfg/.legacy-uninstalled" 2>/dev/null && ok "S39: old plugin uninstalled at user scope" || bad "S39: old plugin not uninstalled: $OUT"
-  case "$OUT" in *"uninstalled engineering@engineering (renamed to lathe@engineering)"*) ok "S39: uninstall reported" ;; *) bad "S39: uninstall not reported: $OUT" ;; esac
+  case "$OUT" in *"uninstalled engineering@engineering (renamed to lathe@lathe)"*) ok "S39: uninstall reported" ;; *) bad "S39: uninstall not reported: $OUT" ;; esac
   python3 - "$cfg" <<'PY' && ok "S39: enabledPlugins drops the old id and enables lathe; prior install selects defaults" || bad "S39: settings or marker wrong"
 import json, sys
 d = json.load(open(sys.argv[1] + "/settings.json"))
 assert "engineering@engineering" not in d["enabledPlugins"], d["enabledPlugins"]
-assert d["enabledPlugins"]["lathe@engineering"] is True, d["enabledPlugins"]
+assert d["enabledPlugins"]["lathe@lathe"] is True, d["enabledPlugins"]
 assert json.load(open(sys.argv[1] + "/engineering-installer.json"))["settings_mode"] == "defaults"
 PY
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg"
 
   cfg="$(new_cfg)"
@@ -1897,8 +1897,58 @@ PY
   [ "$RC" -eq 0 ] && ok "S39: a failed uninstall does not fail the run" || bad "S39: failed uninstall failed the run (rc=$RC): $OUT"
   case "$OUT" in *"could not uninstall engineering@engineering; remove it with: claude plugin uninstall engineering@engineering"*) ok "S39: failed uninstall prints the manual command" ;; *) bad "S39: manual uninstall command missing: $OUT" ;; esac
   [ -f "$cfg/rules/engineering-policy.md" ] && ok "S39: policy still installed after the failed uninstall" || bad "S39: policy missing after the failed uninstall"
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@lathe >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
+}
+
+# ---- S40: this source's registration under the old marketplace name is replaced ---------------
+# Before 3.1.0 the marketplace was named engineering. The scenario registers a copy of this
+# checkout under that name with lathe@engineering installed (the 3.0.x layout), then runs the
+# installer against the same copy, now named lathe, with the real CLI.
+set_marketplace_name() {
+  python3 - "$1/.claude-plugin/marketplace.json" "$2" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d["name"] = sys.argv[2]
+json.dump(d, open(sys.argv[1], "w"), indent=2)
+PY
+}
+
+s40() {
+  step "S40: install.sh replaces this source's 'engineering' marketplace registration with 'lathe'"
+  local cfg src; cfg="$(new_cfg)"; src="$(mktemp -d)"
+  tar -C "$HERE" --exclude='plugins/lathe/evals' -cf - .claude-plugin plugins | tar -C "$src" -xf - || bad "S40: setup failed"
+  set_marketplace_name "$src" engineering || bad "S40: setup failed"
+  CLAUDE_CONFIG_DIR="$cfg" claude plugin marketplace add "$src" >/dev/null 2>&1 || bad "S40: setup marketplace add failed"
+  CLAUDE_CONFIG_DIR="$cfg" claude plugin install lathe@engineering --scope user >/dev/null 2>&1 || bad "S40: setup plugin install failed"
+  set_marketplace_name "$src" lathe || bad "S40: setup failed"
+
+  run_capture "$cfg" --source "$src" --dry-run --no-official
+  [ "$RC" -eq 0 ] && ok "S40: dry-run succeeded" || bad "S40: dry-run failed (rc=$RC): $OUT"
+  case "$OUT" in *"would remove marketplace 'engineering'"*) ok "S40: dry-run reports the old marketplace removal" ;; *) bad "S40: dry-run does not report the removal: $OUT" ;; esac
+  case "$OUT" in *"would uninstall lathe@engineering"*) ok "S40: dry-run reports the old plugin id" ;; *) bad "S40: dry-run does not report lathe@engineering: $OUT" ;; esac
+
+  run_capture "$cfg" --source "$src" --yes --no-official
+  [ "$RC" -eq 0 ] && ok "S40: install succeeded" || bad "S40: install failed (rc=$RC): $OUT"
+  case "$OUT" in *"removed marketplace 'engineering' (renamed to 'lathe')"*) ok "S40: old marketplace removal reported" ;; *) bad "S40: old marketplace removal not reported: $OUT" ;; esac
+  local markets plugins
+  markets="$(CLAUDE_CONFIG_DIR="$cfg" claude plugin marketplace list --json 2>/dev/null || true)"
+  plugins="$(CLAUDE_CONFIG_DIR="$cfg" claude plugin list --json 2>/dev/null || true)"
+  python3 - "$cfg" "$markets" "$plugins" <<'PY' && ok "S40: only the lathe marketplace and lathe@lathe remain, in the CLI and settings.json" || bad "S40: old marketplace or plugin left behind"
+import json, sys
+cfg, markets, plugins = sys.argv[1], json.loads(sys.argv[2]), json.loads(sys.argv[3])
+names = {m["name"] for m in markets}
+assert "lathe" in names and "engineering" not in names, names
+ids = {p["id"] for p in plugins}
+assert "lathe@lathe" in ids and "lathe@engineering" not in ids, ids
+d = json.load(open(cfg + "/settings.json"))
+assert d["enabledPlugins"].get("lathe@lathe") is True, d["enabledPlugins"]
+assert "lathe@engineering" not in d["enabledPlugins"], d["enabledPlugins"]
+assert "engineering" not in d.get("extraKnownMarketplaces", {}), d.get("extraKnownMarketplaces")
+PY
+  uninstall_in "$cfg"
+  CLAUDE_CONFIG_DIR="$cfg" claude plugin marketplace remove lathe >/dev/null 2>&1 || true
+  rm -rf "$cfg" "$src"
 }
 
 s37() {
@@ -1994,7 +2044,7 @@ if [ "$TIER" != "quick" ]; then
   s01; s02; s03; s04; s05; s06; s07; s08; s09; s10
   s11; s12; s13; s14; s15; s16; s17; s18; s19; s22
   s23; s24; s25; s26; s27; s28; s29; s30; s31; s32
-  s33; s34; s35; s36; s37; s38; s39
+  s33; s34; s35; s36; s37; s38; s39; s40
 fi
 if [ "$TIER" = "full" ]; then
   s20; s21

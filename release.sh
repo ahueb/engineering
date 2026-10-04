@@ -101,7 +101,7 @@ try:
 except ValueError:
     plugins = []
 for p in plugins if isinstance(plugins, list) else []:
-    if isinstance(p, dict) and p.get("id") == "lathe@engineering":
+    if isinstance(p, dict) and p.get("id") == "lathe@lathe":
         print(p.get("version") or "")
         break
 ' 2>/dev/null || true
@@ -113,12 +113,12 @@ for p in plugins if isinstance(plugins, list) else []:
 # mismatch.
 refresh_local_install() {
   local want="$1" have
-  if ! claude plugin list 2>/dev/null | grep -q "lathe@engineering"; then
-    echo "lathe@engineering is not installed here; skipping local update"
+  if ! claude plugin list 2>/dev/null | grep -q "lathe@lathe"; then
+    echo "lathe@lathe is not installed here; skipping local update"
     return 0
   fi
-  if ! claude plugin update lathe@engineering; then
-    echo "WARN: local plugin update failed; run: claude plugin update lathe@engineering" >&2
+  if ! claude plugin update lathe@lathe; then
+    echo "WARN: local plugin update failed; run: claude plugin update lathe@lathe" >&2
     return 0
   fi
   have="$(installed_version)"
@@ -126,11 +126,11 @@ refresh_local_install() {
     echo "local install updated to $want"
     return 0
   fi
-  echo "local install is ${have:-unknown}, not $want. If your engineering marketplace is this folder, sync it to the release and update again:" >&2
+  echo "local install is ${have:-unknown}, not $want. If your lathe marketplace is this folder, sync it to the release and update again:" >&2
   echo "  git -C \"$HERE\" status --short   # commit or stash anything listed: reset --hard discards it" >&2
   echo "  git -C \"$HERE\" branch backup/pre-v$want-sync main" >&2
   echo "  git -C \"$HERE\" checkout main && git -C \"$HERE\" reset --hard origin/main" >&2
-  echo "  claude plugin update lathe@engineering" >&2
+  echo "  claude plugin update lathe@lathe" >&2
   return 1
 }
 
@@ -327,14 +327,14 @@ PY
     fi
   fi
 
-  if claude plugin list 2>/dev/null | grep -q "lathe@engineering"; then
-    if claude plugin update lathe@engineering; then
+  if claude plugin list 2>/dev/null | grep -q "lathe@lathe"; then
+    if claude plugin update lathe@lathe; then
       echo "local install updated to $NEW"
     else
-      echo "WARN: local plugin update failed; run: claude plugin update lathe@engineering" >&2
+      echo "WARN: local plugin update failed; run: claude plugin update lathe@lathe" >&2
     fi
   else
-    echo "lathe@engineering is not installed here; skipping local update"
+    echo "lathe@lathe is not installed here; skipping local update"
   fi
 }
 

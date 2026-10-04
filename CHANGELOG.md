@@ -4,6 +4,15 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking for self-hosted installs:** the marketplace is renamed from `engineering` to `lathe`, so the install id is `lathe@lathe`. `install.sh` removes this source's registration under the old name, which also uninstalls `lathe@engineering` and `engineering@engineering`, registers the marketplace as `lathe`, and drops both earlier ids from `enabledPlugins`; `--dry-run` reports each step. An `engineering` marketplace bound to another source is left registered, with a note.
+
+### Added
+
+- `plugins/lathe/README.md`, the plugin folder's own README, which the plugin directory requires and shows as the listing description.
+- CI scenario S40: the marketplace rename migration end to end with the real CLI.
+
 ## [3.0.1] - 2026-10-04
 
 ### Changed

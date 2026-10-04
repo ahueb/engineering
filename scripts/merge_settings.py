@@ -24,10 +24,11 @@ import sys
 SCHEMA_URL = "https://json.schemastore.org/claude-code-settings.json"
 OFFICIAL_SUFFIX = "@claude-plugins-official"
 OFFICIAL_MARKETPLACE_NAME = "claude-plugins-official"
-PLUGIN_KEY = "lathe@engineering"
-# The plugin's id before it was renamed to lathe; the installer uninstalls it and the
-# merge drops its enabledPlugins entry, so the old and new plugin never load together.
-LEGACY_PLUGIN_KEY = "engineering@engineering"
+PLUGIN_KEY = "lathe@lathe"
+# This plugin's earlier ids (engineering@engineering before 3.0.0, lathe@engineering in
+# 3.0.x); the installer uninstalls them and the merge drops their enabledPlugins entries,
+# so an old and the current plugin never load together.
+LEGACY_PLUGIN_KEYS = ("engineering@engineering", "lathe@engineering")
 ALIAS_SUFFIX = "[1m]"
 REDACTED = "<redacted>"
 _SECRET_KEY_RE = re.compile(r"(key|token|secret|password|credential)", re.IGNORECASE)
@@ -183,7 +184,7 @@ def _canon_eq_at(key, a, b):
 def _merge_enabled_plugins(current, recommended, path_prefix, drift):
     """enabledPlugins: existing user entries (including explicit false) are
     always kept; only missing entries are filled from the recommendation.
-    This holds in both modes. lathe@engineering is always forced true.
+    This holds in both modes. lathe@lathe is always forced true.
     Records drift for any key present in both sides whose merged (kept)
     value differs from the recommendation, e.g. a plugin the user disabled
     that the recommendation enables."""
@@ -384,7 +385,8 @@ def merge(current, recommended, mode, no_official=False, purge_official=False, r
     if "enabledPlugins" not in merged:
         merged["enabledPlugins"] = {}
     merged["enabledPlugins"][PLUGIN_KEY] = True
-    merged["enabledPlugins"].pop(LEGACY_PLUGIN_KEY, None)
+    for legacy in LEGACY_PLUGIN_KEYS:
+        merged["enabledPlugins"].pop(legacy, None)
 
     final = {"$schema": schema_value if schema_value is not None else SCHEMA_URL}
     final.update(merged)
