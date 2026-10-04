@@ -1,5 +1,5 @@
 # Allowlist for the readonly-guard PreToolUse hook, applied only to the
-# engineering:auditor agent's Bash/PowerShell use. Format (fields separated by
+# lathe:auditor agent's Bash/PowerShell use. Format (fields separated by
 # "|", empty field = unconstrained):
 #   token|verb-whitelist|forbidden-argument-regex|max-operands
 # verb-whitelist: space-separated allowed values for the command's second

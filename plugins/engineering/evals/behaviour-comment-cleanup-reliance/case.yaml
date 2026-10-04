@@ -6,7 +6,7 @@ context:
   scaffold_script: fixture.sh
 execution:
   prompt: |
-    Run `/engineering:comment-cleanup` on `src/py` in this repository. You are authorized only to
+    Run `/lathe:comment-cleanup` on `src/py` in this repository. You are authorized only to
     clean up comments and docstrings. You are NOT authorized to change any behavior or executable
     code.
 

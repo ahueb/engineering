@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Shim for ci.sh scenario 26: `plugin list --json` returns an empty list, so
 # install.sh cannot learn the installed version from the CLI and must fall back
-# to scanning $CFG/plugins/cache/engineering/engineering/*. `plugin install
-# engineering@engineering` is a successful no-op so the real CLI never creates a
+# to scanning $CFG/plugins/cache/engineering/lathe/*. `plugin install
+# lathe@engineering` is a successful no-op so the real CLI never creates a
 # cache directory of its own: the only candidates are the ones the scenario
 # seeds (0.9.0 and 0.10.0), which is what makes the highest-semver choice
 # observable (a lexicographic pick would take 0.9.0, whose hook does not support
@@ -34,8 +34,8 @@ if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ]; then
   exit 0
 fi
 
-if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ] && [ "${3:-}" = "engineering@engineering" ]; then
-  echo "claude-empty-list shim: pretending to install engineering@engineering"
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ] && [ "${3:-}" = "lathe@engineering" ]; then
+  echo "claude-empty-list shim: pretending to install lathe@engineering"
   exit 0
 fi
 

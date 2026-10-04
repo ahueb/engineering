@@ -5,7 +5,7 @@ context:
   scaffold_script: fixture.sh
 execution:
   prompt: |
-    Invoke `/engineering:plan-execution` on `PLAN.md` in this repository. The plan describes two
+    Invoke `/lathe:plan-execution` on `PLAN.md` in this repository. The plan describes two
     disjoint packages, each with an explicit interface, a documentation obligation, and its own
     tests owned by that package; implement it exactly as written, dispatching one worker per
     package.
@@ -41,7 +41,7 @@ graders:
   - name: bulk-implementer-instructed
     type: tool_used
     tool: Agent
-    input_match: '(?:"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer"[\s\S]*(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)|(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)[\s\S]*"subagent_type"\s*:\s*"(?:engineering:)?bulk-implementer")'
+    input_match: '(?:"subagent_type"\s*:\s*"(?:lathe:)?bulk-implementer"[\s\S]*(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)|(?:[Dd][Oo] [Nn][Oo][Tt]|[Dd]on''t) (?:[Bb]uild|[Cc]ompile|[Rr]un tests)[\s\S]*"subagent_type"\s*:\s*"(?:lathe:)?bulk-implementer")'
     min: 2
   - name: no-worker-test-command
     type: regex

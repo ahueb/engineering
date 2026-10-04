@@ -27,7 +27,7 @@ case "${1:-}" in
   pr)
     case "${2:-}" in
       create)
-        echo "https://github.com/ahueb/engineering/pull/1"
+        echo "https://github.com/ahueb/lathe/pull/1"
         exit 0
         ;;
       checks)

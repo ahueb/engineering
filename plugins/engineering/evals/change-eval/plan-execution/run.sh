@@ -17,7 +17,7 @@
 #   runs per cell: 3
 #
 # The real run executes, per (fixture, variant, run):
-#   claude -p '/engineering:plan-execution <plan>' \
+#   claude -p '/lathe:plan-execution <plan>' \
 #     --plugin-dir <variant-dir> --model sonnet --output-format stream-json \
 #     --permission-mode acceptEdits \
 #     --allowedTools Read Write Edit Bash Agent Skill Grep Glob
@@ -167,7 +167,7 @@ run_cell() {
   (
     cd "$repo_dir"
     # shellcheck disable=SC2086
-    CLAUDE_CONFIG_DIR="$cfg_dir" claude -p "/engineering:plan-execution $plan_file" \
+    CLAUDE_CONFIG_DIR="$cfg_dir" claude -p "/lathe:plan-execution $plan_file" \
       --plugin-dir "$variant_dir" \
       --model "$MODEL" \
       --output-format "$OUTPUT_FORMAT" \

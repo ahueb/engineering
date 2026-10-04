@@ -5,7 +5,7 @@ context:
   scaffold_script: fixture.sh
 execution:
   prompt: |
-    Dispatch `engineering:hard-repair` with the following, exactly:
+    Dispatch `lathe:hard-repair` with the following, exactly:
     - Failing command: `python3 -m unittest tests.test_contracts`
     - Captured output: the contents of `failed_check.txt` in this workspace.
     - Changed files so far: none.

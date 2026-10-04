@@ -6,8 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
-            "shell": "bash"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\""
           }
         ]
       }
@@ -18,8 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/readonly-guard.sh\"",
-            "shell": "bash"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/readonly-guard.sh\""
           }
         ]
       }

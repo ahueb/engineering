@@ -4,7 +4,7 @@
 #     without touching the network (so the scenario runs offline in the default
 #     tier), and
 #   * every `plugin install <name>@claude-plugins-official` fails.
-# Exercises install.sh's step-11 partial-failure path: engineering@engineering,
+# Exercises install.sh's step-11 partial-failure path: lathe@engineering,
 # settings.json and the policy are in place, the marker is written, nothing is
 # rolled back, and the run exits 11 naming the failed plugins.
 set -euo pipefail

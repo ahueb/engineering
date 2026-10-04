@@ -2,13 +2,13 @@
 
 Applies to `@playwright/test` specs and to journeys driven through the Playwright MCP tools. Repository conventions override this file where they conflict; say so in the report.
 
-## Dispatch block for `engineering:browser-tester`
+## Dispatch block for `lathe:browser-tester`
 
 One journey per dispatch, containing exactly:
 
 - `JOURNEY`: a short name.
 - `URL`: base URL and starting path.
-- `PRECONDITIONS`: user, seeded data, flags, viewport, and where they come from (environment variables or a fixture file the parent names; never inline secrets).
+- `PRECONDITIONS`: user, seeded data, flags, viewport, and where they come from. A signed-in journey starts from the project's saved login state (a `storageState` file its setup project writes) or from a disposable test account whose credentials the user gave in this conversation. Never read a password, token, or key from environment variables or secret files to type it into the page.
 - `STEPS`: numbered user actions, one per line.
 - `ORACLE`: the conditions that make the journey pass.
 - `EVIDENCE`: screenshots at named steps and the output directory (default `test-results/browser-tester/`), console errors, network failures.
@@ -50,17 +50,18 @@ Honour the existing `playwright.config.*`. `webServer` with `reuseExistingServer
 ## Commands
 
 ```bash
-npx playwright test                                   # full suite, every project
-npx playwright test tests/checkout.spec.ts             # one file
-npx playwright test -g "adds item to cart"             # one test by title
-npx playwright test --project=chromium                 # one browser project
-npx playwright test --trace on --reporter=line         # reproduce with a trace
-npx playwright show-trace test-results/<dir>/trace.zip # inspect a trace
-npx playwright test --repeat-each 3                    # flake check
-npx playwright install --with-deps chromium            # browsers missing (asks the parent first)
+npx --no playwright test                                   # full suite, every project
+npx --no playwright test tests/checkout.spec.ts             # one file
+npx --no playwright test -g "adds item to cart"             # one test by title
+npx --no playwright test --project=chromium                 # one browser project
+npx --no playwright test --trace on --reporter=line         # reproduce with a trace
+npx --no playwright show-trace test-results/<dir>/trace.zip # inspect a trace
+npx --no playwright test --repeat-each 3                    # flake check
 ```
 
-Browsers absent from the machine are an environment gap: install only with the user's or parent's consent and record it.
+`--no` runs only the project's installed `@playwright/test`. Without it, npx in a shell with no terminal downloads and runs the latest `playwright` from the registry when the project does not have it. A missing `@playwright/test` is an environment gap: report it rather than installing it.
+
+Browsers absent from the machine are also an environment gap. `npx --no playwright install chromium` downloads browser binaries, and `--with-deps` also installs system packages with root privileges, so run it only after the user approves it for this machine, and record that it ran.
 
 ## Playwright MCP tool map
 

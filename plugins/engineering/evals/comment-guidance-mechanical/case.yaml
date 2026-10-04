@@ -5,7 +5,7 @@ context:
   scaffold_script: fixture.sh
 execution:
   prompt: |
-    Dispatch `engineering:mechanical-worker` (via the Agent tool) to rename the term "buffer" to
+    Dispatch `lathe:mechanical-worker` (via the Agent tool) to rename the term "buffer" to
     "queue" in prose comments and docstrings only, in src/py/messages.py and src/web/lint.js.
     Explicit protected exception: directive payloads (lint/type/build/bundler directive text) and
     code identifiers must NOT change, even if they contain the word "buffer". Instruct the worker

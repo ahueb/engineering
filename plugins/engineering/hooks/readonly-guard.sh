@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Plugin PreToolUse guard (Bash|PowerShell matcher). Allows every agent except
-# engineering:auditor unrestricted; for engineering:auditor, restricts the
+# lathe:auditor unrestricted; for lathe:auditor, restricts the
 # command to a small read-only allowlist (hooks/readonly-allowlist.txt),
 # tokenised with shell-style unquoting (shlex.split), and denies any command
 # containing a bare '$', a backslash, a backtick, '<', '>', or unbalanced '&',
 # to guard against accidental mutation during an audit. Fails closed: if
 # python3 is unavailable, the python program crashes, or the input JSON does
-# not parse, the guard denies engineering:auditor (and allows every other
+# not parse, the guard denies lathe:auditor (and allows every other
 # agent, since agent_type cannot be determined). Unquoted brace, glob, and
 # tilde characters are denied because the shell expands them after the guard
 # has seen the text. This is not a sandbox
@@ -39,7 +39,7 @@ def main():
         sys.exit(3)
 
     agent_type = data.get("agent_type", "") or ""
-    if not re.match(r"^engineering:auditor$", agent_type):
+    if not re.match(r"^lathe:auditor$", agent_type):
         sys.exit(0)
 
     def deny(reason):
@@ -151,11 +151,11 @@ fi
 
 # Fail closed: python3 was missing, or the python program crashed (including
 # an unparseable-JSON exit 3). We cannot determine agent_type reliably, so
-# fall back to a substring check on the raw input; only engineering:auditor
+# fall back to a substring check on the raw input; only lathe:auditor
 # is denied, every other agent is allowed as before.
 case "$input" in
-  *'"agent_type"'*'"engineering:auditor"'*)
-    printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "readonly guard: guard unavailable, denying for engineering:auditor"}}'
+  *'"agent_type"'*'"lathe:auditor"'*)
+    printf '%s\n' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "readonly guard: guard unavailable, denying for lathe:auditor"}}'
     ;;
 esac
 

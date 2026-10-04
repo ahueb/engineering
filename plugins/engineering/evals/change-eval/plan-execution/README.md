@@ -56,7 +56,7 @@ Each real run:
    `$HOME/.claude/.credentials.json` (or
    `$CLAUDE_CONFIG_DIR/.credentials.json` if that variable is already
    set in the caller's environment).
-4. Runs `claude -p '/engineering:plan-execution <plan.md>' --plugin-dir
+4. Runs `claude -p '/lathe:plan-execution <plan.md>' --plugin-dir
    <variant-dir> --model sonnet --output-format stream-json
    --permission-mode acceptEdits --allowedTools Read Write Edit Bash
    Agent Skill Grep Glob` inside the fixture repository, capturing the

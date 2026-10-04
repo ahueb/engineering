@@ -4,7 +4,7 @@ description: Perform an explicitly requested high-assurance adversarial audit of
 argument-hint: "[implementation, architecture, or audit scope]"
 disable-model-invocation: true
 context: fork
-agent: engineering:auditor
+agent: lathe:auditor
 background: false
 ---
 

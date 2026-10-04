@@ -7,7 +7,7 @@
 #   --version        -> a version new enough for install.sh's precondition
 #   plugin validate  -> exit 0
 #   plugin list      -> empty listing (release.sh then skips the local update); with
-#                       CLAUDE_FAKE_INSTALLED=1, lists engineering@engineering, and --json
+#                       CLAUDE_FAKE_INSTALLED=1, lists lathe@engineering, and --json
 #                       reports version $CLAUDE_FAKE_LIST_VERSION ("garbage" prints non-JSON)
 #   plugin update    -> exit 0
 # Anything else exits 0 silently.
@@ -31,10 +31,10 @@ if [ "${1:-}" = "plugin" ]; then
             if [ "${CLAUDE_FAKE_LIST_VERSION:-}" = "garbage" ]; then
               echo "not json"
             else
-              printf '[{"id":"engineering@engineering","version":"%s"}]\n' "${CLAUDE_FAKE_LIST_VERSION:-}"
+              printf '[{"id":"lathe@engineering","version":"%s"}]\n' "${CLAUDE_FAKE_LIST_VERSION:-}"
             fi
             ;;
-          *) echo "  engineering@engineering" ;;
+          *) echo "  lathe@engineering" ;;
         esac
       else
         case "${3:-}" in

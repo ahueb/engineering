@@ -5,7 +5,7 @@
  "prompt_id": "2b66cbdb-656d-4352-beba-83d66ccb4b94",
  "permission_mode": "acceptEdits",
  "agent_id": "a695e41bf166fb8dd",
- "agent_type": "engineering:auditor",
+ "agent_type": "lathe:auditor",
  "hook_event_name": "PreToolUse",
  "tool_name": "Bash",
  "tool_input": {

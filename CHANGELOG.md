@@ -1,8 +1,22 @@
 # Changelog
 
-All notable changes to the `engineering` plugin. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions from 2.5.1 onward are signed tags `vX.Y.Z`; earlier versions predate tagging and are unlinked.
+All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions from 2.5.1 onward are signed tags `vX.Y.Z`; earlier versions predate tagging and are unlinked.
 
 ## [Unreleased]
+
+### Changed
+
+- **Breaking:** the plugin is renamed from `engineering` to `lathe`, because the Claude plugin directory already lists an unrelated plugin named `engineering`. Skills are now `/lathe:<skill>`, agent types `lathe:<agent>`, and the install id `lathe@engineering`. The marketplace, the repository, the policy file `rules/engineering-policy.md`, the installer marker, the backups directory, and the `ENGINEERING_*` variables keep their names. The read-only guard keys on `lathe:auditor`; CI fails if the guard or `deep-audit` names another auditor, or if a document other than this changelog still names a pre-rename `engineering:` skill or agent.
+- `install.sh` uninstalls an installed `engineering@engineering` once `lathe@engineering` is installed, and `--dry-run` says it would; a failed uninstall is a warning that prints the manual command. The settings merge drops `engineering@engineering` from `enabledPlugins`, and that entry still counts as a prior install when the settings mode is chosen.
+- The repository is renamed from `ahueb/engineering` to `ahueb/lathe`; links, the pinning examples, and `release.sh`'s compare links use the new name, and `install.sh` treats a marketplace registered from `ahueb/engineering` as the same source as `ahueb/lathe` instead of refusing it as bound elsewhere.
+- Hook commands use the form the official plugins use, `bash "${CLAUDE_PLUGIN_ROOT}/hooks/<script>.sh"`, without the `shell` key.
+- `browser-testing` runs Playwright as `npx --no playwright ...`, so npx never downloads and runs a Playwright the project does not have, and asks the user before `playwright install`. A signed-in journey starts from the project's saved login state or a disposable test account the user provides, never from credentials read from environment variables or files.
+
+### Added
+
+- `assets/icon.png`, a 512x512 icon set as the plugin's `icon`; CI checks that it is a 512x512 PNG inside the plugin.
+- README sections "Upgrading from the `engineering` plugin" and "Credentials and data access".
+- CI scenario S39: the rename migration, including the dry-run report and a failed uninstall.
 
 ## [2.13.1] - 2026-10-03
 
@@ -355,20 +369,20 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.13.1...HEAD
-[2.13.1]: https://github.com/ahueb/engineering/compare/v2.13.0...v2.13.1
-[2.13.0]: https://github.com/ahueb/engineering/compare/v2.12.0...v2.13.0
-[2.12.0]: https://github.com/ahueb/engineering/compare/v2.11.0...v2.12.0
-[2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
-[2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
-[2.9.1]: https://github.com/ahueb/engineering/compare/v2.9.0...v2.9.1
-[2.9.0]: https://github.com/ahueb/engineering/compare/v2.8.0...v2.9.0
-[2.8.0]: https://github.com/ahueb/engineering/compare/v2.7.2...v2.8.0
-[2.7.2]: https://github.com/ahueb/engineering/compare/v2.7.1...v2.7.2
-[2.7.1]: https://github.com/ahueb/engineering/compare/v2.7.0...v2.7.1
-[2.7.0]: https://github.com/ahueb/engineering/compare/v2.6.0...v2.7.0
-[2.6.0]: https://github.com/ahueb/engineering/compare/v2.5.4...v2.6.0
-[2.5.4]: https://github.com/ahueb/engineering/compare/v2.5.3...v2.5.4
-[2.5.3]: https://github.com/ahueb/engineering/compare/v2.5.2...v2.5.3
-[2.5.2]: https://github.com/ahueb/engineering/compare/v2.5.1...v2.5.2
-[2.5.1]: https://github.com/ahueb/engineering/releases/tag/v2.5.1
+[Unreleased]: https://github.com/ahueb/lathe/compare/v2.13.1...HEAD
+[2.13.1]: https://github.com/ahueb/lathe/compare/v2.13.0...v2.13.1
+[2.13.0]: https://github.com/ahueb/lathe/compare/v2.12.0...v2.13.0
+[2.12.0]: https://github.com/ahueb/lathe/compare/v2.11.0...v2.12.0
+[2.11.0]: https://github.com/ahueb/lathe/compare/v2.10.0...v2.11.0
+[2.10.0]: https://github.com/ahueb/lathe/compare/v2.9.1...v2.10.0
+[2.9.1]: https://github.com/ahueb/lathe/compare/v2.9.0...v2.9.1
+[2.9.0]: https://github.com/ahueb/lathe/compare/v2.8.0...v2.9.0
+[2.8.0]: https://github.com/ahueb/lathe/compare/v2.7.2...v2.8.0
+[2.7.2]: https://github.com/ahueb/lathe/compare/v2.7.1...v2.7.2
+[2.7.1]: https://github.com/ahueb/lathe/compare/v2.7.0...v2.7.1
+[2.7.0]: https://github.com/ahueb/lathe/compare/v2.6.0...v2.7.0
+[2.6.0]: https://github.com/ahueb/lathe/compare/v2.5.4...v2.6.0
+[2.5.4]: https://github.com/ahueb/lathe/compare/v2.5.3...v2.5.4
+[2.5.3]: https://github.com/ahueb/lathe/compare/v2.5.2...v2.5.3
+[2.5.2]: https://github.com/ahueb/lathe/compare/v2.5.1...v2.5.2
+[2.5.1]: https://github.com/ahueb/lathe/releases/tag/v2.5.1

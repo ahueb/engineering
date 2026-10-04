@@ -1,11 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "name": "engineering",
+  "name": "lathe",
   "description": "Evidence-first engineering: cost-tiered agents, verified implementation and review loops, parallel plan execution, browser testing with Playwright, and a hard-gated production readiness review.",
   "version": "2.13.1",
   "author": {
     "name": "Alan",
     "email": "alan@hueb.org"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "icon": "./assets/icon.png"
 }
