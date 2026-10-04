@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Shim for ci.sh scenario 25: behaves as the real `claude` CLI (including a real,
 # successful `plugin install`), except that `plugin list --json` returns a listing
-# whose FIRST entry is a distractor plugin ("data-lathe@engineering", version 9.9.9)
-# and whose second entry is lathe@engineering with the version the real CLI
+# whose FIRST entry is a distractor plugin ("data-lathe@lathe", version 9.9.9)
+# and whose second entry is lathe@lathe with the version the real CLI
 # reports. install.sh's installed-version probe must skip the distractor and use
 # the real version, so the capability gate finds the real cached hook and keeps
 # --policy-target rules. A sloppy match (substring, or "first entry wins") would
@@ -47,12 +47,12 @@ for e in data:
     if not isinstance(e, dict):
         continue
     for key in ("id", "name"):
-        if e.get(key) == "lathe@engineering" and isinstance(e.get("version"), str):
+        if e.get(key) == "lathe@lathe" and isinstance(e.get("version"), str):
             print(e["version"])
             sys.exit(0)
 ' || true)"
   [ -n "$version" ] || version="0.0.0"
-  printf '[{"id":"data-lathe@engineering","version":"9.9.9"},{"id":"lathe@engineering","version":"%s"}]\n' "$version"
+  printf '[{"id":"data-lathe@lathe","version":"9.9.9"},{"id":"lathe@lathe","version":"%s"}]\n' "$version"
   exit 0
 fi
 

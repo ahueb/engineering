@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shim for ci.sh scenario 23: behaves as the real `claude` CLI except that
-# `plugin marketplace list --json` reports the 'engineering' marketplace as
+# `plugin marketplace list --json` reports the 'lathe' marketplace as
 # registered from the GitHub repository's old name, ahueb/engineering, without
 # touching the network. install.sh must treat that registration as the same source
 # as --source ahueb/lathe (the repository was renamed) rather than refuse it.
@@ -27,7 +27,7 @@ find_real() {
 REAL="$(find_real)" || { echo "claude-renamed-repo shim: no real claude found on PATH" >&2; exit 127; }
 
 if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "marketplace" ] && [ "${3:-}" = "list" ] && [ "${4:-}" = "--json" ]; then
-  echo '[{"name":"engineering","source":"github","repo":"ahueb/engineering"}]'
+  echo '[{"name":"lathe","source":"github","repo":"ahueb/engineering"}]'
   exit 0
 fi
 

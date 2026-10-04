@@ -13,7 +13,7 @@
 #                               Destructive: an explicit `false` entry is kept, everything
 #                               else naming @claude-plugins-official is deleted. Implies no
 #                               official plugins are (re)installed this run.
-#   --source X                 Register the 'engineering' marketplace from X (a directory,
+#   --source X                 Register the 'lathe' marketplace from X (a directory,
 #                               owner/repo, or git URL) instead of this checkout.
 #   --settings-mode enforce|defaults
 #                               Force the settings-merge mode instead of auto-selecting it
@@ -61,13 +61,14 @@
 #                               settings merge (default: settings.recommended.json beside this
 #                               script).
 #
-# lathe@engineering is always installed and enabled: running this installer is an
-# explicit choice, so an existing `enabledPlugins["lathe@engineering"] = false` is
+# lathe@lathe is always installed and enabled: running this installer is an
+# explicit choice, so an existing `enabledPlugins["lathe@lathe"] = false` is
 # overwritten to true (by `claude plugin install` and reasserted by the settings merge).
 # Explicit opt-outs are honored only for @claude-plugins-official plugins.
-# The plugin was named `engineering` before 3.0.0: an installed engineering@engineering is
-# uninstalled once lathe@engineering is in place, and the settings merge drops its
-# enabledPlugins entry, so the two never load side by side.
+# Earlier ids of this plugin (engineering@engineering before 3.0.0, lathe@engineering in
+# 3.0.x) are uninstalled once lathe@lathe is in place, this source's registration under
+# the old marketplace name engineering is removed, and the settings merge drops the old
+# ids' enabledPlugins entries, so no two versions load side by side.
 #
 # Exit codes:
 #   0  success (including a no-op run, --dry-run, --list-backups, and a clean --restore)
@@ -84,7 +85,7 @@
 #      every entry outside the config directory when --no-outside-cfg was given
 #   9  --restore: no backups found or the manifest is invalid
 #  11  partial: the run finished but one or more official-marketplace plugins failed to
-#      install; lathe@engineering, settings.json and the policy are in place and
+#      install; lathe@lathe, settings.json and the policy are in place and
 #      nothing is rolled back
 #  12  never produced by this script: scripts/safe_write.py restore --only-run-files uses it
 #      when the stamp marks no file as written by an installer run (this script checks that
@@ -99,9 +100,9 @@
 # Settings modes: "enforce" makes every recommended value win; "defaults" only fills in
 # absent paths and reports drift. The mode is auto-selected once in preflight from
 # $CFG/engineering-installer.json (present -> defaults), otherwise from evidence of a prior
-# install (enabledPlugins["lathe@engineering"] or the pre-rename "engineering@engineering"
-# present, or a legacy CLAUDE.md policy
-# copy -> defaults with a first-run notice), otherwise enforce. --settings-mode always wins.
+# install (enabledPlugins["lathe@lathe"] or an earlier id of this plugin present, or a
+# legacy CLAUDE.md policy copy -> defaults with a first-run notice), otherwise enforce.
+# --settings-mode always wins.
 set -Eeuo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -225,11 +226,13 @@ version_ge() {
   [ "$h3" -ge "$w3" ]
 }
 
-# The plugin's id before it was renamed to lathe (3.0.0).
-LEGACY_PLUGIN_ID="engineering@engineering"
+# This plugin's earlier ids: engineering@engineering before 3.0.0, and lathe@engineering in
+# 3.0.x, while the marketplace was still named engineering (renamed to lathe in 3.1.0).
+LEGACY_PLUGIN_IDS="engineering@engineering lathe@engineering"
+LEGACY_MARKETPLACE="engineering"
 
-# True (exit 0) when `claude plugin list --json` lists the pre-rename plugin id.
-legacy_plugin_installed() {
+# Prints each earlier plugin id that `claude plugin list --json` lists, one per line.
+legacy_plugins_installed() {
   claude plugin list --json 2>/dev/null | python3 -c '
 import json, sys
 try:
@@ -243,8 +246,10 @@ if isinstance(data, dict):
             break
 if not isinstance(data, list):
     sys.exit(1)
-sys.exit(0 if any(isinstance(e, dict) and sys.argv[1] in (e.get("id"), e.get("name")) for e in data) else 1)
-' "$LEGACY_PLUGIN_ID"
+for legacy in sys.argv[1].split():
+    if any(isinstance(e, dict) and legacy in (e.get("id"), e.get("name")) for e in data):
+        print(legacy)
+' "$LEGACY_PLUGIN_IDS" || true
 }
 
 # True (exit 0) when $1 exists and its first line (BOM/CR tolerant) is the policy header.
@@ -428,7 +433,7 @@ fi
 
 MARKETPLACE_JSON="$(claude plugin marketplace list --json 2>/dev/null || true)"
 if ! printf '%s' "$MARKETPLACE_JSON" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
-  echo "cannot verify the existing 'engineering' marketplace binding" >&2
+  echo "cannot verify the existing 'lathe' marketplace binding" >&2
   exit 1
 fi
 
@@ -516,7 +521,8 @@ try:
 except Exception:
     sys.exit(1)
 plugins = d.get("enabledPlugins", {}) if isinstance(d, dict) else {}
-sys.exit(0 if isinstance(plugins, dict) and ("lathe@engineering" in plugins or "engineering@engineering" in plugins) else 1)
+ids = ("lathe@lathe", "lathe@engineering", "engineering@engineering")
+sys.exit(0 if isinstance(plugins, dict) and any(i in plugins for i in ids) else 1)
 ' "$CFG/settings.json" 2>/dev/null; then
       PRIOR=1
     fi
@@ -556,7 +562,8 @@ print(json.dumps({"source": predict(source)}))
 }
 
 marketplace_compare() {
-  # marketplace_compare SOURCE < MARKETPLACE_JSON ; prints MATCH / ABSENT / "FOREIGN <json>" / UNPARSEABLE
+  # marketplace_compare SOURCE NAME < MARKETPLACE_JSON ; prints MATCH / ABSENT / "FOREIGN <json>" / UNPARSEABLE
+  # for the marketplace registered under NAME
   python3 -c '
 import json, os, re, sys
 
@@ -613,7 +620,7 @@ try:
     data = json.load(sys.stdin)
     entry = None
     for e in data:
-        if e.get("name") == "engineering":
+        if e.get("name") == sys.argv[2]:
             entry = e
             break
     if entry is None:
@@ -627,11 +634,12 @@ try:
     print("FOREIGN " + json.dumps(entry))
 except Exception:
     print("UNPARSEABLE")
-' "$1"
+' "$1" "$2"
 }
 
 PREDICTED_ENTRY_JSON="$(marketplace_predict_json "$SOURCE")"
-MARKETPLACE_CMP="$(printf '%s' "$MARKETPLACE_JSON" | marketplace_compare "$SOURCE")"
+MARKETPLACE_CMP="$(printf '%s' "$MARKETPLACE_JSON" | marketplace_compare "$SOURCE" lathe)"
+LEGACY_MARKETPLACE_CMP="$(printf '%s' "$MARKETPLACE_JSON" | marketplace_compare "$SOURCE" "$LEGACY_MARKETPLACE")"
 
 # ---- step 4: --dry-run preview -----------------------------------------------------------
 
@@ -667,19 +675,23 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo
   echo "marketplace action:"
   case "$MARKETPLACE_CMP" in
-    ABSENT) echo "  would register marketplace 'engineering' from '$SOURCE'" ;;
-    MATCH) echo "  would update marketplace 'engineering' (already bound to '$SOURCE')" ;;
-    FOREIGN*) echo "  marketplace 'engineering' is bound elsewhere; would refuse" ;;
-    *) echo "  cannot verify the existing 'engineering' marketplace binding" ;;
+    ABSENT) echo "  would register marketplace 'lathe' from '$SOURCE'" ;;
+    MATCH) echo "  would update marketplace 'lathe' (already bound to '$SOURCE')" ;;
+    FOREIGN*) echo "  marketplace 'lathe' is bound elsewhere; would refuse" ;;
+    *) echo "  cannot verify the existing 'lathe' marketplace binding" ;;
+  esac
+  case "$LEGACY_MARKETPLACE_CMP" in
+    MATCH) echo "  would remove marketplace '$LEGACY_MARKETPLACE' (this plugin's marketplace before the rename to lathe), which uninstalls the plugins installed from it" ;;
+    FOREIGN*) echo "  marketplace '$LEGACY_MARKETPLACE' is bound elsewhere; would leave it registered" ;;
   esac
   echo "predicted marketplace entry:"
   printf '%s\n' "$PREDICTED_ENTRY_JSON"
   echo
   echo "plugin actions:"
-  echo "  lathe@engineering is always installed and enabled"
-  if legacy_plugin_installed; then
-    echo "  would uninstall $LEGACY_PLUGIN_ID (this plugin's id before the rename to lathe)"
-  fi
+  echo "  lathe@lathe is always installed and enabled"
+  for legacy_id in $(legacy_plugins_installed); do
+    echo "  would uninstall $legacy_id (this plugin's id before the rename to lathe@lathe)"
+  done
   if [ "$OFFICIAL" -eq 1 ] && [ "$PURGE_OFFICIAL" -eq 0 ]; then
     echo "  would register the official marketplace and install its plugins not disabled in your settings"
   elif [ "$PURGE_OFFICIAL" -eq 1 ]; then
@@ -700,21 +712,38 @@ fi
 
 # ---- step 6: marketplace add/update, refusing a foreign binding -------------------------
 
+# The marketplace was named engineering before 3.1.0. Re-adding the same source keeps a
+# registration under its old name, so this source's old registration is removed first;
+# removing it also uninstalls the plugins installed from it. An engineering marketplace
+# bound to another source is not this checkout's and is left alone.
+case "$LEGACY_MARKETPLACE_CMP" in
+  MATCH)
+    if ! claude plugin marketplace remove "$LEGACY_MARKETPLACE" >/dev/null; then
+      echo "could not remove marketplace '$LEGACY_MARKETPLACE' (this plugin's marketplace before the rename to lathe); remove it with 'claude plugin marketplace remove $LEGACY_MARKETPLACE' and rerun" >&2
+      exit 1
+    fi
+    echo "removed marketplace '$LEGACY_MARKETPLACE' (renamed to 'lathe')"
+    ;;
+  FOREIGN*)
+    echo "note: marketplace '$LEGACY_MARKETPLACE' is bound elsewhere and is no longer this plugin's marketplace; remove it with 'claude plugin marketplace remove $LEGACY_MARKETPLACE' if nothing else uses it" >&2
+    ;;
+esac
+
 case "$MARKETPLACE_CMP" in
   ABSENT)
     claude plugin marketplace add "$SOURCE"
-    echo "registered marketplace 'engineering' from '$SOURCE'"
+    echo "registered marketplace 'lathe' from '$SOURCE'"
     ;;
   MATCH)
-    claude plugin marketplace update engineering >/dev/null || true
-    echo "marketplace 'engineering' already bound to '$SOURCE'"
+    claude plugin marketplace update lathe >/dev/null || true
+    echo "marketplace 'lathe' already bound to '$SOURCE'"
     ;;
   FOREIGN*)
-    echo "marketplace 'engineering' is registered elsewhere, not '$SOURCE'; run 'claude plugin marketplace remove engineering' first to rebind it (${MARKETPLACE_CMP#FOREIGN })" >&2
+    echo "marketplace 'lathe' is registered elsewhere, not '$SOURCE'; run 'claude plugin marketplace remove lathe' first to rebind it (${MARKETPLACE_CMP#FOREIGN })" >&2
     exit 1
     ;;
   *)
-    echo "cannot verify the existing 'engineering' marketplace binding" >&2
+    echo "cannot verify the existing 'lathe' marketplace binding" >&2
     exit 1
     ;;
 esac
@@ -725,18 +754,18 @@ python3 "$HERE/scripts/merge_settings.py" --current "$CFG/settings.json" --recom
 
 # ---- step 8: plugin install, then the decision-1 policy-target gate --------------------
 
-claude plugin install lathe@engineering --scope user
-echo "installed lathe@engineering"
+claude plugin install lathe@lathe --scope user
+echo "installed lathe@lathe"
 
 # Not fatal: a leftover old plugin duplicates every skill and agent but changes no file
 # this run writes, so the run continues and says how to remove it.
-if legacy_plugin_installed; then
-  if claude plugin uninstall "$LEGACY_PLUGIN_ID" --scope user >/dev/null; then
-    echo "uninstalled $LEGACY_PLUGIN_ID (renamed to lathe@engineering)"
+for legacy_id in $(legacy_plugins_installed); do
+  if claude plugin uninstall "$legacy_id" --scope user >/dev/null; then
+    echo "uninstalled $legacy_id (renamed to lathe@lathe)"
   else
-    echo "warning: could not uninstall $LEGACY_PLUGIN_ID; remove it with: claude plugin uninstall $LEGACY_PLUGIN_ID" >&2
+    echo "warning: could not uninstall $legacy_id; remove it with: claude plugin uninstall $legacy_id" >&2
   fi
-fi
+done
 
 INSTALLED_VERSION="$(claude plugin list --json 2>/dev/null | python3 -c '
 import json, sys
@@ -765,9 +794,9 @@ for e in data:
         ident = e.get(key)
         if not isinstance(ident, str):
             continue
-        if ident == "lathe@engineering":
+        if ident == "lathe@lathe":
             match = True
-        elif ident == "lathe" and market in ("", "engineering"):
+        elif ident == "lathe" and market in ("", "lathe"):
             match = True
     if match:
         v = e.get("version")
@@ -778,7 +807,7 @@ sys.exit(1)
 ' 2>/dev/null || true)"
 
 if [ -z "$INSTALLED_VERSION" ]; then
-  CACHE_BASE="$CFG/plugins/cache/engineering/lathe"
+  CACHE_BASE="$CFG/plugins/cache/lathe/lathe"
   if [ -d "$CACHE_BASE" ]; then
     INSTALLED_VERSION="$(python3 -c '
 import glob, json, os, re, sys
@@ -809,7 +838,7 @@ fi
 # The gate is the installed hook's capability, not a version number: the cached hook must
 # check rules/engineering-policy.md, otherwise a rules-file policy would load twice.
 installed_hook_supports_rules() {
-  local hook="$CFG/plugins/cache/engineering/lathe/$INSTALLED_VERSION/hooks/session-start.sh"
+  local hook="$CFG/plugins/cache/lathe/lathe/$INSTALLED_VERSION/hooks/session-start.sh"
   [ -f "$hook" ] && grep -q 'rules/engineering-policy.md' "$hook"
 }
 if [ -n "$INSTALLED_VERSION" ]; then

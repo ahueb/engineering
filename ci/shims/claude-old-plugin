@@ -2,8 +2,8 @@
 # Shim for ci.sh scenario 19c: behaves as the real `claude` CLI (including a
 # real, successful `plugin install`), except that `plugin list --json`
 # reports a fabricated installed version ("0.0.0-legacy") for
-# lathe@engineering. The scenario pre-creates
-# $CFG/plugins/cache/engineering/lathe/0.0.0-legacy/hooks/session-start.sh
+# lathe@lathe. The scenario pre-creates
+# $CFG/plugins/cache/lathe/lathe/0.0.0-legacy/hooks/session-start.sh
 # whose content does NOT contain "rules/engineering-policy.md", so
 # install.sh's decision-1 capability gate falls back to --policy-target
 # claude-md and prints the fallback message, exactly as it would for a real
@@ -31,7 +31,7 @@ find_real() {
 REAL="$(find_real)" || { echo "claude-old-plugin shim: no real claude found on PATH" >&2; exit 127; }
 
 if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ]; then
-  echo '[{"name":"lathe@engineering","version":"0.0.0-legacy"}]'
+  echo '[{"name":"lathe@lathe","version":"0.0.0-legacy"}]'
   exit 0
 fi
 

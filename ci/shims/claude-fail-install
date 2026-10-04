@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shim for ci.sh scenario 19b: behaves as the real `claude` CLI for
-# everything except `plugin install lathe@engineering`, which always
+# everything except `plugin install lathe@lathe`, which always
 # fails. Exercises install.sh's step-8 failure path (exit 1, no installer
 # write happens before this call).
 set -euo pipefail
@@ -25,7 +25,7 @@ find_real() {
 
 REAL="$(find_real)" || { echo "claude-fail-install shim: no real claude found on PATH" >&2; exit 127; }
 
-if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ] && [ "${3:-}" = "lathe@engineering" ]; then
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "install" ] && [ "${3:-}" = "lathe@lathe" ]; then
   echo "claude-fail-install shim: simulated plugin install failure" >&2
   exit 1
 fi

@@ -2,7 +2,7 @@
 
 Evidence-first engineering for Claude Code. One operating policy plus eleven cost-tiered agents and nine process skills that route each job to the cheapest model that can do it, verify with real checks before claiming success, and report what was actually proven. Includes parallel plan execution, adversarial code and plan audits, a production readiness review with hard gates, Playwright browser testing, and narrow research skills for documentation and literature. Works standalone or alongside superpowers.
 
-Everything except settings ships as the `lathe` plugin, published from this repository's `engineering` marketplace; the policy also ships inside it, and `install.sh` installs it as a standalone rules file that Claude Code loads every session without a hook.
+Everything except settings ships as the `lathe` plugin, published from this repository's `lathe` marketplace; the policy also ships inside it, and `install.sh` installs it as a standalone rules file that Claude Code loads every session without a hook.
 
 ## Example use cases
 
@@ -25,22 +25,24 @@ git clone git@github.com:ahueb/lathe.git && cd lathe
 ./install.sh --source ahueb/lathe   # register the GitHub repo as the marketplace instead of this checkout
 ```
 
-The script validates your `settings.json`, registers the marketplace, installs `lathe@engineering`, merges the recommended settings into `settings.json`, installs the operating policy (as a rules file by default, or `CLAUDE.md` with `--policy-target claude-md`), installs official plugins, and writes the installer marker, in that order; a marketplace failure stops it before anything is written. A file is backed up before any change that would alter it (see Backups below), so an identical rerun leaves no new backup. A plugin you have explicitly disabled stays disabled, except `lathe@engineering` itself, which the installer always enables (see Changed behaviour below). If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `opus[1m]` (Opus 5.5 with 1M context) at extra-high effort, Sonnet 5.5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
+The script validates your `settings.json`, registers the marketplace, installs `lathe@lathe`, merges the recommended settings into `settings.json`, installs the operating policy (as a rules file by default, or `CLAUDE.md` with `--policy-target claude-md`), installs official plugins, and writes the installer marker, in that order; a marketplace failure stops it before anything is written. A file is backed up before any change that would alter it (see Backups below), so an identical rerun leaves no new backup. A plugin you have explicitly disabled stays disabled, except `lathe@lathe` itself, which the installer always enables (see Changed behaviour below). If `lathe` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `opus[1m]` (Opus 5.5 with 1M context) at extra-high effort, Sonnet 5.5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
 
 Flags: `--no-official` (skip registering the official marketplace and installing official plugins; leaves any existing official entries alone), `--purge-official` (also remove previously registered official marketplace/plugin entries from `settings.json`, backed up first; an explicit `false` you set is kept), `--source X` (register `X` — a directory or a GitHub `owner/repo` — as the `engineering` marketplace instead of this checkout), `--settings-mode enforce|defaults` (override the auto-selected merge mode; see the mode table below), `--policy-target rules|claude-md` (install the policy as `~/.claude/rules/engineering-policy.md`, the default, or keep the legacy `~/.claude/CLAUDE.md` layout), `--dry-run` (print the settings diff, drift report, policy action, marketplace action, and plugin actions without writing anything; cannot be combined with `--restore`, which exits 2), `--yes` (assume yes to any confirmation, including legacy-policy migration, without a TTY prompt), `--break-hardlinks` (allow the installer to replace a hard-linked target instead of refusing), `--create-through-dangling` (when `settings.json` is a dangling symlink, create the target through the link instead of refusing; without it the installer exits 4 with "settings.json is a dangling symlink; check out the dotfiles target or pass --create-through-dangling"), `--restore [STAMP]` (restore the given backup, or the latest one, from `~/.claude/backups/engineering/`; accepts `--break-hardlinks` and `--no-outside-cfg`), `--no-outside-cfg` (`--restore` only: refuse every entry whose real target lies outside the config directory instead of restoring it; see Installer rollback and restore below), `--no-rollback` (do not roll this run's own writes back on failure; print the manual restore command instead), `--list-backups` (list available backup stamps and the files each one holds), `-h` (help).
 
 Environment variables: `ENGINEERING_NO_PROMPT=1` declines any interactive confirmation deterministically, the same as running without a TTY (used for the legacy-policy migration prompt); `ENGINEERING_RECOMMENDED=PATH` points the installer at an alternate recommended-settings file whenever it is set, printing "recommendation file overridden by ENGINEERING_RECOMMENDED: <path>" (test and CI use only; the default is `settings.recommended.json` beside `install.sh`). The pointed-to file replaces the whole recommendation, including hooks, `env`, and permissions, so only set this deliberately — a hostile file could grant itself broad settings through this variable. `ENGINEERING_RELEASE=1` is not an installer variable; `release.sh` and `.githooks/pre-push` use it to recognize a release push (see Release below).
 
-Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/lathe && claude plugin install lathe@engineering`. A SessionStart hook then injects the policy every session until you run `install.sh` to install it as a rules file (or a legacy `CLAUDE.md`, with `--policy-target claude-md`).
+Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/lathe && claude plugin install lathe@lathe`. A SessionStart hook then injects the policy every session until you run `install.sh` to install it as a rules file (or a legacy `CLAUDE.md`, with `--policy-target claude-md`).
 
 ### Upgrading from the `engineering` plugin
 
-Before 3.0.0 the plugin was named `engineering`, which collided with another plugin's name in the Claude plugin directory. Skills are now `/lathe:<skill>` and agent types `lathe:<agent>`; the marketplace keeps its name, so the install id is `lathe@engineering`. The repository moved from `ahueb/engineering` to `ahueb/lathe`; GitHub redirects the old name, and `install.sh --source ahueb/lathe` accepts a marketplace registered from `ahueb/engineering` as the same source. Rerun `./install.sh`: it installs `lathe@engineering`, uninstalls `engineering@engineering`, drops that id from `enabledPlugins`, and refreshes the installed policy. Without the script:
+Before 3.0.0 the plugin was named `engineering`, which collided with another plugin's name in the Claude plugin directory, and before 3.1.0 its marketplace was too. Skills are now `/lathe:<skill>`, agent types `lathe:<agent>`, and the install id `lathe@lathe` (it was `engineering@engineering` before 3.0.0 and `lathe@engineering` in 3.0.x). The repository moved from `ahueb/engineering` to `ahueb/lathe`; GitHub redirects the old name, and `install.sh --source ahueb/lathe` accepts a marketplace registered from `ahueb/engineering` as the same source.
+
+Rerun `./install.sh`. When this checkout (or the `--source` you pass) is registered under the old marketplace name `engineering`, it removes that registration, which also uninstalls the plugins installed from it, and registers the marketplace again as `lathe`. It then installs `lathe@lathe`, uninstalls any remaining earlier id, drops the earlier ids from `enabledPlugins`, and refreshes the installed policy. An `engineering` marketplace bound to a different source is left registered, with a note. Without the script:
 
 ```bash
-claude plugin marketplace update engineering
-claude plugin uninstall engineering@engineering
-claude plugin install lathe@engineering
+claude plugin marketplace remove engineering   # also uninstalls engineering@engineering or lathe@engineering
+claude plugin marketplace add ahueb/lathe       # or the path of your clone
+claude plugin install lathe@lathe
 ```
 
 Until the old plugin is removed, every skill and agent loads twice, once under each name.
@@ -70,7 +72,7 @@ The installer also gates on what the installed plugin version actually supports:
 | `enforce` | The recommended value wins at every path above: lists still union, but marketplace/MCP entries, `fallbackModel`, `modelPicker`, and `availableModels` are replaced whole by the recommendation. |
 | `defaults` | A recommended value is applied only where the path is absent from your settings; lists still union; a marketplace or MCP entry already present by name is left untouched; `enabledPlugins` gains only missing entries. Every path where your value differs from the recommendation is printed as a drift report, ending with the line `apply the recommended values with: ./install.sh --settings-mode enforce`. |
 
-The mode is chosen automatically unless `--settings-mode` is given: `defaults` once the installer marker `~/.claude/engineering-installer.json` is present from a prior run; `defaults` with a prominent drift report and a first-run notice when the marker is absent but a prior installation is otherwise evident (an enabled `lathe@engineering` or a legacy policy copy) — this covers the first run of a rewritten installer on an existing configuration; `enforce` only on a genuinely first install, where neither signal exists. An explicit `--settings-mode` always wins.
+The mode is chosen automatically unless `--settings-mode` is given: `defaults` once the installer marker `~/.claude/engineering-installer.json` is present from a prior run; `defaults` with a prominent drift report and a first-run notice when the marker is absent but a prior installation is otherwise evident (an enabled `lathe@lathe` or a legacy policy copy) — this covers the first run of a rewritten installer on an existing configuration; `enforce` only on a genuinely first install, where neither signal exists. An explicit `--settings-mode` always wins.
 
 The drift report and the `--dry-run` settings diff both redact sensitive values as `<redacted>`: anything under an `env` block, any key containing `key`, `token`, `secret`, `password`, or `credential`, and `apiKeyHelper`.
 
@@ -90,7 +92,7 @@ File modes: an existing `settings.json` keeps its current mode across a write; o
 
 After the first file a run writes, an unexpected command failure or an explicit exit with code 3-7 rolls that run's writes back automatically: every file the run wrote is restored to what it was before the run (or, if the run created it, removed), and the run then exits with its original code. The scope is exactly what this run wrote or removed, and only if nothing else changed that file or removed-path since — `scripts/safe_write.py mark-written` records the post-write hash of every file the run touches, and rollback compares against it before touching anything; a file changed by something else after the run wrote it is reported as `not rolled back: <rel> changed after this run wrote it` and left alone. The installer marker `engineering-installer.json` is removed on rollback only when this run created it.
 
-Not every non-zero exit is a rollback trigger. Exit 1 refusals (a user-owned policy file the installer would not overwrite, a marketplace refusal, and similar) are deliberate stopping points, not failures, and leave whatever was already written in place. `--dry-run` never writes, so there is nothing to roll back. Exit 11 (a partial run: `lathe@engineering`, `settings.json`, and the policy are installed, but one or more official plugins failed) is not rolled back either — the successful part of the run stays.
+Not every non-zero exit is a rollback trigger. Exit 1 refusals (a user-owned policy file the installer would not overwrite, a marketplace refusal, and similar) are deliberate stopping points, not failures, and leave whatever was already written in place. `--dry-run` never writes, so there is nothing to roll back. Exit 11 (a partial run: `lathe@lathe`, `settings.json`, and the policy are installed, but one or more official plugins failed) is not rolled back either — the successful part of the run stays.
 
 `--no-rollback` disables the automatic restore and instead prints the manual command (`./install.sh --restore <stamp>`); the run's partial writes are left as they are. If rollback itself fails, the installer prints the same manual restore command and exits with the run's original exit code. What rollback never removes, by design: the config directory created for this run and its `backups/` tree.
 
@@ -102,8 +104,8 @@ Exit codes 11 and 12: 11 is the partial-official-plugin-failure case above. 12 i
 |---|---|
 | policy | Installed as `rules/engineering-policy.md` by default, or `CLAUDE.md` with `--policy-target claude-md`; a legacy `CLAUDE.md` policy copy is migrated to the rules file (with confirmation) or refreshed in place if migration is declined; a user's own `CLAUDE.md` or rules file is never touched |
 | `settings.json` | Merged from `settings.recommended.json` per the merge rules above, in `enforce` or `defaults` mode |
-| marketplaces | `engineering` registered from this checkout, or from `--source`; `claude-plugins-official` registered unless `--no-official` |
-| plugins | `lathe@engineering` installed at user scope and always enabled; each official plugin installed unless `--no-official` or disabled in your settings; `--purge-official` removes previously registered official entries instead |
+| marketplaces | `lathe` registered from this checkout, or from `--source`, after removing that source's registration under the old name `engineering`; `claude-plugins-official` registered unless `--no-official` |
+| plugins | `lathe@lathe` installed at user scope and always enabled; each official plugin installed unless `--no-official` or disabled in your settings; `--purge-official` removes previously registered official entries instead |
 | backups | Any file the run would change is copied to `~/.claude/backups/engineering/<stamp>/` first; see Backups above |
 | `--dry-run` | Prints the settings diff, drift report (in `defaults` mode), policy action, marketplace action, and plugin actions; writes nothing |
 
@@ -112,12 +114,12 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 ## Verify, pin, and roll back
 
 - Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`.
-- Pin instead of tracking `main`. Pin the marketplace source to a signed tag with `@ref` (verified 2026-09-12, when the repository was still named `engineering`: `claude plugin marketplace add ahueb/engineering@v2.7.1` installs 2.7.1); `claude plugin marketplace update engineering` then follows that tag, not `main`. The plugin-version form `lathe@engineering@<version>` does not pin.
+- Pin instead of tracking `main`. Pin the marketplace source to a signed tag with `@ref` (verified 2026-09-12, when the repository was still named `engineering`: `claude plugin marketplace add ahueb/engineering@v2.7.1` installs 2.7.1); `claude plugin marketplace update lathe` then follows that tag, not `main`. The plugin-version form `lathe@lathe@<version>` does not pin.
 
   ```bash
-  claude plugin marketplace remove engineering
-  claude plugin marketplace add ahueb/lathe@v2.7.1
-  claude plugin install engineering@engineering   # lathe@engineering for v3.0.0 and later tags
+  claude plugin marketplace remove lathe
+  claude plugin marketplace add ahueb/lathe@vX.Y.Z
+  claude plugin install lathe@lathe   # lathe@engineering for v3.0.x tags, engineering@engineering before v3.0.0
   ```
 
   To verify the tag signature yourself, clone, `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`, check out the tag, and register the clone as a directory marketplace instead.
@@ -130,7 +132,7 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 Claude Code copies the plugin into a version-keyed cache and skips `plugin update` when the version is unchanged, so editing this repo changes nothing until the version is bumped.
 
 - Maintainer: `./release.sh prepare patch|minor|major` (or an explicit `x.y.z`) bumps `plugin.json`, folds `CHANGELOG.md`'s `## [Unreleased]` section under a new dated heading, validates with `claude plugin validate --strict`, runs `./ci.sh` (or `./ci.sh --full` when `install.sh`, `ci.sh`, `scripts/`, or `ci/` changed since the previous tag, or when no tag exists), branches `release/vX.Y.Z`, commits `Release engineering X.Y.Z`, pushes, and opens/watches/merges the PR through `gh` — see Release below for what the check and the tag each prove. `release.sh patch|minor|major|x.y.z [--no-commit]` (no subcommand) is the deprecated legacy form: it behaves like `prepare <bump> --no-pr` and prints a deprecation line; `--no-commit` keeps its old meaning of bumping, validating, and running `ci.sh` only, with nothing branched, committed, or pushed.
-- Everyone else: `claude plugin update lathe@engineering`, then restart Claude Code.
+- Everyone else: `claude plugin update lathe@lathe`, then restart Claude Code.
 - Policy changes also need a refreshed installed policy: rerun `./install.sh` (updates the rules file, or `CLAUDE.md` with `--policy-target claude-md`).
 
 ## Release
@@ -246,9 +248,10 @@ The policy maps superpowers' subagent roles onto `lathe` agents (implementer →
 ## Repository layout
 
 ```
-.claude-plugin/marketplace.json   marketplace manifest (`engineering`); lists the lathe plugin
+.claude-plugin/marketplace.json   marketplace manifest (`lathe`); lists the lathe plugin
 plugins/lathe/                    the lathe plugin
   .claude-plugin/plugin.json      plugin manifest and version
+  README.md                       the plugin's own README, shown as its directory listing description
   assets/icon.png                 512x512 icon for the plugin directory listing
   agents/                         eleven agent definitions
   skills/                         twelve SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests; comment-cleanup bundles references/ (comment-guidance.md canonical reference, source-basis.md)
@@ -273,8 +276,8 @@ CHANGELOG.md                      release notes per version
 ## Uninstall
 
 ```bash
-claude plugin uninstall lathe@engineering
-claude plugin marketplace remove engineering
+claude plugin uninstall lathe@lathe
+claude plugin marketplace remove lathe
 rm ~/.claude/rules/engineering-policy.md ~/.claude/engineering-installer.json
 ```
 

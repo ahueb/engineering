@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shim for ci.sh scenario 39: behaves as the real `claude` CLI (including a real,
-# successful `plugin install lathe@engineering`), except that the pre-rename plugin
+# successful `plugin install lathe@lathe`), except that the pre-rename plugin
 # engineering@engineering appears installed:
 #   * `plugin list --json` appends {"id":"engineering@engineering"} to the real
 #     listing until it has been uninstalled;

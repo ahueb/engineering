@@ -4,6 +4,17 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-10-04
+
+### Changed
+
+- **Breaking for self-hosted installs:** the marketplace is renamed from `engineering` to `lathe`, so the install id is `lathe@lathe`. `install.sh` removes this source's registration under the old name, which also uninstalls `lathe@engineering` and `engineering@engineering`, registers the marketplace as `lathe`, and drops both earlier ids from `enabledPlugins`; `--dry-run` reports each step. An `engineering` marketplace bound to another source is left registered, with a note.
+
+### Added
+
+- `plugins/lathe/README.md`, the plugin folder's own README, which the plugin directory requires and shows as the listing description.
+- CI scenario S40: the marketplace rename migration end to end with the real CLI.
+
 ## [3.0.1] - 2026-10-04
 
 ### Changed
@@ -377,7 +388,8 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/lathe/compare/v3.0.1...HEAD
+[Unreleased]: https://github.com/ahueb/lathe/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/ahueb/lathe/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/ahueb/lathe/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/ahueb/lathe/compare/v2.13.1...v3.0.0
 [2.13.1]: https://github.com/ahueb/lathe/compare/v2.13.0...v2.13.1
