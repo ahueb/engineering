@@ -4,6 +4,17 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.13.1] - 2026-10-03
+
+### Changed
+
+- `mechanical-worker` runs at `medium` effort instead of `low`, runs its check as its own command after the edits, retries a check a permission rule denied once as a single plain `python3` command, and says which check could not run instead of reporting the change done. In a measured rename task the tests actually ran in 9 of 12 runs, against 0 of 9 with the previous text at `low`, at the same cost per run.
+- README's Tuning section states how agent `effort` frontmatter, `CLAUDE_CODE_EFFORT_LEVEL`, `maxEffortLevel`, and `modelSettings` interact on Opus 5.5 and Sonnet 5.5.
+
+### Added
+
+- An Effort measurements section in `plugins/engineering/evals/RESULTS.md`: `bulk-implementer` and `architect` stay at `medium` because `high` showed no clear gain; `mechanical-worker` moves to `medium`.
+
 ## [2.13.0] - 2026-10-03
 
 ### Changed
@@ -344,7 +355,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.13.1...HEAD
+[2.13.1]: https://github.com/ahueb/engineering/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/ahueb/engineering/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/ahueb/engineering/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0

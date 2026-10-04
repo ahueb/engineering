@@ -810,7 +810,7 @@ VALID_AGENT_FRONTMATTER = {
     "browser-tester": "tools: Read, Grep, Glob, mcp__plugin_playwright_playwright, mcp__playwright\nmodel: sonnet\neffort: medium",
     "bulk-implementer": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: sonnet\neffort: medium",
     "hard-repair": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: opus\neffort: high",
-    "mechanical-worker": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: sonnet\neffort: low",
+    "mechanical-worker": "tools: Read, Grep, Glob, Bash, Edit, Write\nmodel: sonnet\neffort: medium",
     "plan-auditor": "tools: Read, Grep, Glob\nmodel: opus\neffort: high",
     "scout": "tools: Read, Grep, Glob\nmodel: sonnet\neffort: low",
     "security-reviewer": "tools: Read, Grep, Glob\nmodel: opus\neffort: medium",
