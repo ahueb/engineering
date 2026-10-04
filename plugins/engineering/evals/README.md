@@ -69,7 +69,7 @@ those hardened git forms, so the skill can run the hardened `git -c ...` command
 release: with `Bash(python3 *)` alone all 28 git calls in one 24-run measurement were denied, and
 scenario 4 could not show that `src/` at HEAD matched the release.
 
-`behaviour-comment-cleanup` exercises `/engineering:comment-cleanup` against a small polyglot
+`behaviour-comment-cleanup` exercises `/lathe:comment-cleanup` against a small polyglot
 repository and asserts that every protected directive comment (lint/type suppressions, build
 directives, source-map and bundler magic comments, `@generated` headers) survives byte-identical
 while ordinary stale comments are rewritten. It needs `Edit`/`Write` and runs as a separate
@@ -87,7 +87,7 @@ cost far more per run, and need write grants the trigger suite does not.
 
 ## Security-reviewer suite
 
-The five `behaviour-security-*` cases run `/engineering:change-review` on an uncommitted diff and grade the merged report. Cases 1, 3, and 4 test detection and exposure reasoning (a public route to a shell command; Redis published on all interfaces by a config-only change; `pull_request_target` running PR code with secrets). Cases 2 and 5 test restraint: an operator-only caller must not be rated High or Critical, and an authorization check applied by a blueprint hook and a scoped base class must not be reported missing. Graders are `tool_used`, `regex`, and one-criterion `llm` rubrics.
+The five `behaviour-security-*` cases run `/lathe:change-review` on an uncommitted diff and grade the merged report. Cases 1, 3, and 4 test detection and exposure reasoning (a public route to a shell command; Redis published on all interfaces by a config-only change; `pull_request_target` running PR code with secrets). Cases 2 and 5 test restraint: an operator-only caller must not be rated High or Critical, and an authorization check applied by a blueprint hook and a scoped base class must not be reported missing. Graders are `tool_used`, `regex`, and one-criterion `llm` rubrics.
 
 ```bash
 cd plugins/engineering

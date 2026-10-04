@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release the engineering plugin through a required-check-gated PR flow.
+# Release the lathe plugin through a required-check-gated PR flow.
 # Claude Code installs plugins into a version-keyed cache and skips `plugin update`
 # when the version is unchanged, so edits are invisible until `tag` (or the
 # --no-commit escape hatch) refreshes the local copy.
@@ -39,7 +39,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="$HERE/plugins/engineering/.claude-plugin/plugin.json"
 CHANGELOG="$HERE/CHANGELOG.md"
-REPO_URL="https://github.com/ahueb/engineering"
+REPO_URL="https://github.com/ahueb/lathe"
 
 usage() {
   cat >&2 <<'EOF'
@@ -91,7 +91,7 @@ wait_for_checks() {
   return 1
 }
 
-# Prints the installed engineering plugin's version, or nothing when it is not installed or the
+# Prints the installed lathe plugin's version, or nothing when it is not installed or the
 # listing cannot be read.
 installed_version() {
   claude plugin list --json 2>/dev/null | python3 -c '
@@ -101,7 +101,7 @@ try:
 except ValueError:
     plugins = []
 for p in plugins if isinstance(plugins, list) else []:
-    if isinstance(p, dict) and p.get("id") == "engineering@engineering":
+    if isinstance(p, dict) and p.get("id") == "lathe@engineering":
         print(p.get("version") or "")
         break
 ' 2>/dev/null || true
@@ -113,12 +113,12 @@ for p in plugins if isinstance(plugins, list) else []:
 # mismatch.
 refresh_local_install() {
   local want="$1" have
-  if ! claude plugin list 2>/dev/null | grep -q "engineering@engineering"; then
-    echo "engineering@engineering is not installed here; skipping local update"
+  if ! claude plugin list 2>/dev/null | grep -q "lathe@engineering"; then
+    echo "lathe@engineering is not installed here; skipping local update"
     return 0
   fi
-  if ! claude plugin update engineering@engineering; then
-    echo "WARN: local plugin update failed; run: claude plugin update engineering@engineering" >&2
+  if ! claude plugin update lathe@engineering; then
+    echo "WARN: local plugin update failed; run: claude plugin update lathe@engineering" >&2
     return 0
   fi
   have="$(installed_version)"
@@ -130,7 +130,7 @@ refresh_local_install() {
   echo "  git -C \"$HERE\" status --short   # commit or stash anything listed: reset --hard discards it" >&2
   echo "  git -C \"$HERE\" branch backup/pre-v$want-sync main" >&2
   echo "  git -C \"$HERE\" checkout main && git -C \"$HERE\" reset --hard origin/main" >&2
-  echo "  claude plugin update engineering@engineering" >&2
+  echo "  claude plugin update lathe@engineering" >&2
   return 1
 }
 
@@ -327,14 +327,14 @@ PY
     fi
   fi
 
-  if claude plugin list 2>/dev/null | grep -q "engineering@engineering"; then
-    if claude plugin update engineering@engineering; then
+  if claude plugin list 2>/dev/null | grep -q "lathe@engineering"; then
+    if claude plugin update lathe@engineering; then
       echo "local install updated to $NEW"
     else
-      echo "WARN: local plugin update failed; run: claude plugin update engineering@engineering" >&2
+      echo "WARN: local plugin update failed; run: claude plugin update lathe@engineering" >&2
     fi
   else
-    echo "engineering@engineering is not installed here; skipping local update"
+    echo "lathe@engineering is not installed here; skipping local update"
   fi
 }
 

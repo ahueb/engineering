@@ -5,7 +5,7 @@ context:
   scaffold_script: fixture.sh
 execution:
   prompt: |
-    Invoke `/engineering:implementation-loop` to add support for `end_ns=None` as an open upper
+    Invoke `/lathe:implementation-loop` to add support for `end_ns=None` as an open upper
     bound in `select_window` in `src/py/contracts.py`. When `end_ns` is `None`, every event at or
     after `start_ns` should be included, with no upper bound. Preserve all existing behavior:
     `start_ns` remains inclusive, an explicit `end_ns` remains exclusive, input order is

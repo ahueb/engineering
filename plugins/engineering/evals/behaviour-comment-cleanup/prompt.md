@@ -5,7 +5,7 @@ timeout_seconds: 900
 tags: [behaviour, behaviour-cleanup, comment-guidance-write]
 allowed_tools: [Read, Grep, Glob, Skill]
 ---
-Run `/engineering:comment-cleanup` on this repository. You are authorized only to clean up comments and docstrings. You are NOT authorized to change any behavior, executable code, or consumer-visible text (help output, error strings, generated files, licenses, or vendor files).
+Run `/lathe:comment-cleanup` on this repository. You are authorized only to clean up comments and docstrings. You are NOT authorized to change any behavior, executable code, or consumer-visible text (help output, error strings, generated files, licenses, or vendor files).
 
 When the skill has finished, write ONE final message that reports:
 1. The scope of the cleanup (which files you reviewed and which you changed).

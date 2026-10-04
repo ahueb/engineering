@@ -1,37 +1,49 @@
-# engineering
+# lathe
 
 Evidence-first engineering for Claude Code. One operating policy plus eleven cost-tiered agents and nine process skills that route each job to the cheapest model that can do it, verify with real checks before claiming success, and report what was actually proven. Includes parallel plan execution, adversarial code and plan audits, a production readiness review with hard gates, Playwright browser testing, and narrow research skills for documentation and literature. Works standalone or alongside superpowers.
 
-Everything except settings ships as the `engineering` plugin; the policy also ships inside it, and `install.sh` installs it as a standalone rules file that Claude Code loads every session without a hook.
+Everything except settings ships as the `lathe` plugin, published from this repository's `engineering` marketplace; the policy also ships inside it, and `install.sh` installs it as a standalone rules file that Claude Code loads every session without a hook.
 
 ## Example use cases
 
-- **Ship a feature from a plan fast.** `/engineering:plan-execution docs/plans/checkout.md` splits the plan into disjoint-file packages, implements all of them in parallel on Sonnet, runs one integrated build-and-test pass, then has Opus auditors prove every plan item is complete.
-- **Fix a bug with evidence.** `/engineering:implementation-loop` inspects the repo, reproduces the failure, makes the smallest fix, and closes with `verification-loop`, which reports exactly which checks ran, passed, or could not run.
-- **Confirm a UI change in a real browser.** `/engineering:browser-testing "add item to cart and see the badge update"` starts the app, dispatches a headless Playwright agent with an explicit pass condition, and returns screenshots, console errors, and failed requests.
-- **Decide go or no-go before a release.** `/engineering:production-readiness-review assess this branch for a 5% canary` audits twelve non-compensable gates, tries to falsify every apparent pass, and returns READY, CONDITIONALLY READY, or NOT READY with evidence strength per gate.
-- **Review a pull request without noise.** `/engineering:change-review` reports concrete defects with location, failure mechanism, and fix direction, and dispatches `security-reviewer` when the diff touches auth, secrets, external input, CI, or deployment and network configuration; the reviewer rates each finding by who can reach the code where it runs.
-- **Check one fact that may have changed.** `/engineering:docs-check "does Next.js 16 still support the pages router?"` answers from version-matched official docs with citations, on Sonnet, without editing anything.
-- **Make comments orient a stranger.** `/engineering:comment-cleanup` audits or, in a bounded scope (explicit invocation or a named path), rewrites comments and docstrings, preserving their semantic content and never touching the code itself.
-- **Hand work to the next session.** `/engineering:checkpoint` writes what is done, what failed and why, what was verified, and the next safe step.
-- **Escalate only when it matters.** `/engineering:deep-audit` runs a read-only adversarial audit on Opus at extra-high effort, reserved for consequential or hard-to-reverse changes.
+- **Ship a feature from a plan fast.** `/lathe:plan-execution docs/plans/checkout.md` splits the plan into disjoint-file packages, implements all of them in parallel on Sonnet, runs one integrated build-and-test pass, then has Opus auditors prove every plan item is complete.
+- **Fix a bug with evidence.** `/lathe:implementation-loop` inspects the repo, reproduces the failure, makes the smallest fix, and closes with `verification-loop`, which reports exactly which checks ran, passed, or could not run.
+- **Confirm a UI change in a real browser.** `/lathe:browser-testing "add item to cart and see the badge update"` starts the app, dispatches a headless Playwright agent with an explicit pass condition, and returns screenshots, console errors, and failed requests.
+- **Decide go or no-go before a release.** `/lathe:production-readiness-review assess this branch for a 5% canary` audits twelve non-compensable gates, tries to falsify every apparent pass, and returns READY, CONDITIONALLY READY, or NOT READY with evidence strength per gate.
+- **Review a pull request without noise.** `/lathe:change-review` reports concrete defects with location, failure mechanism, and fix direction, and dispatches `security-reviewer` when the diff touches auth, secrets, external input, CI, or deployment and network configuration; the reviewer rates each finding by who can reach the code where it runs.
+- **Check one fact that may have changed.** `/lathe:docs-check "does Next.js 16 still support the pages router?"` answers from version-matched official docs with citations, on Sonnet, without editing anything.
+- **Make comments orient a stranger.** `/lathe:comment-cleanup` audits or, in a bounded scope (explicit invocation or a named path), rewrites comments and docstrings, preserving their semantic content and never touching the code itself.
+- **Hand work to the next session.** `/lathe:checkpoint` writes what is done, what failed and why, what was verified, and the next safe step.
+- **Escalate only when it matters.** `/lathe:deep-audit` runs a read-only adversarial audit on Opus at extra-high effort, reserved for consequential or hard-to-reverse changes.
 
 ## Install
 
 ```bash
-git clone git@github.com:ahueb/engineering.git && cd engineering
+git clone git@github.com:ahueb/lathe.git && cd lathe
 ./install.sh                 # into ~/.claude, or $CLAUDE_CONFIG_DIR if set
 ./install.sh --no-official   # do not register or install the claude-plugins-official marketplace/plugins
-./install.sh --source ahueb/engineering   # register the GitHub repo as the marketplace instead of this checkout
+./install.sh --source ahueb/lathe   # register the GitHub repo as the marketplace instead of this checkout
 ```
 
-The script validates your `settings.json`, registers the marketplace, installs `engineering@engineering`, merges the recommended settings into `settings.json`, installs the operating policy (as a rules file by default, or `CLAUDE.md` with `--policy-target claude-md`), installs official plugins, and writes the installer marker, in that order; a marketplace failure stops it before anything is written. A file is backed up before any change that would alter it (see Backups below), so an identical rerun leaves no new backup. A plugin you have explicitly disabled stays disabled, except `engineering@engineering` itself, which the installer always enables (see Changed behaviour below). If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `opus[1m]` (Opus 5.5 with 1M context) at extra-high effort, Sonnet 5.5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
+The script validates your `settings.json`, registers the marketplace, installs `lathe@engineering`, merges the recommended settings into `settings.json`, installs the operating policy (as a rules file by default, or `CLAUDE.md` with `--policy-target claude-md`), installs official plugins, and writes the installer marker, in that order; a marketplace failure stops it before anything is written. A file is backed up before any change that would alter it (see Backups below), so an identical rerun leaves no new backup. A plugin you have explicitly disabled stays disabled, except `lathe@engineering` itself, which the installer always enables (see Changed behaviour below). If `engineering` is already registered from a different source, the installer refuses and tells you to remove the old marketplace first. Defaults set: `opus[1m]` (Opus 5.5 with 1M context) at extra-high effort, Sonnet 5.5 at medium, Concise output style, auto memory on, 16 concurrent subagents, no nested subagents, and a 2% skill-listing budget so every skill keeps its description on 200K-context models (at the 1% default the listing overflows and Claude Code drops descriptions starting with the least-invoked skills).
 
 Flags: `--no-official` (skip registering the official marketplace and installing official plugins; leaves any existing official entries alone), `--purge-official` (also remove previously registered official marketplace/plugin entries from `settings.json`, backed up first; an explicit `false` you set is kept), `--source X` (register `X` — a directory or a GitHub `owner/repo` — as the `engineering` marketplace instead of this checkout), `--settings-mode enforce|defaults` (override the auto-selected merge mode; see the mode table below), `--policy-target rules|claude-md` (install the policy as `~/.claude/rules/engineering-policy.md`, the default, or keep the legacy `~/.claude/CLAUDE.md` layout), `--dry-run` (print the settings diff, drift report, policy action, marketplace action, and plugin actions without writing anything; cannot be combined with `--restore`, which exits 2), `--yes` (assume yes to any confirmation, including legacy-policy migration, without a TTY prompt), `--break-hardlinks` (allow the installer to replace a hard-linked target instead of refusing), `--create-through-dangling` (when `settings.json` is a dangling symlink, create the target through the link instead of refusing; without it the installer exits 4 with "settings.json is a dangling symlink; check out the dotfiles target or pass --create-through-dangling"), `--restore [STAMP]` (restore the given backup, or the latest one, from `~/.claude/backups/engineering/`; accepts `--break-hardlinks` and `--no-outside-cfg`), `--no-outside-cfg` (`--restore` only: refuse every entry whose real target lies outside the config directory instead of restoring it; see Installer rollback and restore below), `--no-rollback` (do not roll this run's own writes back on failure; print the manual restore command instead), `--list-backups` (list available backup stamps and the files each one holds), `-h` (help).
 
 Environment variables: `ENGINEERING_NO_PROMPT=1` declines any interactive confirmation deterministically, the same as running without a TTY (used for the legacy-policy migration prompt); `ENGINEERING_RECOMMENDED=PATH` points the installer at an alternate recommended-settings file whenever it is set, printing "recommendation file overridden by ENGINEERING_RECOMMENDED: <path>" (test and CI use only; the default is `settings.recommended.json` beside `install.sh`). The pointed-to file replaces the whole recommendation, including hooks, `env`, and permissions, so only set this deliberately — a hostile file could grant itself broad settings through this variable. `ENGINEERING_RELEASE=1` is not an installer variable; `release.sh` and `.githooks/pre-push` use it to recognize a release push (see Release below).
 
-Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/engineering && claude plugin install engineering@engineering`. A SessionStart hook then injects the policy every session until you run `install.sh` to install it as a rules file (or a legacy `CLAUDE.md`, with `--policy-target claude-md`).
+Marketplace-only install (no script) also works: `claude plugin marketplace add ahueb/lathe && claude plugin install lathe@engineering`. A SessionStart hook then injects the policy every session until you run `install.sh` to install it as a rules file (or a legacy `CLAUDE.md`, with `--policy-target claude-md`).
+
+### Upgrading from the `engineering` plugin
+
+Before 3.0.0 the plugin was named `engineering`, which collided with another plugin's name in the Claude plugin directory. Skills are now `/lathe:<skill>` and agent types `lathe:<agent>`; the marketplace keeps its name, so the install id is `lathe@engineering`. The repository moved from `ahueb/engineering` to `ahueb/lathe`; GitHub redirects the old name, and `install.sh --source ahueb/lathe` accepts a marketplace registered from `ahueb/engineering` as the same source. Rerun `./install.sh`: it installs `lathe@engineering`, uninstalls `engineering@engineering`, drops that id from `enabledPlugins`, and refreshes the installed policy. Without the script:
+
+```bash
+claude plugin marketplace update engineering
+claude plugin uninstall engineering@engineering
+claude plugin install lathe@engineering
+```
+
+Until the old plugin is removed, every skill and agent loads twice, once under each name.
 
 ### How the policy loads
 
@@ -58,7 +70,7 @@ The installer also gates on what the installed plugin version actually supports:
 | `enforce` | The recommended value wins at every path above: lists still union, but marketplace/MCP entries, `fallbackModel`, `modelPicker`, and `availableModels` are replaced whole by the recommendation. |
 | `defaults` | A recommended value is applied only where the path is absent from your settings; lists still union; a marketplace or MCP entry already present by name is left untouched; `enabledPlugins` gains only missing entries. Every path where your value differs from the recommendation is printed as a drift report, ending with the line `apply the recommended values with: ./install.sh --settings-mode enforce`. |
 
-The mode is chosen automatically unless `--settings-mode` is given: `defaults` once the installer marker `~/.claude/engineering-installer.json` is present from a prior run; `defaults` with a prominent drift report and a first-run notice when the marker is absent but a prior installation is otherwise evident (an enabled `engineering@engineering` or a legacy policy copy) — this covers the first run of a rewritten installer on an existing configuration; `enforce` only on a genuinely first install, where neither signal exists. An explicit `--settings-mode` always wins.
+The mode is chosen automatically unless `--settings-mode` is given: `defaults` once the installer marker `~/.claude/engineering-installer.json` is present from a prior run; `defaults` with a prominent drift report and a first-run notice when the marker is absent but a prior installation is otherwise evident (an enabled `lathe@engineering` or a legacy policy copy) — this covers the first run of a rewritten installer on an existing configuration; `enforce` only on a genuinely first install, where neither signal exists. An explicit `--settings-mode` always wins.
 
 The drift report and the `--dry-run` settings diff both redact sensitive values as `<redacted>`: anything under an `env` block, any key containing `key`, `token`, `secret`, `password`, or `credential`, and `apiKeyHelper`.
 
@@ -78,7 +90,7 @@ File modes: an existing `settings.json` keeps its current mode across a write; o
 
 After the first file a run writes, an unexpected command failure or an explicit exit with code 3-7 rolls that run's writes back automatically: every file the run wrote is restored to what it was before the run (or, if the run created it, removed), and the run then exits with its original code. The scope is exactly what this run wrote or removed, and only if nothing else changed that file or removed-path since — `scripts/safe_write.py mark-written` records the post-write hash of every file the run touches, and rollback compares against it before touching anything; a file changed by something else after the run wrote it is reported as `not rolled back: <rel> changed after this run wrote it` and left alone. The installer marker `engineering-installer.json` is removed on rollback only when this run created it.
 
-Not every non-zero exit is a rollback trigger. Exit 1 refusals (a user-owned policy file the installer would not overwrite, a marketplace refusal, and similar) are deliberate stopping points, not failures, and leave whatever was already written in place. `--dry-run` never writes, so there is nothing to roll back. Exit 11 (a partial run: `engineering@engineering`, `settings.json`, and the policy are installed, but one or more official plugins failed) is not rolled back either — the successful part of the run stays.
+Not every non-zero exit is a rollback trigger. Exit 1 refusals (a user-owned policy file the installer would not overwrite, a marketplace refusal, and similar) are deliberate stopping points, not failures, and leave whatever was already written in place. `--dry-run` never writes, so there is nothing to roll back. Exit 11 (a partial run: `lathe@engineering`, `settings.json`, and the policy are installed, but one or more official plugins failed) is not rolled back either — the successful part of the run stays.
 
 `--no-rollback` disables the automatic restore and instead prints the manual command (`./install.sh --restore <stamp>`); the run's partial writes are left as they are. If rollback itself fails, the installer prints the same manual restore command and exits with the run's original exit code. What rollback never removes, by design: the config directory created for this run and its `backups/` tree.
 
@@ -91,7 +103,7 @@ Exit codes 11 and 12: 11 is the partial-official-plugin-failure case above. 12 i
 | policy | Installed as `rules/engineering-policy.md` by default, or `CLAUDE.md` with `--policy-target claude-md`; a legacy `CLAUDE.md` policy copy is migrated to the rules file (with confirmation) or refreshed in place if migration is declined; a user's own `CLAUDE.md` or rules file is never touched |
 | `settings.json` | Merged from `settings.recommended.json` per the merge rules above, in `enforce` or `defaults` mode |
 | marketplaces | `engineering` registered from this checkout, or from `--source`; `claude-plugins-official` registered unless `--no-official` |
-| plugins | `engineering@engineering` installed at user scope and always enabled; each official plugin installed unless `--no-official` or disabled in your settings; `--purge-official` removes previously registered official entries instead |
+| plugins | `lathe@engineering` installed at user scope and always enabled; each official plugin installed unless `--no-official` or disabled in your settings; `--purge-official` removes previously registered official entries instead |
 | backups | Any file the run would change is copied to `~/.claude/backups/engineering/<stamp>/` first; see Backups above |
 | `--dry-run` | Prints the settings diff, drift report (in `defaults` mode), policy action, marketplace action, and plugin actions; writes nothing |
 
@@ -100,12 +112,12 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 ## Verify, pin, and roll back
 
 - Every release is a signed tag. Verify before installing from a clone: `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`.
-- Pin instead of tracking `main`. Pin the marketplace source to a signed tag with `@ref` (verified 2026-09-12: `claude plugin marketplace add ahueb/engineering@v2.7.1` installs 2.7.1); `claude plugin marketplace update engineering` then follows that tag, not `main`. The plugin-version form `engineering@engineering@<version>` does not pin.
+- Pin instead of tracking `main`. Pin the marketplace source to a signed tag with `@ref` (verified 2026-09-12, when the repository was still named `engineering`: `claude plugin marketplace add ahueb/engineering@v2.7.1` installs 2.7.1); `claude plugin marketplace update engineering` then follows that tag, not `main`. The plugin-version form `lathe@engineering@<version>` does not pin.
 
   ```bash
   claude plugin marketplace remove engineering
-  claude plugin marketplace add ahueb/engineering@v2.7.1
-  claude plugin install engineering@engineering
+  claude plugin marketplace add ahueb/lathe@v2.7.1
+  claude plugin install engineering@engineering   # lathe@engineering for v3.0.0 and later tags
   ```
 
   To verify the tag signature yourself, clone, `git config gpg.ssh.allowedSignersFile .allowed_signers && git tag -v v2.7.1`, check out the tag, and register the clone as a directory marketplace instead.
@@ -118,7 +130,7 @@ Set `CLAUDE_CONFIG_DIR` to install somewhere other than `~/.claude`, for example
 Claude Code copies the plugin into a version-keyed cache and skips `plugin update` when the version is unchanged, so editing this repo changes nothing until the version is bumped.
 
 - Maintainer: `./release.sh prepare patch|minor|major` (or an explicit `x.y.z`) bumps `plugin.json`, folds `CHANGELOG.md`'s `## [Unreleased]` section under a new dated heading, validates with `claude plugin validate --strict`, runs `./ci.sh` (or `./ci.sh --full` when `install.sh`, `ci.sh`, `scripts/`, or `ci/` changed since the previous tag, or when no tag exists), branches `release/vX.Y.Z`, commits `Release engineering X.Y.Z`, pushes, and opens/watches/merges the PR through `gh` — see Release below for what the check and the tag each prove. `release.sh patch|minor|major|x.y.z [--no-commit]` (no subcommand) is the deprecated legacy form: it behaves like `prepare <bump> --no-pr` and prints a deprecation line; `--no-commit` keeps its old meaning of bumping, validating, and running `ci.sh` only, with nothing branched, committed, or pushed.
-- Everyone else: `claude plugin update engineering@engineering`, then restart Claude Code.
+- Everyone else: `claude plugin update lathe@engineering`, then restart Claude Code.
 - Policy changes also need a refreshed installed policy: rerun `./install.sh` (updates the rules file, or `CLAUDE.md` with `--policy-target claude-md`).
 
 ## Release
@@ -149,7 +161,7 @@ cat > /tmp/protection.json <<'EOF'
  "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null,
  "required_linear_history": true, "allow_force_pushes": false, "allow_deletions": false}
 EOF
-gh api -X PUT repos/ahueb/engineering/branches/main/protection --input /tmp/protection.json
+gh api -X PUT repos/ahueb/lathe/branches/main/protection --input /tmp/protection.json
 ```
 
 `macos` becomes a required check only after two consecutive green releases on it.
@@ -186,10 +198,10 @@ Two independent kinds of checking apply to the comment-guidance cases, and neith
 
 | Kind | Names |
 |---|---|
-| Agents | `engineering:scout` (sonnet, low), `engineering:test-triage` (sonnet, low, no Bash), `engineering:mechanical-worker` (sonnet, medium), `engineering:bulk-implementer` (sonnet, medium), `engineering:architect` (opus, medium), `engineering:semantic-reviewer` (opus, medium), `engineering:security-reviewer` (opus, medium), `engineering:hard-repair` (opus, high), `engineering:plan-auditor` (opus, high), `engineering:browser-tester` (sonnet, medium, no Bash, has Playwright MCP), `engineering:auditor` (opus, xhigh, Bash guarded by a plugin hook allowlist) |
-| Process skills | `/engineering:plan-execution`, `/engineering:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review`, `comment-cleanup` (forked, sonnet, medium; audit or bounded cleanup of comments and docstrings, edits comment/docstring spans only) |
+| Agents | `lathe:scout` (sonnet, low), `lathe:test-triage` (sonnet, low, no Bash), `lathe:mechanical-worker` (sonnet, medium), `lathe:bulk-implementer` (sonnet, medium), `lathe:architect` (opus, medium), `lathe:semantic-reviewer` (opus, medium), `lathe:security-reviewer` (opus, medium), `lathe:hard-repair` (opus, high), `lathe:plan-auditor` (opus, high), `lathe:browser-tester` (sonnet, medium, no Bash, has Playwright MCP), `lathe:auditor` (opus, xhigh, Bash guarded by a plugin hook allowlist) |
+| Process skills | `/lathe:plan-execution`, `/lathe:implementation-loop`, `verification-loop`, `browser-testing`, `change-review`, `checkpoint`, `change-eval`, `production-readiness-review`, `comment-cleanup` (forked, sonnet, medium; audit or bounded cleanup of comments and docstrings, edits comment/docstring spans only) |
 | Research skills (forked, no shell) | `docs-check` (sonnet, medium), `literature-review` (opus, medium) |
-| User-only escalation | `/engineering:deep-audit` (forks to `engineering:auditor`, opus, xhigh) |
+| User-only escalation | `/lathe:deep-audit` (forks to `lathe:auditor`, opus, xhigh) |
 
 | Agent/skill | Tools |
 |---|---|
@@ -197,26 +209,26 @@ Two independent kinds of checking apply to the comment-guidance cases, and neith
 | `test-triage` | read-only by tool list, no Bash (removed: it never reruns anything; refuses a dispatch without captured output or a log path) |
 | `browser-tester` | read-only by tool list, no Bash, plus the Playwright MCP tools it needs to drive a browser |
 | `docs-check`, `literature-review` | `disallowed-tools` removes Bash, PowerShell, and every edit tool; body says "No shell: use Read, WebFetch, and WebSearch" |
-| `deep-audit` (forks to `engineering:auditor`) | Read, Grep, Glob, Bash — the Bash is restricted by the plugin `PreToolUse` hook `hooks/readonly-guard.sh` to an allowlist (`hooks/readonly-allowlist.txt`) keyed to the `engineering:auditor` agent type; every other agent's Bash is unaffected by the hook |
+| `deep-audit` (forks to `lathe:auditor`) | Read, Grep, Glob, Bash — the Bash is restricted by the plugin `PreToolUse` hook `hooks/readonly-guard.sh` to an allowlist (`hooks/readonly-allowlist.txt`) keyed to the `lathe:auditor` agent type; every other agent's Bash is unaffected by the hook |
 | `bulk-implementer`, `mechanical-worker`, `hard-repair` | full, unguarded shell (implementers) |
 
 Before this release, `test-triage`, `browser-tester`, `deep-audit`, `docs-check`, and `literature-review` all kept Bash and were "read-only" only by instruction. `test-triage`, `browser-tester`, `docs-check`, and `literature-review` no longer have Bash at all. `deep-audit`'s Bash is enforced, not merely instructed: the guard denies any command whose first token is not on the allowlist, and denies redirection, command substitution, backticks, and background `&` outright regardless of the first token. The guard's stated property is narrow: it prevents accidental mutation by the auditor during a normal audit; it is not a sandbox against a hostile repository — obfuscated commands, repository-controlled runners, and interpreters (`bash -c`, `eval`, `env`, `xargs`, `sed`, `awk`) are out of scope, and the allowlist is data that can drift out of sync with the guard's intent. Accepted false-denies (fail-closed, since quotes are not parsed and separators inside them still split the command): `grep 'a;b' f` (the `;` inside the quotes is treated as a command separator, and `b` — not a token on the allowlist — is denied), `git -C d status` (rejected because the allowed-verb check looks at the *second* token, which here is `-C`, not `status`), and `git --no-pager log` (rejected for the same reason: the second token is `--no-pager`).
 
 ## Executing plans
 
-`/engineering:plan-execution` is the fast path for a written plan. It partitions the plan into packages that own disjoint files and share explicit interfaces, dispatches every package to a parallel `bulk-implementer` in one batch with building and testing forbidden, merges the results, runs one integrated build-and-test pass, and then has `plan-auditor` and `semantic-reviewer` adversarially check the merged result against the plan for completeness and correctness. The policy routes superpowers' `executing-plans` and `subagent-driven-development` through this flow.
+`/lathe:plan-execution` is the fast path for a written plan. It partitions the plan into packages that own disjoint files and share explicit interfaces, dispatches every package to a parallel `bulk-implementer` in one batch with building and testing forbidden, merges the results, runs one integrated build-and-test pass, and then has `plan-auditor` and `semantic-reviewer` adversarially check the merged result against the plan for completeness and correctness. The policy routes superpowers' `executing-plans` and `subagent-driven-development` through this flow.
 
 ## Browser testing
 
-`/engineering:browser-testing` is the only path through which the plugin drives a browser. It finds the app's own launch path (`playwright.config` `webServer`, package scripts, compose files), starts the app once, and requires an explicit oracle for every journey before anything is clicked. Exploratory runs dispatch `engineering:browser-tester`, which uses the Playwright MCP server from the official `playwright` plugin (enabled by `install.sh`) or a user-configured MCP server named `playwright`; plugin agents cannot bundle their own MCP server, Claude Code ignores `mcpServers` in a plugin agent. It returns a fixed evidence block: result, steps executed, oracle evidence, console errors, same-origin network failures, artifact paths, blockers. It never edits files. Journeys that will be rerun are codified as `@playwright/test` specs under the conventions in `skills/browser-testing/references/playwright-conventions.md` (user-facing locators, web-first assertions, no fixed sleeps, no assertion loosening to hide a defect, three-run flake rule) and run with `npx playwright test`. `verification-loop` and `implementation-loop` route user-facing web changes here; the readiness review may use one `browser-tester` dispatch per critical journey as G2 evidence.
+`/lathe:browser-testing` is the only path through which the plugin drives a browser. It finds the app's own launch path (`playwright.config` `webServer`, package scripts, compose files), starts the app once, and requires an explicit oracle for every journey before anything is clicked. Exploratory runs dispatch `lathe:browser-tester`, which uses the Playwright MCP server from the official `playwright` plugin (enabled by `install.sh`) or a user-configured MCP server named `playwright`; plugin agents cannot bundle their own MCP server, Claude Code ignores `mcpServers` in a plugin agent. It returns a fixed evidence block: result, steps executed, oracle evidence, console errors, same-origin network failures, artifact paths, blockers. It never edits files. Journeys that will be rerun are codified as `@playwright/test` specs under the conventions in `skills/browser-testing/references/playwright-conventions.md` (user-facing locators, web-first assertions, no fixed sleeps, no assertion loosening to hide a defect, three-run flake rule) and run with `npx --no playwright test`, which uses only the project's installed Playwright and never downloads one. `verification-loop` and `implementation-loop` route user-facing web changes here; the readiness review may use one `browser-tester` dispatch per critical journey as G2 evidence.
 
-Requirements: the official `playwright` plugin enabled (or a `playwright` MCP server in your own config), Node with `npx`, and Playwright browsers installed (`npx playwright install --with-deps chromium`; the conventions reference has the agent ask before installing).
+Requirements: the official `playwright` plugin enabled (or a `playwright` MCP server in your own config), Node with `npx`, and Playwright browsers installed (`npx --no playwright install --with-deps chromium`; the conventions reference has the agent ask before installing).
 
 ## Production readiness review
 
-`/engineering:production-readiness-review` judges whether a repository or release candidate is ready for a specific production exposure. It is read-only and evidence-first: 12 non-compensable hard gates, 13 graded readiness dimensions, separate readiness-state and evidence-strength axes, domain overlays, and an adversarial pass that tries to falsify every apparent pass before the verdict of READY, CONDITIONALLY READY, or NOT READY. Repository absence never proves an operational fact; on-call, restore drills, live SLOs, and production configuration are marked unknown unless directly evidenced.
+`/lathe:production-readiness-review` judges whether a repository or release candidate is ready for a specific production exposure. It is read-only and evidence-first: 12 non-compensable hard gates, 13 graded readiness dimensions, separate readiness-state and evidence-strength axes, domain overlays, and an adversarial pass that tries to falsify every apparent pass before the verdict of READY, CONDITIONALLY READY, or NOT READY. Repository absence never proves an operational fact; on-call, restore drills, live SLOs, and production configuration are marked unknown unless directly evidenced.
 
-The skill runs inline so it keeps the conversation's release context, and fans evidence collection out to `scout`, `security-reviewer`, and `semantic-reviewer`. Claude invokes it on readiness questions; `/engineering:production-readiness-review assess this branch for a 5% canary` invokes it directly. It is never run automatically by the other skills.
+The skill runs inline so it keeps the conversation's release context, and fans evidence collection out to `scout`, `security-reviewer`, and `semantic-reviewer`. Claude invokes it on readiness questions; `/lathe:production-readiness-review assess this branch for a 5% canary` invokes it directly. It is never run automatically by the other skills.
 
 A bundled probe emits read-only repository discovery as JSON, with no file contents or secret values:
 
@@ -229,14 +241,15 @@ Trigger-quality evals live in `plugins/engineering/evals/`; see its README.
 
 ## Working with superpowers
 
-The policy maps superpowers' subagent roles onto engineering agents (implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`), and `implementation-loop` and `verification-loop` invoke the matching superpowers skills when present; `checkpoint` records the superpowers plan file and completed task numbers. `dispatching-parallel-agents` work that edits code maps to `bulk-implementer` or `hard-repair`, not `scout`. Superpowers is not a dependency; without it every reference is simply skipped.
+The policy maps superpowers' subagent roles onto `lathe` agents (implementer → `bulk-implementer`, reviewers → `semantic-reviewer` and `security-reviewer`, late fix rounds → `hard-repair`, lookups → `scout`), and `implementation-loop` and `verification-loop` invoke the matching superpowers skills when present; `checkpoint` records the superpowers plan file and completed task numbers. `dispatching-parallel-agents` work that edits code maps to `bulk-implementer` or `hard-repair`, not `scout`. Superpowers is not a dependency; without it every reference is simply skipped.
 
 ## Repository layout
 
 ```
-.claude-plugin/marketplace.json   marketplace manifest; lists the engineering plugin
-plugins/engineering/
+.claude-plugin/marketplace.json   marketplace manifest (`engineering`); lists the lathe plugin
+plugins/engineering/              the lathe plugin
   .claude-plugin/plugin.json      plugin manifest and version
+  assets/icon.png                 512x512 icon for the plugin directory listing
   agents/                         eleven agent definitions
   skills/                         twelve SKILL.md skills; browser-testing bundles a Playwright conventions reference; production-readiness-review bundles references, a probe, and tests; comment-cleanup bundles references/ (comment-guidance.md canonical reference, source-basis.md)
   evals/                          claude plugin eval cases for skill trigger quality; comment-guidance-support/ holds the fixture builder and data shared by the comment-guidance cases
@@ -260,12 +273,21 @@ CHANGELOG.md                      release notes per version
 ## Uninstall
 
 ```bash
-claude plugin uninstall engineering@engineering
+claude plugin uninstall lathe@engineering
 claude plugin marketplace remove engineering
 rm ~/.claude/rules/engineering-policy.md ~/.claude/engineering-installer.json
 ```
 
 Then restore `settings.json` (and `CLAUDE.md`, if you used `--policy-target claude-md`) from a backup with `./install.sh --restore` (see `--list-backups` above), or edit them by hand.
+
+## Credentials and data access
+
+The plugin reads no API key, token, or other credential, ships no MCP server, and makes no network request of its own. Its two hooks read only local files:
+
+- `hooks/session-start.sh` checks whether the first line of `rules/engineering-policy.md` or `CLAUDE.md` in the config directory (`$CLAUDE_CONFIG_DIR`, default `~/.claude`) is the policy heading and whether that file matches the bundled `context/CLAUDE.md`. It prints the bundled policy, a one-line refresh notice naming the file, or nothing; it never prints those files' contents.
+- `hooks/readonly-guard.sh` reads the `PreToolUse` payload on stdin and `hooks/readonly-allowlist.txt`, and prints an allow or deny decision for `lathe:auditor`'s shell commands.
+
+`browser-tester` drives the Playwright MCP server from the official `playwright` plugin. A signed-in journey starts from the project's saved login state or from a disposable test account the user provides in the conversation, never from credentials read from environment variables or files. `install.sh` reads and writes `settings.json` and the policy file in the config directory, and redacts secret-looking values in the settings diff and drift report it prints.
 
 ## Not included
 

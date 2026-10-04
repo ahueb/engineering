@@ -5,7 +5,7 @@ context:
   scaffold_script: fixture.sh
 execution:
   prompt: |
-    Dispatch `engineering:plan-auditor` (via the Agent tool) once, auditing both PLAN_DOCS.md and
+    Dispatch `lathe:plan-auditor` (via the Agent tool) once, auditing both PLAN_DOCS.md and
     PLAN_RUNTIME.md together as the plan set. Supply, as the diff to audit, the list of files
     changed in this workspace (`docs/guide.md`, `docs/runtime-claim.md`), and supply "no tests
     run" as the verification results the auditor should treat as already reported. Do not run

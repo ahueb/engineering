@@ -12,6 +12,6 @@
     "FOO": "bar"
   },
   "enabledPlugins": {
-    "engineering@engineering": true
+    "lathe@engineering": true
   }
 }

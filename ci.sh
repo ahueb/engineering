@@ -103,6 +103,17 @@ step "plugin and marketplace manifests"
 claude plugin validate "$PLUGIN" --strict >/dev/null && ok "plugin validate --strict" || bad "plugin validate --strict"
 claude plugin validate "$HERE" --strict >/dev/null && ok "marketplace validate --strict" || bad "marketplace validate --strict"
 python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$PLUGIN/hooks/hooks.json" && ok "hooks.json is JSON" || bad "hooks.json is JSON"
+# The plugin directory requires an icon: an SVG or a 512x512 PNG inside the plugin.
+python3 - "$PLUGIN" <<'PY' && ok "plugin.json icon is a 512x512 PNG in the plugin" || bad "plugin.json icon is a 512x512 PNG in the plugin"
+import json, os, struct, sys
+plugin = sys.argv[1]
+icon = json.load(open(os.path.join(plugin, ".claude-plugin", "plugin.json")))["icon"]
+path = os.path.realpath(os.path.join(plugin, icon))
+assert path.startswith(os.path.realpath(plugin) + os.sep), icon
+head = open(path, "rb").read(24)
+assert head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR", "not a PNG"
+assert struct.unpack(">II", head[16:24]) == (512, 512), struct.unpack(">II", head[16:24])
+PY
 python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$HERE/settings.recommended.json" && ok "settings.recommended.json is JSON" || bad "settings.recommended.json is JSON"
 
 step "probe"
@@ -169,10 +180,23 @@ for f in glob.glob(f"{plugin}/agents/*.md") + glob.glob(f"{plugin}/skills/*/SKIL
 policy = open(f"{plugin}/context/CLAUDE.md").read()
 if not policy.startswith("# Agent operating policy\n"): problems.append("policy first line changed")
 if policy.count("\n") > 120: problems.append(f"policy is {policy.count(chr(10))} lines")
-scan = [f"{root}/README.md", f"{root}/CHANGELOG.md", f"{plugin}/context/CLAUDE.md"] + glob.glob(f"{plugin}/skills/*/SKILL.md") + glob.glob(f"{plugin}/agents/*.md")
+import json
+pname = json.load(open(f"{plugin}/.claude-plugin/plugin.json"))["name"]
+scan = [f"{root}/README.md", f"{root}/CHANGELOG.md", f"{plugin}/context/CLAUDE.md"] + glob.glob(f"{plugin}/skills/*/SKILL.md") + glob.glob(f"{plugin}/skills/*/references/*.md") + glob.glob(f"{plugin}/agents/*.md")
 for f in scan:
-    for ref in set(re.findall(r"engineering:([a-z-]+)", open(f).read())):
-        if ref not in names: problems.append(f"{f}: unknown reference engineering:{ref}")
+    t = open(f).read()
+    for ref in set(re.findall(rf"(?<![\w-]){re.escape(pname)}:([a-z-]+)", t)):
+        if ref not in names: problems.append(f"{f}: unknown reference {pname}:{ref}")
+    # The plugin was named engineering before 3.0.0; only the changelog may still say so.
+    if f != f"{root}/CHANGELOG.md":
+        for ref in set(re.findall(r"(?<![\w-])engineering:([a-z-]+)", t)):
+            if ref in names: problems.append(f"{f}: pre-rename reference engineering:{ref}")
+# The read-only guard and deep-audit must name this plugin's auditor, or the guard stops applying.
+auditor = f"{pname}:auditor"
+guard = open(f"{plugin}/hooks/readonly-guard.sh").read()
+if f"^{auditor}$" not in guard: problems.append(f"readonly-guard.sh does not key on {auditor}")
+if f"""*'"{auditor}"'*""" not in guard: problems.append(f"readonly-guard.sh fail-closed fallback does not name {auditor}")
+if not re.search(rf"^agent: {re.escape(auditor)}$", open(f"{plugin}/skills/deep-audit/SKILL.md").read(), re.M): problems.append(f"deep-audit does not fork to {auditor}")
 for p in problems: print("   " + p)
 sys.exit(1 if problems else 0)
 PY
@@ -280,7 +304,7 @@ for tmp in "$HOOK_OUTER_PLAIN" "$HOOK_OUTER_SPACE/has space"; do
   printf '# Agent operating policy\n\nold text\n' > "$tmp/rules/engineering-policy.md"
   stale_out="$(CLAUDE_CONFIG_DIR="$tmp" bash "$PLUGIN/hooks/session-start.sh")"
   case "$stale_out" in
-    "engineering: installed policy "*"differs from the plugin's bundled policy"*) [ "$(printf '%s\n' "$stale_out" | wc -l)" -eq 1 ] && ok "one-line notice when the installed policy is stale ($tmp)" || bad "stale-policy notice is not one line ($tmp)" ;;
+    "lathe: installed policy "*"differs from the plugin's bundled policy"*) [ "$(printf '%s\n' "$stale_out" | wc -l)" -eq 1 ] && ok "one-line notice when the installed policy is stale ($tmp)" || bad "stale-policy notice is not one line ($tmp)" ;;
     *) bad "no stale-policy notice, or the policy was injected twice ($tmp)" ;;
   esac
 
@@ -319,7 +343,7 @@ rm -rf "$HOOK_OUTER_PLAIN" "$HOOK_OUTER_SPACE"
 # ============================================================================================
 # Installer behavioural scenarios (default and --full tiers). Every scenario runs in a fresh
 # CLAUDE_CONFIG_DIR, passes --yes unless it tests the prompt, and uninstalls
-# engineering@engineering from that config at the end (best effort). Assertions on
+# lathe@engineering from that config at the end (best effort). Assertions on
 # settings.json use python3 -c structural checks, never byte compares.
 # ============================================================================================
 
@@ -330,7 +354,7 @@ new_cfg() { mktemp -d; }
 guard_run() {
   # guard_run AGENT_TYPE COMMAND [PATH_OVERRIDE] -> sets GOUT (combined output) and GRC
   # Loads ci/fixtures/pretooluse-payload.json, a real PreToolUse payload recorded from a
-  # live `claude -p '/engineering:deep-audit ...'` run of this plugin on Claude Code 2.1.269
+  # live `claude -p '/lathe:deep-audit ...'` run of this plugin on Claude Code 2.1.269
   # (2026-09-12; paths shortened), in which the shipped guard denied `touch created.txt`.
   # Only agent_type and tool_input.command are substituted per table row.
   local agent="$1" cmd="$2" path_override="${3:-}" json
@@ -358,7 +382,7 @@ print(json.dumps(data))' "$HERE/ci/fixtures/pretooluse-payload.json" "$agent" "$
 }
 
 guard_table() {
-  step "read-only guard (engineering:auditor PreToolUse allow/deny table)"
+  step "read-only guard (lathe:auditor PreToolUse allow/deny table)"
   # Payloads are the recorded real PreToolUse shape from ci/fixtures/pretooluse-payload.json
   # (see guard_run), with only agent_type/command substituted: no agent, no session, no
   # Claude process. "deny" means the guard printed the deny decision; "allow" means no
@@ -371,7 +395,7 @@ guard_table() {
   while read -r verdict cmd <&3; do
     [ -n "$verdict" ] || continue
     case "$verdict" in "#"*) continue ;; esac
-    guard_run "engineering:auditor" "$cmd"
+    guard_run "lathe:auditor" "$cmd"
     case "$verdict" in
       allow)
         if [ "$GRC" -eq 0 ] && [ -z "$GOUT" ]; then
@@ -467,10 +491,10 @@ GUARD_TABLE
   [ "$label" -ge 15 ] && ok "allowlist holds $label entries" || bad "allowlist holds only $label entries"
 
   # Fail-closed fallback: no python3 on PATH.
-  guard_run "engineering:auditor" "ls" "/nonexistent"
+  guard_run "lathe:auditor" "ls" "/nonexistent"
   case "$GOUT" in
-    *'"permissionDecision": "deny"'*) ok "guard fail-closed: denies engineering:auditor when python3 is unavailable" ;;
-    *) bad "guard fail-closed: did not deny engineering:auditor without python3 (rc=$GRC, output: ${GOUT:-<empty>})" ;;
+    *'"permissionDecision": "deny"'*) ok "guard fail-closed: denies lathe:auditor when python3 is unavailable" ;;
+    *) bad "guard fail-closed: did not deny lathe:auditor without python3 (rc=$GRC, output: ${GOUT:-<empty>})" ;;
   esac
   guard_run "general-purpose" "ls" "/nonexistent"
   if [ "$GRC" -eq 0 ] && [ -z "$GOUT" ]; then
@@ -488,7 +512,7 @@ GUARD_TABLE
   fi
 
   # tool_input present but no command field: denied (unknown payload shape, fail closed).
-  if GOUT="$(printf '%s' '{"agent_type": "engineering:auditor", "tool_input": {"script": "x"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/readonly-guard.sh" 2>&1)"; then GRC=0; else GRC=$?; fi
+  if GOUT="$(printf '%s' '{"agent_type": "lathe:auditor", "tool_input": {"script": "x"}}' | CLAUDE_PLUGIN_ROOT="$PLUGIN" bash "$PLUGIN/hooks/readonly-guard.sh" 2>&1)"; then GRC=0; else GRC=$?; fi
   case "$GOUT" in
     *'"permissionDecision": "deny"'*) ok "guard denies a tool_input with no command field" ;;
     *) bad "guard should deny a tool_input with no command field (rc=$GRC, output: ${GOUT:-<empty>})" ;;
@@ -513,7 +537,7 @@ run_capture() {
 
 uninstall_in() {
   local cfg="$1"
-  CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+  CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
 }
 
 shim_bin() {
@@ -622,7 +646,7 @@ s02() {
   python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1] + "/settings.json"))
-assert d["enabledPlugins"]["engineering@engineering"] is True
+assert d["enabledPlugins"]["lathe@engineering"] is True
 ' "$cfg" && ok "S2: settings merged" || bad "S2: settings not merged"
   uninstall_in "$cfg"; rm -rf "$cfg"
 
@@ -694,7 +718,7 @@ assert d["env"]["FOO"] == "bar"
 assert d["modelSettings"]["claude-opus-5"]["effortLevel"] == "high"
 assert d["enabledPlugins"]["sample@claude-plugins-official"] is False
 assert "ref" not in d["extraKnownMarketplaces"]["widgets"]["source"]
-assert d["enabledPlugins"]["engineering@engineering"] is True
+assert d["enabledPlugins"]["lathe@engineering"] is True
 PY
   uninstall_in "$cfg"; rm -rf "$cfg"
 }
@@ -1263,19 +1287,19 @@ s19() {
     *"rolled back to"*|*"rollback skipped"*|*"rollback failed"*) bad "S19b: rollback ran before the first write: $OUT" ;;
     *) ok "S19b: no rollback line (nothing had been written)" ;;
   esac
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 
   step "S19c: claude-old-plugin falls back to --policy-target claude-md"
   cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-old-plugin" claude)"
-  mkdir -p "$cfg/plugins/cache/engineering/engineering/0.0.0-legacy/hooks" || bad "S19: setup failed"
-  printf '#!/usr/bin/env bash\ncat "$(dirname "$0")/../context/CLAUDE.md"\n' > "$cfg/plugins/cache/engineering/engineering/0.0.0-legacy/hooks/session-start.sh" || bad "S19: setup failed"
+  mkdir -p "$cfg/plugins/cache/engineering/lathe/0.0.0-legacy/hooks" || bad "S19: setup failed"
+  printf '#!/usr/bin/env bash\ncat "$(dirname "$0")/../context/CLAUDE.md"\n' > "$cfg/plugins/cache/engineering/lathe/0.0.0-legacy/hooks/session-start.sh" || bad "S19: setup failed"
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes --no-official 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 0 ] && ok "S19c: install succeeded" || bad "S19c: install failed (rc=$RC): $OUT"
   [ ! -f "$cfg/rules/engineering-policy.md" ] && ok "S19c: no rules file" || bad "S19c: rules file was created"
   [ -f "$cfg/CLAUDE.md" ] && ok "S19c: policy fell back to CLAUDE.md" || bad "S19c: CLAUDE.md not written"
   case "$OUT" in *"does not support the rules-file policy; keeping the policy in CLAUDE.md"*) ok "S19c: fallback message correct" ;; *) bad "S19c: fallback message missing: $OUT" ;; esac
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1295,12 +1319,19 @@ s23() {
   step "S23: an 'engineering' marketplace bound elsewhere is refused"
   local cfg; cfg="$(new_cfg)"
   CLAUDE_CONFIG_DIR="$cfg" claude plugin marketplace add "$HERE" >/dev/null 2>&1 || bad "S23: setup marketplace add failed"
-  run_capture "$cfg" --source ahueb/engineering --no-official --yes
+  run_capture "$cfg" --source ahueb/lathe --no-official --yes
   [ "$RC" -eq 1 ] && ok "S23: foreign binding refused (rc=1)" || bad "S23: expected exit 1, got $RC: $OUT"
-  case "$OUT" in *"is registered elsewhere, not 'ahueb/engineering'"*) ok "S23: message says the binding is not the requested source" ;; *) bad "S23: message does not name the requested source: $OUT" ;; esac
+  case "$OUT" in *"is registered elsewhere, not 'ahueb/lathe'"*) ok "S23: message says the binding is not the requested source" ;; *) bad "S23: message does not name the requested source: $OUT" ;; esac
   case "$OUT" in *"run 'claude plugin marketplace remove engineering'"*) ok "S23: message gives the rebind command" ;; *) bad "S23: message missing the rebind command: $OUT" ;; esac
   [ ! -e "$cfg/rules/engineering-policy.md" ] && [ ! -e "$cfg/CLAUDE.md" ] && [ ! -e "$cfg/engineering-installer.json" ] && ok "S23: nothing installed" || bad "S23: installer wrote despite refusal"
   uninstall_in "$cfg"; rm -rf "$cfg"
+
+  # The repository was renamed from ahueb/engineering: that registration is the same source.
+  local bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-renamed-repo" claude)"
+  if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --dry-run --source ahueb/lathe --no-official 2>&1)"; then RC=0; else RC=$?; fi
+  [ "$RC" -eq 0 ] && ok "S23: dry-run against the old repository name succeeded" || bad "S23: dry-run against the old repository name failed (rc=$RC): $OUT"
+  case "$OUT" in *"would update marketplace 'engineering' (already bound to 'ahueb/lathe')"*) ok "S23: ahueb/engineering registration matches --source ahueb/lathe" ;; *) bad "S23: old repository name not treated as the same source: $OUT" ;; esac
+  rm -rf "$cfg" "$bindir"
 }
 
 # ---- S24: two backups in one run land in one stamp/manifest -------------------------------------
@@ -1341,11 +1372,11 @@ s25() {
   [ -f "$cfg/rules/engineering-policy.md" ] && ok "S25: rules policy installed" || bad "S25: rules file missing (probe matched the distractor?)"
   [ ! -e "$cfg/CLAUDE.md" ] && ok "S25: no CLAUDE.md fallback" || bad "S25: fell back to CLAUDE.md"
   case "$OUT" in
-    *"does not support the rules-file policy"*|*"could not determine the installed engineering plugin version"*)
+    *"does not support the rules-file policy"*|*"could not determine the installed lathe plugin version"*)
       bad "S25: version probe was confused by the distractor: $OUT" ;;
     *) ok "S25: no capability-gate fallback message" ;;
   esac
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1353,11 +1384,11 @@ s25() {
 s26() {
   step "S26: cache-directory fallback picks 0.10.0 over 0.9.0"
   local cfg bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-empty-list" claude)"
-  local base="$cfg/plugins/cache/engineering/engineering"
+  local base="$cfg/plugins/cache/engineering/lathe"
   local v
   for v in 0.9.0 0.10.0; do
     mkdir -p "$base/$v/.claude-plugin" "$base/$v/hooks" || bad "S26: setup failed"
-    printf '{"name":"engineering","version":"%s"}\n' "$v" > "$base/$v/.claude-plugin/plugin.json" || bad "S26: setup failed"
+    printf '{"name":"lathe","version":"%s"}\n' "$v" > "$base/$v/.claude-plugin/plugin.json" || bad "S26: setup failed"
   done
   # only the higher version's hook knows about the rules file
   printf '#!/usr/bin/env bash\n# legacy hook: CLAUDE.md only\n' > "$base/0.9.0/hooks/session-start.sh" || bad "S26: setup failed"
@@ -1372,7 +1403,7 @@ import json, sys
 d = json.load(open(sys.argv[1] + "/engineering-installer.json"))
 assert d["policy_target"] == "rules", d
 ' "$cfg" && ok "S26: marker records policy target rules" || bad "S26: marker policy target wrong"
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1406,7 +1437,7 @@ s28() {
   python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1]))
-assert d["enabledPlugins"]["engineering@engineering"] is True, d.get("enabledPlugins")
+assert d["enabledPlugins"]["lathe@engineering"] is True, d.get("enabledPlugins")
 ' "$ext/settings.json" && ok "S28: merged settings written through the link" || bad "S28: settings not merged into the target"
   uninstall_in "$cfg"; rm -rf "$cfg" "$ext"
 }
@@ -1507,7 +1538,7 @@ entry = next(f for f in d["files"] if f["rel"] == "settings.json")
 live = hashlib.sha256(open(os.path.realpath(os.path.join(cfg, "settings.json")), "rb").read()).hexdigest()
 assert live == entry["written_sha256"], ("live", live, "written", entry.get("written_sha256"))
 settings = json.load(open(os.path.join(cfg, "settings.json")))
-assert settings["enabledPlugins"]["engineering@engineering"] is True, settings.get("enabledPlugins")
+assert settings["enabledPlugins"]["lathe@engineering"] is True, settings.get("enabledPlugins")
 PY
   local n; n="$(count_stamps "$cfg")"
   [ "$n" = "1" ] && ok "S32: one stamp (no pre-restore backup was taken)" || bad "S32: expected 1 stamp, found $n"
@@ -1522,7 +1553,7 @@ s33() {
   step "S33: a failed official plugin exits 11 and rolls nothing back"
   local cfg bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-official-fail" claude)"
   # The shim fakes the official marketplace registration (so this stays offline) and fails
-  # every official plugin install; engineering@engineering installs for real.
+  # every official plugin install; lathe@engineering installs for real.
   if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 11 ] && ok "S33: exit 11" || bad "S33: expected exit 11, got $RC: $OUT"
   case "$OUT" in
@@ -1539,9 +1570,9 @@ s33() {
   python3 -c '
 import json, sys
 d = json.load(open(sys.argv[1] + "/settings.json"))
-assert d["enabledPlugins"]["engineering@engineering"] is True
-' "$cfg" && ok "S33: engineering@engineering enabled" || bad "S33: settings not merged"
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+assert d["enabledPlugins"]["lathe@engineering"] is True
+' "$cfg" && ok "S33: lathe@engineering enabled" || bad "S33: settings not merged"
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1831,9 +1862,42 @@ raw = open(sys.argv[1] + "/settings.json").read()
 assert raw.endswith("\n\n"), repr(raw[-4:])
 json.loads(raw)
 d = json.loads(raw)
-assert d.get("enabledPlugins", {}).get("engineering@engineering") is True, d
+assert d.get("enabledPlugins", {}).get("lathe@engineering") is True, d
 PY
-  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall engineering@engineering >/dev/null 2>&1 || true
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  rm -rf "$cfg" "$bindir"
+}
+
+# ---- S39: the pre-rename plugin engineering@engineering is uninstalled -------------------------
+s39() {
+  step "S39: install.sh uninstalls the pre-rename engineering@engineering plugin"
+  local cfg bindir; cfg="$(new_cfg)"; bindir="$(shim_bin "$HERE/ci/shims/claude-legacy-installed" claude)"
+  printf '{"enabledPlugins": {"engineering@engineering": true}}\n' > "$cfg/settings.json" || bad "S39: setup failed"
+  if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --dry-run --no-official 2>&1)"; then RC=0; else RC=$?; fi
+  [ "$RC" -eq 0 ] && ok "S39: dry-run succeeded" || bad "S39: dry-run failed (rc=$RC): $OUT"
+  case "$OUT" in *"would uninstall engineering@engineering"*) ok "S39: dry-run reports the uninstall" ;; *) bad "S39: dry-run does not report the uninstall: $OUT" ;; esac
+  [ ! -e "$cfg/.legacy-uninstalled" ] && ok "S39: dry-run uninstalled nothing" || bad "S39: dry-run uninstalled the old plugin"
+
+  if OUT="$(PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes --no-official 2>&1)"; then RC=0; else RC=$?; fi
+  [ "$RC" -eq 0 ] && ok "S39: install succeeded" || bad "S39: install failed (rc=$RC): $OUT"
+  grep -q '^plugin uninstall engineering@engineering --scope user$' "$cfg/.legacy-uninstalled" 2>/dev/null && ok "S39: old plugin uninstalled at user scope" || bad "S39: old plugin not uninstalled: $OUT"
+  case "$OUT" in *"uninstalled engineering@engineering (renamed to lathe@engineering)"*) ok "S39: uninstall reported" ;; *) bad "S39: uninstall not reported: $OUT" ;; esac
+  python3 - "$cfg" <<'PY' && ok "S39: enabledPlugins drops the old id and enables lathe; prior install selects defaults" || bad "S39: settings or marker wrong"
+import json, sys
+d = json.load(open(sys.argv[1] + "/settings.json"))
+assert "engineering@engineering" not in d["enabledPlugins"], d["enabledPlugins"]
+assert d["enabledPlugins"]["lathe@engineering"] is True, d["enabledPlugins"]
+assert json.load(open(sys.argv[1] + "/engineering-installer.json"))["settings_mode"] == "defaults"
+PY
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
+  rm -rf "$cfg"
+
+  cfg="$(new_cfg)"
+  if OUT="$(PATH="$bindir:$PATH" LEGACY_UNINSTALL_FAIL=1 CLAUDE_CONFIG_DIR="$cfg" "$HERE/install.sh" --yes --no-official 2>&1)"; then RC=0; else RC=$?; fi
+  [ "$RC" -eq 0 ] && ok "S39: a failed uninstall does not fail the run" || bad "S39: failed uninstall failed the run (rc=$RC): $OUT"
+  case "$OUT" in *"could not uninstall engineering@engineering; remove it with: claude plugin uninstall engineering@engineering"*) ok "S39: failed uninstall prints the manual command" ;; *) bad "S39: manual uninstall command missing: $OUT" ;; esac
+  [ -f "$cfg/rules/engineering-policy.md" ] && ok "S39: policy still installed after the failed uninstall" || bad "S39: policy missing after the failed uninstall"
+  PATH="$bindir:$PATH" CLAUDE_CONFIG_DIR="$cfg" claude plugin uninstall lathe@engineering >/dev/null 2>&1 || true
   rm -rf "$cfg" "$bindir"
 }
 
@@ -1930,7 +1994,7 @@ if [ "$TIER" != "quick" ]; then
   s01; s02; s03; s04; s05; s06; s07; s08; s09; s10
   s11; s12; s13; s14; s15; s16; s17; s18; s19; s22
   s23; s24; s25; s26; s27; s28; s29; s30; s31; s32
-  s33; s34; s35; s36; s37; s38
+  s33; s34; s35; s36; s37; s38; s39
 fi
 if [ "$TIER" = "full" ]; then
   s20; s21

@@ -10,7 +10,7 @@ Goal: shortest wall-clock time to a fully implemented, verified, audited plan. I
 
 ## 1. Partition
 
-1. Read the plan and the repository areas it touches. Use `engineering:scout` in one batch for any call sites, tests, or config the plan does not already name.
+1. Read the plan and the repository areas it touches. Use `lathe:scout` in one batch for any call sites, tests, or config the plan does not already name.
 2. Split the plan into work packages. Every package must have:
    - a disjoint set of files it may create or modify, listed explicitly;
    - the interfaces it provides and consumes (function signatures, types, schemas, endpoints, CLI flags), stated exactly;
@@ -18,11 +18,11 @@ Goal: shortest wall-clock time to a fully implemented, verified, audited plan. I
    - any documentation artifacts the change makes necessary, included in the package's write ownership, with the caller contracts, units, ordering, side effects, failure/concurrency assumptions, and rationale that must be preserved or updated when relevant. Name shared references as read-only inputs; do not give several workers write ownership of the same reference or design document.
 3. If two tasks need the same file, merge them into one package or split the file's responsibilities so ownership is disjoint. If a package cannot be made disjoint, it runs after the batch, not inside it. Also check behavioral dependency: if package B's correctness depends on the runtime behavior of package A beyond the stated interface, B runs after the batch.
 4. When packages share a new type, schema, or interface, write the stub or declaration yourself before fan-out so every implementer codes against the same contract. This is the only implementation the main session does before dispatch.
-5. Use `engineering:architect` only if the partition itself needs a cross-cutting design decision the plan did not settle.
+5. Use `lathe:architect` only if the partition itself needs a cross-cutting design decision the plan did not settle.
 
 ## 2. Fan out
 
-Dispatch every package in a single message as parallel `engineering:bulk-implementer` calls, up to the concurrency limit. Each dispatch contains the package spec from step 1 and these instructions verbatim:
+Dispatch every package in a single message as parallel `lathe:bulk-implementer` calls, up to the concurrency limit. Each dispatch contains the package spec from step 1 and these instructions verbatim:
 
 - Implement only the listed files. Do not touch any other file.
 - Code against the stated interfaces exactly. If an interface is missing or ambiguous, choose the simplest reading, implement it, and report the assumption.
@@ -36,18 +36,18 @@ Do not review, build, or test any package while others are still running.
 
 1. Collect every report. Reconcile assumptions that conflict across packages by editing the affected files directly; this is expected and is cheaper than a second implementer round.
 2. Diff the working tree against the plan's file list. Any file changed outside its package's ownership is a defect to resolve now. Cap a package at roughly 15 files; split larger ones.
-3. Run one integrated verification with `/engineering:verification-loop`: build, type check, lint, then the full test suite. A permission rule's denial of one command form does not mean every form is denied: if a permission rule (not the user) denies a command, retry it once as a single command with no redirect, pipe, or chain, invoking Python as `python3` on POSIX systems, before reporting it as not run. Launch independent checks in parallel.
-4. On failure, dispatch `engineering:test-triage` with the captured failure output (it has no Bash and will not rerun anything), then repair in the main session. Use `engineering:hard-repair` for a failure that survives two repair attempts. Rerun the exact failing check, then the full pass.
+3. Run one integrated verification with `/lathe:verification-loop`: build, type check, lint, then the full test suite. A permission rule's denial of one command form does not mean every form is denied: if a permission rule (not the user) denies a command, retry it once as a single command with no redirect, pipe, or chain, invoking Python as `python3` on POSIX systems, before reporting it as not run. Launch independent checks in parallel.
+4. On failure, dispatch `lathe:test-triage` with the captured failure output (it has no Bash and will not rerun anything), then repair in the main session. Use `lathe:hard-repair` for a failure that survives two repair attempts. Rerun the exact failing check, then the full pass.
 
 ## 4. Adversarial audit
 
-Only after the integrated pass is green. This audit is required: the final report must state that `engineering:plan-auditor` ran and what it returned, or why it could not run.
+Only after the integrated pass is green. This audit is required: the final report must state that `lathe:plan-auditor` ran and what it returned, or why it could not run.
 
-1. Dispatch in one batch: `engineering:plan-auditor` with the plan and the full diff, and `engineering:semantic-reviewer` with the diff. Add `engineering:security-reviewer` when any package touched a trust boundary or exposure (auth, secrets, external input, file or network access, network listeners or deployment configuration, privileges, supply chain, CI, or agent tool wiring), passing the diff and any known deployment or exposure facts, marked as supplied rather than verified.
+1. Dispatch in one batch: `lathe:plan-auditor` with the plan and the full diff, and `lathe:semantic-reviewer` with the diff. Add `lathe:security-reviewer` when any package touched a trust boundary or exposure (auth, secrets, external input, file or network access, network listeners or deployment configuration, privileges, supply chain, CI, or agent tool wiring), passing the diff and any known deployment or exposure facts, marked as supplied rather than verified.
 2. The auditor's job is to prove the plan is not done: a plan item is complete when the required repository artifact satisfies its acceptance criterion, not when the implementer reports completion. Executable-behavior claims need the corresponding implementation and verification evidence. Documentation and instruction tasks require the specified text/artifacts, working references, preserved constraints, and any applicable consumer or behavior checks; prose is not execution evidence. Every gap, partial implementation, silent scope reduction, or unverified claim is reported.
 3. Merge the three reports before fixing: drop duplicates, drop findings not tied to a plan item or a concrete failure path, and record what was dropped and why.
 4. Fix every confirmed finding, rerun the integrated verification, and re-audit only the fixed areas.
 
 ## 5. Report
 
-Per the completion report policy: what changed per package, the verification commands and results, audit findings and their resolution, and residual risk. Write `/engineering:checkpoint` if the work continues in another session.
+Per the completion report policy: what changed per package, the verification commands and results, audit findings and their resolution, and residual risk. Write `/lathe:checkpoint` if the work continues in another session.

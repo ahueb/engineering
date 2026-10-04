@@ -61,10 +61,13 @@
 #                               settings merge (default: settings.recommended.json beside this
 #                               script).
 #
-# engineering@engineering is always installed and enabled: running this installer is an
-# explicit choice, so an existing `enabledPlugins["engineering@engineering"] = false` is
+# lathe@engineering is always installed and enabled: running this installer is an
+# explicit choice, so an existing `enabledPlugins["lathe@engineering"] = false` is
 # overwritten to true (by `claude plugin install` and reasserted by the settings merge).
 # Explicit opt-outs are honored only for @claude-plugins-official plugins.
+# The plugin was named `engineering` before 3.0.0: an installed engineering@engineering is
+# uninstalled once lathe@engineering is in place, and the settings merge drops its
+# enabledPlugins entry, so the two never load side by side.
 #
 # Exit codes:
 #   0  success (including a no-op run, --dry-run, --list-backups, and a clean --restore)
@@ -81,7 +84,7 @@
 #      every entry outside the config directory when --no-outside-cfg was given
 #   9  --restore: no backups found or the manifest is invalid
 #  11  partial: the run finished but one or more official-marketplace plugins failed to
-#      install; engineering@engineering, settings.json and the policy are in place and
+#      install; lathe@engineering, settings.json and the policy are in place and
 #      nothing is rolled back
 #  12  never produced by this script: scripts/safe_write.py restore --only-run-files uses it
 #      when the stamp marks no file as written by an installer run (this script checks that
@@ -96,7 +99,8 @@
 # Settings modes: "enforce" makes every recommended value win; "defaults" only fills in
 # absent paths and reports drift. The mode is auto-selected once in preflight from
 # $CFG/engineering-installer.json (present -> defaults), otherwise from evidence of a prior
-# install (enabledPlugins["engineering@engineering"] present, or a legacy CLAUDE.md policy
+# install (enabledPlugins["lathe@engineering"] or the pre-rename "engineering@engineering"
+# present, or a legacy CLAUDE.md policy
 # copy -> defaults with a first-run notice), otherwise enforce. --settings-mode always wins.
 set -Eeuo pipefail
 
@@ -219,6 +223,28 @@ version_ge() {
   if [ "$h2" -gt "$w2" ]; then return 0; fi
   if [ "$h2" -lt "$w2" ]; then return 1; fi
   [ "$h3" -ge "$w3" ]
+}
+
+# The plugin's id before it was renamed to lathe (3.0.0).
+LEGACY_PLUGIN_ID="engineering@engineering"
+
+# True (exit 0) when `claude plugin list --json` lists the pre-rename plugin id.
+legacy_plugin_installed() {
+  claude plugin list --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+if isinstance(data, dict):
+    for key in ("plugins", "installed", "entries"):
+        if isinstance(data.get(key), list):
+            data = data[key]
+            break
+if not isinstance(data, list):
+    sys.exit(1)
+sys.exit(0 if any(isinstance(e, dict) and sys.argv[1] in (e.get("id"), e.get("name")) for e in data) else 1)
+' "$LEGACY_PLUGIN_ID"
 }
 
 # True (exit 0) when $1 exists and its first line (BOM/CR tolerant) is the policy header.
@@ -489,7 +515,8 @@ try:
     d = json.load(open(sys.argv[1]))
 except Exception:
     sys.exit(1)
-sys.exit(0 if isinstance(d, dict) and "engineering@engineering" in d.get("enabledPlugins", {}) else 1)
+plugins = d.get("enabledPlugins", {}) if isinstance(d, dict) else {}
+sys.exit(0 if isinstance(plugins, dict) and ("lathe@engineering" in plugins or "engineering@engineering" in plugins) else 1)
 ' "$CFG/settings.json" 2>/dev/null; then
       PRIOR=1
     fi
@@ -533,9 +560,14 @@ marketplace_compare() {
   python3 -c '
 import json, os, re, sys
 
+# The repository was renamed; GitHub redirects the old name, so a marketplace
+# registered from it is the same source.
+RENAMED = {"ahueb/engineering": "ahueb/lathe"}
+
 def canon_github(owner, repo):
     repo = re.sub(r"\.git$", "", repo)
-    return ("github", ("%s/%s" % (owner, repo)).lower())
+    name = ("%s/%s" % (owner, repo)).lower()
+    return ("github", RENAMED.get(name, name))
 
 def canon_git_url(s):
     s = re.sub(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", "", s)
@@ -644,7 +676,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
   printf '%s\n' "$PREDICTED_ENTRY_JSON"
   echo
   echo "plugin actions:"
-  echo "  engineering@engineering is always installed and enabled"
+  echo "  lathe@engineering is always installed and enabled"
+  if legacy_plugin_installed; then
+    echo "  would uninstall $LEGACY_PLUGIN_ID (this plugin's id before the rename to lathe)"
+  fi
   if [ "$OFFICIAL" -eq 1 ] && [ "$PURGE_OFFICIAL" -eq 0 ]; then
     echo "  would register the official marketplace and install its plugins not disabled in your settings"
   elif [ "$PURGE_OFFICIAL" -eq 1 ]; then
@@ -690,8 +725,18 @@ python3 "$HERE/scripts/merge_settings.py" --current "$CFG/settings.json" --recom
 
 # ---- step 8: plugin install, then the decision-1 policy-target gate --------------------
 
-claude plugin install engineering@engineering --scope user
-echo "installed engineering@engineering"
+claude plugin install lathe@engineering --scope user
+echo "installed lathe@engineering"
+
+# Not fatal: a leftover old plugin duplicates every skill and agent but changes no file
+# this run writes, so the run continues and says how to remove it.
+if legacy_plugin_installed; then
+  if claude plugin uninstall "$LEGACY_PLUGIN_ID" --scope user >/dev/null; then
+    echo "uninstalled $LEGACY_PLUGIN_ID (renamed to lathe@engineering)"
+  else
+    echo "warning: could not uninstall $LEGACY_PLUGIN_ID; remove it with: claude plugin uninstall $LEGACY_PLUGIN_ID" >&2
+  fi
+fi
 
 INSTALLED_VERSION="$(claude plugin list --json 2>/dev/null | python3 -c '
 import json, sys
@@ -720,9 +765,9 @@ for e in data:
         ident = e.get(key)
         if not isinstance(ident, str):
             continue
-        if ident == "engineering@engineering":
+        if ident == "lathe@engineering":
             match = True
-        elif ident == "engineering" and market in ("", "engineering"):
+        elif ident == "lathe" and market in ("", "engineering"):
             match = True
     if match:
         v = e.get("version")
@@ -733,7 +778,7 @@ sys.exit(1)
 ' 2>/dev/null || true)"
 
 if [ -z "$INSTALLED_VERSION" ]; then
-  CACHE_BASE="$CFG/plugins/cache/engineering/engineering"
+  CACHE_BASE="$CFG/plugins/cache/engineering/lathe"
   if [ -d "$CACHE_BASE" ]; then
     INSTALLED_VERSION="$(python3 -c '
 import glob, json, os, re, sys
@@ -764,7 +809,7 @@ fi
 # The gate is the installed hook's capability, not a version number: the cached hook must
 # check rules/engineering-policy.md, otherwise a rules-file policy would load twice.
 installed_hook_supports_rules() {
-  local hook="$CFG/plugins/cache/engineering/engineering/$INSTALLED_VERSION/hooks/session-start.sh"
+  local hook="$CFG/plugins/cache/engineering/lathe/$INSTALLED_VERSION/hooks/session-start.sh"
   [ -f "$hook" ] && grep -q 'rules/engineering-policy.md' "$hook"
 }
 if [ -n "$INSTALLED_VERSION" ]; then
@@ -775,7 +820,7 @@ if [ -n "$INSTALLED_VERSION" ]; then
 else
   if [ "$POLICY_TARGET" = "rules" ]; then
     POLICY_TARGET="claude-md"
-    echo "could not determine the installed engineering plugin version; keeping the policy in CLAUDE.md" >&2
+    echo "could not determine the installed lathe plugin version; keeping the policy in CLAUDE.md" >&2
   fi
 fi
 
@@ -1027,7 +1072,7 @@ if [ "$BACKED_UP" -eq 1 ]; then
   echo "  restore with: ./install.sh --restore $STAMP"
 fi
 echo
-echo "Verify with:  claude plugin list   and   claude --print '/help' (look for /engineering:* skills)"
+echo "Verify with:  claude plugin list   and   claude --print '/help' (look for /lathe:* skills)"
 echo "restart Claude Code if a session was already running, so it picks up the new policy and hook."
 
 # A failed official plugin leaves a usable installation: report it and exit 11 instead of

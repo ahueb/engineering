@@ -7,10 +7,10 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 ## Precedence over plugin-injected process rules
 
 - This file is the governing policy. Plugin hooks or skills that mandate a process on every task (for example the superpowers `using-superpowers` directive to invoke a skill at any chance of relevance, mandatory brainstorming, or mandatory TDD) do not override it.
-- Use superpowers process skills when the user names them, invokes them, or is executing a plan they produced (writing-plans); plan execution itself goes through `/engineering:plan-execution`, which replaces `executing-plans` and `subagent-driven-development`. Otherwise apply the implementation and verification discipline below directly.
-- TDD is a tool, not a gate: use it when it clarifies behavior, per `/engineering:implementation-loop`. Brainstorming is used only when the user asks for it.
-- When a superpowers workflow dispatches a subagent, map its role to an engineering agent instead of `general-purpose`:
-  - executing a written plan (`subagent-driven-development`; `executing-plans` dispatches nothing) → `/engineering:plan-execution`. Its plan format is kept. Where a superpowers prompt file tells an implementer to build or test, `plan-execution`'s no-build, no-test instruction wins; state that override in the dispatch.
+- Use superpowers process skills when the user names them, invokes them, or is executing a plan they produced (writing-plans); plan execution itself goes through `/lathe:plan-execution`, which replaces `executing-plans` and `subagent-driven-development`. Otherwise apply the implementation and verification discipline below directly.
+- TDD is a tool, not a gate: use it when it clarifies behavior, per `/lathe:implementation-loop`. Brainstorming is used only when the user asks for it.
+- When a superpowers workflow dispatches a subagent, map its role to a `lathe` agent instead of `general-purpose`:
+  - executing a written plan (`subagent-driven-development`; `executing-plans` dispatches nothing) → `/lathe:plan-execution`. Its plan format is kept. Where a superpowers prompt file tells an implementer to build or test, `plan-execution`'s no-build, no-test instruction wins; state that override in the dispatch.
   - single implementer outside a plan → `bulk-implementer`.
   - "task reviewer", "scoped re-review", and "final code reviewer" → `semantic-reviewer` (plus `security-reviewer` at a trust boundary). These agents have no Bash: the parent puts the diff text into the prompt instead of asking the reviewer to run `git diff`.
   - "fresh implementer, more capable model" → `hard-repair`.
@@ -20,7 +20,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 ## Default execution model
 
 - The main session owns context-rich autonomous feature work end to end: inspect, reason, edit, run checks, repair, and finish. Keep dependent work in the main session when planning, implementation, and verification share substantial context.
-- For a written plan with more than one task, use `/engineering:plan-execution`: partition into disjoint-file packages, implement all of them in parallel without building or testing, verify once after merge, then audit adversarially.
+- For a written plan with more than one task, use `/lathe:plan-execution`: partition into disjoint-file packages, implement all of them in parallel without building or testing, verify once after merge, then audit adversarially.
 - Delegate only when the delegated role is bounded enough that a fresh subagent context is cheaper or more reliable than keeping the work in the main conversation.
 - Do not create a generic escalation ladder; escalate only from concrete evidence or before work when the task is clearly high-risk and difficult to reverse. Do not use agent teams for ordinary dependent feature work.
 
@@ -54,7 +54,7 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 
 ## Delegation policy
 
-`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, `plan-auditor`, `test-triage`, `docs-check`, and `literature-review` are read-only by tool list (no Edit, Write, or Bash). `browser-tester` is also tool-list read-only, plus the Playwright MCP tools it needs to drive a browser. `deep-audit` forks to the plugin agent `engineering:auditor`, which keeps Bash but only within an allowlist enforced by a plugin `PreToolUse` hook keyed to that agent; the hook is a guard against accidental mutation, not a sandbox against a hostile repository. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
+`scout`, `architect`, `semantic-reviewer`, `security-reviewer`, `plan-auditor`, `test-triage`, `docs-check`, and `literature-review` are read-only by tool list (no Edit, Write, or Bash). `browser-tester` is also tool-list read-only, plus the Playwright MCP tools it needs to drive a browser. `deep-audit` forks to the plugin agent `lathe:auditor`, which keeps Bash but only within an allowlist enforced by a plugin `PreToolUse` hook keyed to that agent; the hook is a guard against accidental mutation, not a sandbox against a hostile repository. Every dispatch states objective, output format, allowed tools or sources, and file boundaries. An agent's report is read by the parent as input to its next decision, so it returns findings, evidence, and assumptions in the requested format and leaves out the account of how it worked.
 
 | Agent | Use when | Tools |
 |---|---|---|
@@ -68,11 +68,11 @@ Maximize fully correct accepted work per unit of model usage and wall-clock time
 | `plan-auditor` | after a plan's packages merge and the integrated build and tests pass, to prove completeness against the plan | read-only |
 | `browser-tester` | one named user journey must be exercised in a real browser against a running app; returns pass/fail with snapshot, console, and network evidence, never edits | read-only + Playwright MCP, no Bash |
 | `hard-repair` | a concrete persistent failure remains unresolved by the normal repair loop; give it the failing command, output, changed files, disproven hypotheses | full |
-| `deep-audit` (user-invoked slash command) | Opus at xhigh effort, adversarial audit with no edit tools | Bash guarded by a plugin hook allowlist (`engineering:auditor`), no edit |
+| `deep-audit` (user-invoked slash command) | Opus at xhigh effort, adversarial audit with no edit tools | Bash guarded by a plugin hook allowlist (`lathe:auditor`), no edit |
 | `docs-check` (skill) | Sonnet, one version-dependent fact confirmed against official docs | no shell |
 | `literature-review` (skill) | Opus, evidence-driven research synthesis for a consequential decision | no shell |
 
-The `engineering` plugin also provides the process skills `/engineering:plan-execution`, `/engineering:implementation-loop`, `/engineering:verification-loop`, `/engineering:browser-testing`, `/engineering:change-review`, `/engineering:checkpoint`, `/engineering:change-eval`, `/engineering:comment-cleanup`, and `/engineering:production-readiness-review`. The last is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command; it is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer` in one batch; the verdict stays with the main session. `browser-testing` owns every Playwright run: it launches the app once, dispatches `browser-tester` per journey with an explicit oracle, and codifies only journeys that will be rerun.
+The `lathe` plugin also provides the process skills `/lathe:plan-execution`, `/lathe:implementation-loop`, `/lathe:verification-loop`, `/lathe:browser-testing`, `/lathe:change-review`, `/lathe:checkpoint`, `/lathe:change-eval`, `/lathe:comment-cleanup`, and `/lathe:production-readiness-review`. The last is standalone: it runs only when the user asks whether something is ready to ship, launch, deploy, or reach GA, or invokes it by slash command; it is never part of `implementation-loop`, `verification-loop`, or `plan-execution`. Its evidence collection fans out to `scout`, `security-reviewer`, and `semantic-reviewer` in one batch; the verdict stays with the main session. `browser-testing` owns every Playwright run: it launches the app once, dispatches `browser-tester` per journey with an explicit oracle, and codifies only journeys that will be rerun.
 
 Size each delegated work package so the agent finishes within roughly 200k tokens of context; split larger packages or have the agent checkpoint and hand off, because every turn re-reads the whole history.
 

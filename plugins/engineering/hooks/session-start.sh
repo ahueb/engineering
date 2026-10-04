@@ -35,7 +35,7 @@ installed() {
   if cmp -s "$1" "$BUNDLED"; then
     exit 0
   fi
-  echo "engineering: installed policy $1 differs from the plugin's bundled policy; rerun install.sh to refresh it."
+  echo "lathe: installed policy $1 differs from the plugin's bundled policy; rerun install.sh to refresh it."
   exit 0
 }
 

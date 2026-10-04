@@ -75,7 +75,7 @@ cat > /tmp/protection.json <<'EOF'
  "enforce_admins": true, "required_pull_request_reviews": null, "restrictions": null,
  "required_linear_history": true, "allow_force_pushes": false, "allow_deletions": false}
 EOF
-gh api -X PUT repos/ahueb/engineering/branches/main/protection --input /tmp/protection.json
+gh api -X PUT repos/ahueb/lathe/branches/main/protection --input /tmp/protection.json
 ```
 
 `macos` becomes a required check only after two consecutive green releases

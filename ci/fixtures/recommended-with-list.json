@@ -23,7 +23,7 @@
     }
   },
   "enabledPlugins": {
-    "engineering@engineering": true,
+    "lathe@engineering": true,
     "sample@claude-plugins-official": true
   }
 }

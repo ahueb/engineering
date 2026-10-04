@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Shim for ci.sh scenario 39: behaves as the real `claude` CLI (including a real,
+# successful `plugin install lathe@engineering`), except that the pre-rename plugin
+# engineering@engineering appears installed:
+#   * `plugin list --json` appends {"id":"engineering@engineering"} to the real
+#     listing until it has been uninstalled;
+#   * `plugin uninstall engineering@engineering` records the call in
+#     $CLAUDE_CONFIG_DIR/.legacy-uninstalled and exits 0, or exits 1 without
+#     recording it when LEGACY_UNINSTALL_FAIL=1.
+# Exercises install.sh's rename migration: dry-run reports the uninstall, a real run
+# performs it, and a failed uninstall is a warning, not a failed run.
+set -euo pipefail
+
+find_real() {
+  if [ -n "${REAL_CLAUDE:-}" ]; then
+    printf '%s\n' "$REAL_CLAUDE"
+    return 0
+  fi
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  while IFS= read -r c; do
+    local rc
+    rc="$(cd "$(dirname "$c")" && pwd)/$(basename "$c")"
+    if [ "$rc" != "$self" ]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done < <(type -aP claude)
+  return 1
+}
+
+REAL="$(find_real)" || { echo "claude-legacy-installed shim: no real claude found on PATH" >&2; exit 127; }
+STATE="${CLAUDE_CONFIG_DIR:?}/.legacy-uninstalled"
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "list" ] && [ "${3:-}" = "--json" ]; then
+  "$REAL" plugin list --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    data = []
+if not isinstance(data, list):
+    data = []
+if not sys.argv[1] == "1":
+    data.append({"id": "engineering@engineering", "version": "2.13.1", "scope": "user"})
+print(json.dumps(data))
+' "$([ -e "$STATE" ] && echo 1 || echo 0)"
+  exit 0
+fi
+
+if [ "${1:-}" = "plugin" ] && [ "${2:-}" = "uninstall" ] && [ "${3:-}" = "engineering@engineering" ]; then
+  if [ "${LEGACY_UNINSTALL_FAIL:-0}" = "1" ]; then
+    echo "claude-legacy-installed shim: simulated uninstall failure" >&2
+    exit 1
+  fi
+  printf '%s\n' "$*" >> "$STATE"
+  exit 0
+fi
+
+exec "$REAL" "$@"
