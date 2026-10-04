@@ -4,6 +4,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-03
+
 ### Changed
 
 - `security-reviewer` traces outward from the change to callers and config-defined entry points, deployment, and network exposure before it looks for vulnerabilities, marks facts observed or assumed, and marks settings the repository cannot show as undetermined. It looks for implicitly applied controls and refutes each candidate with a located control, rates severity from reach, attacker position, and impact (no CVSS numbers), and returns EXPOSURE, FINDINGS (or NO_FINDINGS), and UNDETERMINED, plus CONTROLS for a whole-candidate review. It reads the new exposure reference for CI, container, cloud, network-service, agent-tool, and shared-host surfaces.
@@ -342,7 +344,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/ahueb/engineering/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/ahueb/engineering/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0
