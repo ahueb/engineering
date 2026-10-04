@@ -34,7 +34,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"   # plugins/engineering
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"   # plugins/lathe
 LIB_DIR="$SCRIPT_DIR/lib"
 FIXTURES_DIR="$SCRIPT_DIR/fixtures"
 VARIANTS_DIR="$SCRIPT_DIR/variants"

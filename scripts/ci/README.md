@@ -19,7 +19,7 @@ check:
   `python -X dev -m unittest scripts.tests.test_merge_settings
   scripts.tests.test_safe_write`, and runs `bash -n` under Git Bash on
   `install.sh`, `release.sh`, `ci.sh`, and
-  `plugins/engineering/hooks/session-start.sh`. Proves the Python helpers
+  `plugins/lathe/hooks/session-start.sh`. Proves the Python helpers
   pass their unit tests under Python's dev-mode checks and that the shell
   scripts are at least syntactically valid on Windows; it does not run the
   scratch/`ci.sh` scenarios on Windows.

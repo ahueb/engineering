@@ -4,7 +4,7 @@ Fresh-session scenarios for judging audit quality. Each needs a representative r
 
 Each scenario below is implemented as an executable, outcome-graded eval case: scenario N is
 `evals/behaviour-prr-N` (`behaviour-prr-1` … `behaviour-prr-8`), relative to the plugin root
-(`plugins/engineering/`). Each case's `fixture.sh` builds the shared `evals/fixture-service.sh`
+(`plugins/lathe/`). Each case's `fixture.sh` builds the shared `evals/fixture-service.sh`
 orders-api repository and adds the scenario's distinguishing artefacts, and its graders check
 the report's machine-checkable `VERDICT:`/`GATE G<n>:` lines (see
 `output-template.md`), that the report cites one of the scenario's own artefact paths, plus

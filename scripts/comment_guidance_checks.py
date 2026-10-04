@@ -258,16 +258,16 @@ def structure_checks(repo):
     checks = []
     diagnostics = {}
 
-    skills_dir = os.path.join(repo, "plugins", "engineering", "skills")
-    agents_dir = os.path.join(repo, "plugins", "engineering", "agents")
-    policy_path = os.path.join(repo, "plugins", "engineering", "context", "CLAUDE.md")
+    skills_dir = os.path.join(repo, "plugins", "lathe", "skills")
+    agents_dir = os.path.join(repo, "plugins", "lathe", "agents")
+    policy_path = os.path.join(repo, "plugins", "lathe", "context", "CLAUDE.md")
     comment_cleanup_skill = os.path.join(skills_dir, "comment-cleanup", "SKILL.md")
     references_dir = os.path.join(skills_dir, "comment-cleanup", "references")
     guidance_ref = os.path.join(references_dir, "comment-guidance.md")
     source_basis_ref = os.path.join(references_dir, "source-basis.md")
     prr_skill = os.path.join(skills_dir, "production-readiness-review", "SKILL.md")
     plan_auditor_agent = os.path.join(agents_dir, "plan-auditor.md")
-    evals_dir = os.path.join(repo, "plugins", "engineering", "evals")
+    evals_dir = os.path.join(repo, "plugins", "lathe", "evals")
 
     # 1. skill set
     if os.path.isdir(skills_dir):

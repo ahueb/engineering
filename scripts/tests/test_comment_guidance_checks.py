@@ -12,7 +12,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from scripts import comment_guidance_checks as cgc  # noqa: E402
 
-SUPPORT_DIR = REPO_ROOT / "plugins" / "engineering" / "evals" / "comment-guidance-support"
+SUPPORT_DIR = REPO_ROOT / "plugins" / "lathe" / "evals" / "comment-guidance-support"
 FIXTURES_PATH = SUPPORT_DIR / "fixtures.json"
 MANIFEST_PATH = SUPPORT_DIR / "manifest.json"
 BUILD_FIXTURE = SUPPORT_DIR / "build_fixture.py"
@@ -821,7 +821,7 @@ VALID_AGENT_FRONTMATTER = {
 
 def build_baseline_structure_repo(root):
     """A synthetic, minimal, self-contained plugin tree that passes every structure check."""
-    plugin = root / "plugins" / "engineering"
+    plugin = root / "plugins" / "lathe"
     skills_dir = plugin / "skills"
     agents_dir = plugin / "agents"
     context_dir = plugin / "context"
@@ -896,7 +896,7 @@ def build_baseline_structure_repo(root):
             wr(case_dir / "graders" / "rubric.md", "---\ntype: llm\n---\nRubric.\n")
             wr(case_dir / "graders" / "directives-intact.md", "---\ntype: regex\ntarget:\n  source: file\n  path: src/go/build_linux.go\nmatch: contains\n---\n^//go:build linux\n")
             shutil.copy(
-                REPO_ROOT / "plugins" / "engineering" / "evals" / "behaviour-comment-cleanup" / "graders" / "skill-fired.md",
+                REPO_ROOT / "plugins" / "lathe" / "evals" / "behaviour-comment-cleanup" / "graders" / "skill-fired.md",
                 case_dir / "graders" / "skill-fired.md",
             )
 
@@ -919,14 +919,14 @@ class StructureSelfTests(TempDirCase):
 
     def test_reference_deletion_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        (repo / "plugins" / "engineering" / "skills" / "comment-cleanup" / "references" / "comment-guidance.md").unlink()
+        (repo / "plugins" / "lathe" / "skills" / "comment-cleanup" / "references" / "comment-guidance.md").unlink()
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)
         self.assertTrue(fail_checks(report))
 
     def test_broken_cross_skill_path_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        path = repo / "plugins" / "engineering" / "skills" / "comment-cleanup" / "SKILL.md"
+        path = repo / "plugins" / "lathe" / "skills" / "comment-cleanup" / "SKILL.md"
         wr(path, rd(path).replace("[source-basis](references/source-basis.md)", "[source-basis](references/missing.md)"))
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)
@@ -934,7 +934,7 @@ class StructureSelfTests(TempDirCase):
 
     def test_121_newline_policy_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        path = repo / "plugins" / "engineering" / "context" / "CLAUDE.md"
+        path = repo / "plugins" / "lathe" / "context" / "CLAUDE.md"
         wr(path, rd(path) + "\n" * 121)
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)
@@ -942,7 +942,7 @@ class StructureSelfTests(TempDirCase):
 
     def test_changed_first_line_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        path = repo / "plugins" / "engineering" / "context" / "CLAUDE.md"
+        path = repo / "plugins" / "lathe" / "context" / "CLAUDE.md"
         wr(path, rd(path).replace("# Agent operating policy", "# Something else"))
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)
@@ -950,7 +950,7 @@ class StructureSelfTests(TempDirCase):
 
     def test_modified_agent_tool_grant_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        path = repo / "plugins" / "engineering" / "agents" / "scout.md"
+        path = repo / "plugins" / "lathe" / "agents" / "scout.md"
         wr(path, rd(path).replace("tools: Read, Grep, Glob", "tools: Read, Grep, Glob, Bash"))
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)
@@ -958,7 +958,7 @@ class StructureSelfTests(TempDirCase):
 
     def test_unregistered_fixture_case_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        support_dir = repo / "plugins" / "engineering" / "evals" / "comment-guidance-support"
+        support_dir = repo / "plugins" / "lathe" / "evals" / "comment-guidance-support"
         data = json.loads(rd(support_dir / "fixtures.json"))
         del data["cases"]["comment-guidance-mechanical"]
         wr(support_dir / "fixtures.json", json.dumps(data))
@@ -968,14 +968,14 @@ class StructureSelfTests(TempDirCase):
 
     def test_missing_b01_grader_file_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        (repo / "plugins" / "engineering" / "evals" / "behaviour-comment-cleanup" / "graders" / "skill-fired.md").unlink()
+        (repo / "plugins" / "lathe" / "evals" / "behaviour-comment-cleanup" / "graders" / "skill-fired.md").unlink()
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)
         self.assertTrue(any(c["id"] == "case_dirs_and_tags" and c["status"] == "FAIL" for c in report["checks"]))
 
     def test_grader_reading_unproducible_file_fails(self):
         repo = build_baseline_structure_repo(self.root / "repo")
-        case_yaml = repo / "plugins" / "engineering" / "evals" / "comment-guidance-repair" / "case.yaml"
+        case_yaml = repo / "plugins" / "lathe" / "evals" / "comment-guidance-repair" / "case.yaml"
         wr(case_yaml, rd(case_yaml) + "graders:\n  - name: x\n    type: regex\n    target:\n      source: file\n      path: nonexistent_output.txt\n    pattern: OK\n")
         rc, report = self.run_structure(repo)
         self.assertEqual(rc, 1)

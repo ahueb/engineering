@@ -23,7 +23,7 @@
 #                   subcommand" check a failure instead of a skip
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN="$HERE/plugins/engineering"
+PLUGIN="$HERE/plugins/lathe"
 PRR="$PLUGIN/skills/production-readiness-review"
 
 # ---- flag parsing ------------------------------------------------------------------------
@@ -141,7 +141,7 @@ rm -f "$UT_TMP"
 rm -rf "$HERE/scripts/__pycache__" "$HERE/scripts/tests/__pycache__"
 
 step "comment-guidance checks"
-(cd "$HERE" && python3 -W error -m py_compile scripts/comment_guidance_checks.py plugins/engineering/evals/comment-guidance-support/build_fixture.py) && ok "py_compile" || bad "py_compile"
+(cd "$HERE" && python3 -W error -m py_compile scripts/comment_guidance_checks.py plugins/lathe/evals/comment-guidance-support/build_fixture.py) && ok "py_compile" || bad "py_compile"
 UT_TMP="$(mktemp)"
 if (cd "$HERE" && python3 -X dev -m unittest scripts.tests.test_comment_guidance_checks >"$UT_TMP" 2>&1); then
   ok "unit tests"
@@ -1667,7 +1667,7 @@ s35() {
   local ghlog="$work/gh.log"; : > "$ghlog"
 
   local cur new
-  cur="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/plugins/engineering/.claude-plugin/plugin.json")"
+  cur="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/plugins/lathe/.claude-plugin/plugin.json")"
   new="$(python3 -c 'import sys; a,b,c = sys.argv[1].split("."); print("%s.%s.%d" % (a, b, int(c)+1))' "$cur")"
 
   # --- prepare --no-pr: branch, commit, push, no PR, no tag
@@ -1676,7 +1676,7 @@ s35() {
     || bad "S35 prepare: expected exit 0, got $RC (a successful prepare must exit 0; check release.sh's do_prepare EXIT trap, which dereferences the function locals ORIG_MANIFEST/ORIG_CHANGELOG after do_prepare has returned, so set -u fails the trap): $OUT"
   [ "$(git -C "$repo" rev-parse --abbrev-ref HEAD)" = "release/v$new" ] && ok "S35 prepare: on branch release/v$new" || bad "S35 prepare: branch is $(git -C "$repo" rev-parse --abbrev-ref HEAD)"
   [ "$(git -C "$repo" log -1 --format=%s)" = "Release engineering $new" ] && ok "S35 prepare: commit subject 'Release engineering $new'" || bad "S35 prepare: commit subject is '$(git -C "$repo" log -1 --format=%s)'"
-  [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/plugins/engineering/.claude-plugin/plugin.json")" = "$new" ] \
+  [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/plugins/lathe/.claude-plugin/plugin.json")" = "$new" ] \
     && ok "S35 prepare: plugin.json bumped to $new" || bad "S35 prepare: plugin.json not bumped"
   grep -q "^## \[$new\] - " "$repo/CHANGELOG.md" && ok "S35 prepare: CHANGELOG has the [$new] heading" || bad "S35 prepare: CHANGELOG heading missing"
   [ -z "$(git -C "$repo" tag -l "v$new")" ] && ok "S35 prepare: no tag created" || bad "S35 prepare: created tag v$new"
@@ -1754,7 +1754,7 @@ s35() {
     *"is deprecated; use 'release.sh prepare patch'"*) ok "S35 legacy: deprecation line printed" ;;
     *) bad "S35 legacy: deprecation line missing: $OUT" ;;
   esac
-  [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/plugins/engineering/.claude-plugin/plugin.json")" = "$newer" ] \
+  [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo/plugins/lathe/.claude-plugin/plugin.json")" = "$newer" ] \
     && ok "S35 legacy: --no-commit bumped plugin.json to $newer" || bad "S35 legacy: plugin.json not bumped"
   [ "$(git -C "$repo" rev-parse HEAD)" = "$head_before" ] && ok "S35 legacy: --no-commit committed nothing" || bad "S35 legacy: --no-commit created a commit"
   rm -rf "$work"
@@ -1771,7 +1771,7 @@ s35() {
   ln -s "$HERE/ci/shims/claude-release-ok" "$bindir2/claude"
   ln -s "$HERE/ci/shims/gh-fake" "$bindir2/gh"
   local cur2 new2
-  cur2="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo2/plugins/engineering/.claude-plugin/plugin.json")"
+  cur2="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$repo2/plugins/lathe/.claude-plugin/plugin.json")"
   new2="$(python3 -c 'import sys; a,b,c = sys.argv[1].split("."); print("%s.%s.%d" % (a, b, int(c)+1))' "$cur2")"
   if OUT="$(cd "$repo2" && PATH="$bindir2:$PATH" GH_FAKE_AUTH_FAIL=1 ENGINEERING_RELEASE=1 ./release.sh prepare patch 2>&1)"; then RC=0; else RC=$?; fi
   [ "$RC" -eq 1 ] && ok "S35 auth-fail: exit 1" || bad "S35 auth-fail: expected exit 1, got $RC: $OUT"

@@ -2,7 +2,7 @@
 
 Compares two variants of the `plan-execution` skill across three frozen
 fixtures, per the change-eval methodology
-(`plugins/engineering/skills/change-eval/SKILL.md`), using the
+(`plugins/lathe/skills/change-eval/SKILL.md`), using the
 pre-registered decision rule below.
 
 This benchmark does not modify the shipped skill. It runs the shipped
@@ -19,7 +19,7 @@ separately, from the results, in a follow-up release (out of scope here).
   deliberate wrong assumption in a shared interface stub; see its
   README for the mechanism.
 - `variants/current/` — no stored plugin copy (see its README); `run.sh`
-  copies the live `plugins/engineering` directory at run time.
+  copies the live `plugins/lathe` directory at run time.
 - `variants/bounded-check/skill.patch` — a unified diff against
   `skills/plan-execution/SKILL.md` adding one step to the fan-out
   dispatch instructions: an implementer may run the package's own unit
@@ -51,7 +51,7 @@ Each real run:
 
 1. Scaffolds a fresh fixture repository with the fixture's `scaffold.sh`.
 2. Builds the variant's plugin directory (a fresh copy of the live
-   `plugins/engineering`, patched for `bounded-check`).
+   `plugins/lathe`, patched for `bounded-check`).
 3. Builds a scratch `CLAUDE_CONFIG_DIR` holding only a copy of
    `$HOME/.claude/.credentials.json` (or
    `$CLAUDE_CONFIG_DIR/.credentials.json` if that variable is already
@@ -113,7 +113,7 @@ fixture is incomplete or has excess cost spread; otherwise reject.
   system temp directory for inspection and is not auto-deleted by
   `run.sh`.
 - No `.claude-plugin`/`evals` exclusion beyond `evals/change-eval/plan-execution/.runs`
-  is applied when copying `plugins/engineering` into a variant
+  is applied when copying `plugins/lathe` into a variant
   directory; the rest of the plugin (including this benchmark's own
   fixtures/variants) is copied along but is inert at agent run time
   since nothing invokes it.

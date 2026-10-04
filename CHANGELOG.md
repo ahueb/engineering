@@ -4,6 +4,12 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-04
+
+### Changed
+
+- The plugin's source folder moved from `plugins/engineering/` to `plugins/lathe/`, and the marketplace entry's `source` is `./plugins/lathe`. Installed copies are unaffected apart from the version; the plugin directory listing's source path is now `plugins/lathe`.
+
 ## [3.0.0] - 2026-10-04
 
 ### Changed
@@ -371,7 +377,8 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/lathe/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/ahueb/lathe/compare/v3.0.1...HEAD
+[3.0.1]: https://github.com/ahueb/lathe/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/ahueb/lathe/compare/v2.13.1...v3.0.0
 [2.13.1]: https://github.com/ahueb/lathe/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/ahueb/lathe/compare/v2.12.0...v2.13.0

@@ -1,12 +1,12 @@
 # Variant: bounded-check
 
-The shipped `plugins/engineering` plugin plus one added instruction in
+The shipped `plugins/lathe` plugin plus one added instruction in
 `skills/plan-execution/SKILL.md`'s fan-out dispatch (step 2): an
 implementer may run the package's own unit tests or type check once,
 capped at 60 seconds, before returning.
 
 `run.sh` builds this variant at run time the same way it builds
-`variants/current` (a fresh copy of the live `plugins/engineering`
+`variants/current` (a fresh copy of the live `plugins/lathe`
 directory into a temp directory), then applies `skill.patch` to that
 copy with:
 

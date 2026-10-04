@@ -37,7 +37,7 @@
 # prior contents and nothing is committed.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MANIFEST="$HERE/plugins/engineering/.claude-plugin/plugin.json"
+MANIFEST="$HERE/plugins/lathe/.claude-plugin/plugin.json"
 CHANGELOG="$HERE/CHANGELOG.md"
 REPO_URL="https://github.com/ahueb/lathe"
 
@@ -69,7 +69,7 @@ PY
 }
 
 check_clean_tree() {
-  if [ -n "$(git -C "$HERE" status --porcelain -- . ":(exclude)CHANGELOG.md" ":(exclude)plugins/engineering/.claude-plugin/plugin.json")" ]; then
+  if [ -n "$(git -C "$HERE" status --porcelain -- . ":(exclude)CHANGELOG.md" ":(exclude)plugins/lathe/.claude-plugin/plugin.json")" ]; then
     echo "working tree has unrelated changes; commit or stash them first" >&2
     exit 1
   fi
@@ -243,7 +243,7 @@ PY
   update_changelog "$NEW" "$CUR" "$(date +%Y-%m-%d)"
   echo "CHANGELOG.md: moved [Unreleased] content under [$NEW]"
 
-  if ! claude plugin validate "$HERE/plugins/engineering" --strict; then
+  if ! claude plugin validate "$HERE/plugins/lathe" --strict; then
     echo "validation failed; version and changelog restored" >&2
     exit 1
   fi
@@ -414,14 +414,14 @@ cmd_tag() {
   HEAD_SHA="$(git -C "$HERE" rev-parse origin/main)"
   HEAD_SUBJECT="$(git -C "$HERE" log -1 --format=%s "$HEAD_SHA")"
   if [ -z "$V" ]; then
-    V="$(git -C "$HERE" show "$HEAD_SHA:plugins/engineering/.claude-plugin/plugin.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+    V="$(git -C "$HERE" show "$HEAD_SHA:plugins/lathe/.claude-plugin/plugin.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
   fi
   if [ "$HEAD_SUBJECT" != "Release engineering $V" ]; then
     echo "origin/main HEAD ($HEAD_SHA) subject is '$HEAD_SUBJECT'; expected 'Release engineering $V'" >&2
     exit 1
   fi
   local MANIFEST_VERSION
-  MANIFEST_VERSION="$(git -C "$HERE" show "$HEAD_SHA:plugins/engineering/.claude-plugin/plugin.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+  MANIFEST_VERSION="$(git -C "$HERE" show "$HEAD_SHA:plugins/lathe/.claude-plugin/plugin.json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
   if [ "$MANIFEST_VERSION" != "$V" ]; then
     echo "plugin.json at origin/main is $MANIFEST_VERSION; expected $V" >&2
     exit 1

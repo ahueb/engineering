@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "lathe",
-      "source": "./plugins/engineering",
+      "source": "./plugins/lathe",
       "description": "Evidence-first engineering: cost-tiered agents, verified implementation and review loops, parallel plan execution, browser testing with Playwright, and a hard-gated production readiness review.",
       "category": "development"
     }
