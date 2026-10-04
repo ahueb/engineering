@@ -4,6 +4,19 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-10-03
+
+### Changed
+
+- `security-reviewer` traces outward from the change to callers and config-defined entry points, deployment, and network exposure before it looks for vulnerabilities, marks facts observed or assumed, and marks settings the repository cannot show as undetermined. It looks for implicitly applied controls and refutes each candidate with a located control, rates severity from reach, attacker position, and impact (no CVSS numbers), and returns EXPOSURE, FINDINGS (or NO_FINDINGS), and UNDETERMINED, plus CONTROLS for a whole-candidate review. It reads the new exposure reference for CI, container, cloud, network-service, agent-tool, and shared-host surfaces.
+- `change-review`, `implementation-loop`, and `plan-execution` also dispatch `security-reviewer` for listener, deployment, privilege, CI, and agent-tool configuration changes and pass known deployment and exposure facts, marked as supplied rather than verified; `change-review` waits for the reviewer and writes one report that carries its UNDETERMINED items and the exposure facts behind each finding; `production-readiness-review` passes the target exposure and environment boundary; the policy's delegation row matches.
+
+### Added
+
+- `plugins/engineering/references/security-exposure.md` and `security-source-basis.md`.
+- `behaviour-security-1` through `-5`: change-review cases grading detection (public route to shell command, Redis published on all interfaces, `pull_request_target` with secrets) and restraint (operator-only caller, authorization applied by a blueprint hook and scoped base class).
+- 2026-10-04 rows in `plugins/engineering/evals/RESULTS.md`: on the final graders the security suite passes every grader 3/3 on the evidence, against the 2.12.0 reviewer's 0/3 on case 1's deployment evidence and 2/3 on case 4's undetermined token setting; `comment-guidance-change-review` passes 3/3; the readiness suite passes scenarios 1-3 and 5-8 3/3, and scenario 4's `rubric-4` is equally noisy on both trees.
+
 ## [2.12.0] - 2026-10-03
 
 ### Changed
@@ -331,7 +344,8 @@ All notable changes to the `engineering` plugin. The format follows [Keep a Chan
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/engineering/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/ahueb/engineering/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/ahueb/engineering/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/ahueb/engineering/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/ahueb/engineering/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/ahueb/engineering/compare/v2.9.1...v2.10.0

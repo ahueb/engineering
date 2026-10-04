@@ -65,6 +65,7 @@ SHELL_FILES=(
   "$PLUGIN/evals/change-eval/plan-execution/run.sh" "$PLUGIN/evals/fixture-service.sh"
   "$PLUGIN/evals/behaviour-prr-4/fixture.sh" "$PLUGIN/evals/behaviour-prr-5/fixture.sh" "$PLUGIN/evals/behaviour-prr-8/fixture.sh"
   "$PLUGIN/evals/cleanup-trigger-01/fixture.sh"
+  "$PLUGIN/evals/behaviour-security-1/fixture.sh" "$PLUGIN/evals/behaviour-security-2/fixture.sh" "$PLUGIN/evals/behaviour-security-3/fixture.sh" "$PLUGIN/evals/behaviour-security-4/fixture.sh" "$PLUGIN/evals/behaviour-security-5/fixture.sh"
   "$PLUGIN/evals/behaviour-comment-cleanup/fixture.sh" "$PLUGIN/evals/comment-guidance-review-only/fixture.sh"
   "$PLUGIN/evals/comment-guidance-implementation/fixture.sh" "$PLUGIN/evals/comment-guidance-plan/fixture.sh"
   "$PLUGIN/evals/comment-guidance-change-review/fixture.sh" "$PLUGIN/evals/comment-guidance-mechanical/fixture.sh"
