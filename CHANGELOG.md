@@ -4,6 +4,8 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-10-04
+
 ### Changed
 
 - **Breaking:** the plugin is renamed from `engineering` to `lathe`, because the Claude plugin directory already lists an unrelated plugin named `engineering`. Skills are now `/lathe:<skill>`, agent types `lathe:<agent>`, and the install id `lathe@engineering`. The marketplace, the repository, the policy file `rules/engineering-policy.md`, the installer marker, the backups directory, and the `ENGINEERING_*` variables keep their names. The read-only guard keys on `lathe:auditor`; CI fails if the guard or `deep-audit` names another auditor, or if a document other than this changelog still names a pre-rename `engineering:` skill or agent.
@@ -369,7 +371,8 @@ All notable changes to the `lathe` plugin (named `engineering` before 3.0.0). Th
 
 - First release of the `engineering` plugin and marketplace: operating policy, eight agents, five process skills, four user-invoked escalation skills, SessionStart policy hook, recommended settings, and `install.sh`.
 
-[Unreleased]: https://github.com/ahueb/lathe/compare/v2.13.1...HEAD
+[Unreleased]: https://github.com/ahueb/lathe/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/ahueb/lathe/compare/v2.13.1...v3.0.0
 [2.13.1]: https://github.com/ahueb/lathe/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/ahueb/lathe/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/ahueb/lathe/compare/v2.11.0...v2.12.0
